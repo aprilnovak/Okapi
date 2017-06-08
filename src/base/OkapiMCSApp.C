@@ -4,6 +4,8 @@
 #include "ModulesApp.h"
 #include "MooseSyntax.h"
 
+#include "MomFrictionForce.h"
+
 template <>
 InputParameters
 validParams<OkapiMCSApp>()
@@ -46,6 +48,7 @@ OkapiMCSApp__registerObjects(Factory & factory)
 void
 OkapiMCSApp::registerObjects(Factory & factory)
 {
+  registerKernel(MomFrictionForce);
 }
 
 // External entry point for dynamic syntax association
