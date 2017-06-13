@@ -32,6 +32,7 @@ namespace OpenMC {
        assume that MPI is defined in OpenMC, such that openmc_init must be called
        with an intracommunicator. */
     void openmc_init(const int &);
+    void openmc_reset();
     void openmc_run();
     void openmc_finalize();
     //void FORTRAN_CALL_MOD(openmc_init, initialize)(const int &);

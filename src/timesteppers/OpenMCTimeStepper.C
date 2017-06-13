@@ -34,9 +34,17 @@ OpenMCTimeStepper::computeDT()
 void
 OpenMCTimeStepper::step()
 {
+  OpenMC::openmc_reset();
   OpenMC::openmc_run();
 //  OpenMC::FORTRAN_CALL_MOD(run_simulation, simulation)();
 }
+
+void
+OpenMCTimeStepper::postExecute()
+{
+  OpenMC::openmc_finalize();
+}
+
 
 bool
 OpenMCTimeStepper::converged()
