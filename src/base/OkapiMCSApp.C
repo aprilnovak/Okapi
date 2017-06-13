@@ -7,6 +7,7 @@
 #include "MomFrictionForce.h"
 #include "OpenMCExecutioner.h"
 #include "OpenMCTimeStepper.h"
+#include "LegendrePolynomial.h"
 
 template <>
 InputParameters
@@ -53,6 +54,7 @@ OkapiMCSApp::registerObjects(Factory & factory)
   registerKernel(MomFrictionForce);
   registerExecutioner(OpenMCExecutioner);
   registerTimeStepper(OpenMCTimeStepper);
+  registerFunction(LegendrePolynomial);
 }
 
 // External entry point for dynamic syntax association
