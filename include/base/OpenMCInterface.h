@@ -20,7 +20,7 @@ namespace OpenMC {
   extern "C" {
   /* Prototype a simple subroutine not in a module. This requires a different
      macro than a subroutine in a module. This prototype is simply for testing. */
-    void FORTRAN_CALL(openmc_fort_func)();
+    //void FORTRAN_CALL(openmc_fort_func)();
 
   /* Prototype a subroutine in a module, which requires a different macro than
      a subroutine not in a module. */
@@ -31,9 +31,12 @@ namespace OpenMC {
        is defined within the OpenMC CMake file, it is not known to MOOSE. I 
        assume that MPI is defined in OpenMC, such that openmc_init must be called
        with an intracommunicator. */
-    void FORTRAN_CALL_MOD(openmc_init, initialize)(const int &);
-    void FORTRAN_CALL_MOD(run_simulation, simulation)();
-    void FORTRAN_CALL_MOD(openmc_finalize, finalize)();
+    void openmc_init(const int &);
+    void openmc_run();
+    void openmc_finalize();
+    //void FORTRAN_CALL_MOD(openmc_init, initialize)(const int &);
+    //void FORTRAN_CALL_MOD(run_simulation, simulation)();
+    //void FORTRAN_CALL_MOD(openmc_finalize, finalize)();
   }
 }
 

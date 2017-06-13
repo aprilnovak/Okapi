@@ -5,6 +5,8 @@
 #include "MooseSyntax.h"
 
 #include "MomFrictionForce.h"
+#include "OpenMCExecutioner.h"
+#include "OpenMCTimeStepper.h"
 
 template <>
 InputParameters
@@ -49,6 +51,8 @@ void
 OkapiMCSApp::registerObjects(Factory & factory)
 {
   registerKernel(MomFrictionForce);
+  registerExecutioner(OpenMCExecutioner);
+  registerTimeStepper(OpenMCTimeStepper);
 }
 
 // External entry point for dynamic syntax association

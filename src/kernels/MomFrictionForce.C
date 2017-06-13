@@ -19,15 +19,18 @@ MomFrictionForce::MomFrictionForce(const InputParameters & parameters) :
 Real
 MomFrictionForce::computeQpResidual()
 {
-  static bool first_step = true;
+  static int step = 1;
 
-  if (first_step)
+  if (step <= 2)
   {
-    OpenMC::FORTRAN_CALL(openmc_fort_func)();
-    OpenMC::FORTRAN_CALL_MOD(openmc_init, initialize)(_communicator.get());
-    OpenMC::FORTRAN_CALL_MOD(run_simulation, simulation)();
-    OpenMC::FORTRAN_CALL_MOD(openmc_finalize, finalize)();
-    first_step = false;
+    OpenMC::openmc_init(_communicator.get());
+    OpenMC::openmc_run();
+    OpenMC::openmc_finalize();
+    //OpenMC::FORTRAN_CALL(openmc_fort_func)();
+    //OpenMC::FORTRAN_CALL_MOD(openmc_init, initialize)(_communicator.get());
+    //OpenMC::FORTRAN_CALL_MOD(run_simulation, simulation)();
+    //OpenMC::FORTRAN_CALL_MOD(openmc_finalize, finalize)();
+    step += 1;
 }
   return _W[_qp] * Reaction::computeQpResidual();
 }
