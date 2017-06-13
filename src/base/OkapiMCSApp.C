@@ -8,6 +8,7 @@
 #include "OpenMCExecutioner.h"
 #include "OpenMCTimeStepper.h"
 #include "LegendrePolynomial.h"
+#include "ZernikePolynomial.h"
 
 template <>
 InputParameters
@@ -55,6 +56,7 @@ OkapiMCSApp::registerObjects(Factory & factory)
   registerExecutioner(OpenMCExecutioner);
   registerTimeStepper(OpenMCTimeStepper);
   registerFunction(LegendrePolynomial);
+  registerFunction(ZernikePolynomial);
 }
 
 // External entry point for dynamic syntax association
