@@ -1,10 +1,12 @@
 [Mesh]
-  # cylinder with r = 0.5 and z = (0, 1)
-  file = 3D_sideset.exo
-  block_id = '1'
-  block_name = 'interior'
-  boundary_id = '100 200 300'
-  boundary_name = 'top bottom wall'
+  type = GeneratedMesh
+  dim = 2
+  nx = 10
+  ny = 10
+  xmin = 0.0
+  xmax = 1.0
+  ymin = 0.0
+  ymax = 1.0
 []
 
 [Variables]
@@ -18,25 +20,35 @@
     order = FIRST # this order should match the number of Zernike coefficients for a given Legendre order
     initial_condition = '1.0'
   [../]
+  [./poly]
+  [../]
+[]
+
+[ICs]
+active = ''
+  [./ic]
+    type = ScalarComponentIC
+    variable = 'l_0_coeffs'
+    values = '1.0 1.0 0.0'
+  [../]
+[]
+
+[AuxKernels]
+  [./polyaux]
+    type = FunctionAux
+    variable = poly
+    function = 'reconstruction'
+  [../]
 []
 
 # When coupling, these aux variables will come from a multiapp, but for testing
 # the polynomial reconstruction, just set them to a arbitrary value.
 
 [Functions]
-  [./bc_func] # the analytical form of the currently-tested Zernike-Legendre expansion
-    type = ParsedFunction
-    value = sqrt(2)
-  [../]
-  [./forcing] # the needed forcing function
-    type = ParsedFunction
-    value = 0
-  [../]
-
   [./zernike]
     type = ZernikePolynomial
     radius = 0.5
-    center = 0.0
+    center = '0.5 0.5'
   [../]
   [./legendre]
     type = LegendrePolynomial
@@ -59,19 +71,20 @@
     type = Diffusion
     variable = u
   [../]
-  [./forcing]
-    type = UserForcingFunction
-    variable = u
-    function = forcing
-  [../]
 []
 
 [BCs]
-  [./u]
-    type = FunctionDirichletBC
+  [./dir]
+    type = DirichletBC
     variable = u
-    boundary = 'top bottom wall'
-    function = bc_func
+    boundary = 'left'
+    value = '1.0'
+  [../]
+  [./dir2]
+    type = DirichletBC
+    variable = u
+    boundary = 'right'
+    value = '2.0'
   [../]
 []
 
@@ -79,18 +92,6 @@
   type = Steady
 []
 
-[Postprocessors]
-  [./integral]
-    type = ElementL2Error
-    variable = u
-    function = reconstruction
-  [../]
-[]
-
 [Outputs]
     exodus = true
-  [./console]
-    type = Console
-    max_rows = 400
-  [../]
 []
