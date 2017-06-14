@@ -65,11 +65,8 @@ ZernikePolynomial::getPolynomialValue(Real t, Real x, Real y, int m, int n)
   /* Normalize the coordinates by first relocating the circle to (0, 0)
      and then scaling the coordinates individually so that the radius is unity
      by dividing by the radius. */
-  Real x_norm;          // Normalized position
-  Real y_norm;          // Normalized position
-
-  x_norm = (x - _center[0]) / _radius;
-  y_norm = (y - _center[1]) / _radius;
+  Real x_norm = (x - _center[0]) / _radius;         // Normalized position
+  Real y_norm = (y - _center[1]) / _radius;         // Normalized position
 
   Real theta = atan2(y_norm, x_norm);  
   Real r = sqrt(x_norm * x_norm + y_norm * y_norm);
@@ -91,12 +88,14 @@ ZernikePolynomial::getPolynomialValue(Real t, Real x, Real y, int m, int n)
            pow(r, n - 2 * s);
   }
 
-  
-
   if(_dbg)
   {
-
+    Moose::out << "Normalization factor: " << N;
+    Moose::out << "theta: " << theta;
+    Moose::out << "Normalized coordinates (x, y): (" <<\
+       x_norm << ", " << y_norm << ")" << std::endl;
+    Moose::out << "Rnm: " << Rnm << std::endl;
   }
 
-  return 0.0;
+  return N * Rnm;
 }
