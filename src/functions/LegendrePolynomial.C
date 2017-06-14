@@ -1,4 +1,6 @@
 #include "LegendrePolynomial.h"
+#include <iostream>
+#include <stdio.h>
 
 template<>
 InputParameters validParams<LegendrePolynomial>()
@@ -10,7 +12,8 @@ InputParameters validParams<LegendrePolynomial>()
      different range. So, just scale the polynomial appropriately. 
      Care should be taken that this value matches that given in the
      OpenMC input XML files. */
-  params.addRequiredParam<std::vector<Real>>("l_geom_norm","Lengths needed for Legendre polynomial normalization (min, max)");
+  params.addRequiredParam<std::vector<Real>>("l_geom_norm","Lengths needed for\
+    Legendre polynomial normalization (min, max)");
   params.addParam<bool>("dbg", false, "Print debug output");
   return params;
 }
@@ -40,7 +43,7 @@ LegendrePolynomial::value(Real t, const Point & p)
 Real
 LegendrePolynomial::getPolynomialValue(Real t, Real p, int n)
 {
-  /* The Legendre polynomials are computed with a recurion relation
+  /* The Legendre polynomials are computed with a recursion relation
      that uses the P_{L-1} and P_{L-2} Legendre polynomials. This
      method returns the Legendre polynomials normalized by 
      \sqrt{(2*l + 1)/2} so that the calculation of the expansion
@@ -51,21 +54,13 @@ LegendrePolynomial::getPolynomialValue(Real t, Real p, int n)
   Real plm1 = 0.0; // L-1 Legendre polynomial value
   Real plm = 0.0;  // L   Legendre polynomial value
   
-  z = 2.0 * (p - _geom_norm[0])/_dz - 1.0;
-
-  if(_dbg)
-  {
-    Moose::out<<"point: " << p << std::endl;
-    Moose::out<<"dz = "<< _dz << std::endl;
-    Moose::out<<"_geom_norm[0] = "<<_geom_norm[0]<<std::endl;
-    Moose::out<<"Normalized z = "<<z<<std::endl;
-  }
+  z = 2.0 * (p - _geom_norm[0]) / _dz - 1.0;
 
   /* The recursion relation can only be used for order 2 and above. */
   if (n == 0)
-    return 1.0 / sqrt(2.0);
+    plm = 1.0;
   else if (n == 1)
-    return sqrt(3.0 / 2.0) * z;
+    plm = z;
   else
   {
     plm2 = 1.0;
@@ -76,10 +71,10 @@ LegendrePolynomial::getPolynomialValue(Real t, Real p, int n)
       plm2 = plm1;
       plm1 = plm;
     }
-
-    if (_dbg)
-      Moose::out << "Legendre total value  = " << plm * (2.0 * n + 1.0) / _dz << std::endl;
-    
-    return (plm * sqrt((2.0 * n + 1.0) / 2.0));
   }
+
+  if (_dbg)
+    std::cout << "Legendre value  = " << plm * sqrt((2.0 * n + 1.0) / 2.0) << std::endl;
+  
+  return (plm * sqrt((2.0 * n + 1.0) / 2.0));
 }
