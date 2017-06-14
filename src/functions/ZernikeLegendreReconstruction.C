@@ -1,5 +1,7 @@
 #include "ZernikeLegendreReconstruction.h"
 #include "ExtraFunctions.h"
+#include <stdio.h>
+#include <iostream>
 
 template<>
 InputParameters validParams<ZernikeLegendreReconstruction>()
@@ -28,8 +30,6 @@ ZernikeLegendreReconstruction::ZernikeLegendreReconstruction(const InputParamete
     _zernike_function(dynamic_cast<ZernikePolynomial&>(_mci_feproblem.getFunction(parameters.get<std::string>("zernike_function")))),
     _dbg(parameters.get<bool>("dbg"))
 {
-  int _fdir1, _fdir2;
-
   if (_l_direction == 0) // Legendre in x-direction, Zernike in y-z
   {
     _fdir1 = 1;
@@ -55,9 +55,20 @@ ZernikeLegendreReconstruction::ZernikeLegendreReconstruction(const InputParamete
      order, there are n + 1 Zernike polynomials for any particular n, and
      0 <= n <= N. These coefficients are assumed to be ordered as (n, m), 
      such that the coefficients correspond to Z_0^0, Z_1^{-1}, Z_1^1, ... */
-  int _num = num_zernike(_n_order);
-  for (int i = 0; i < _num; ++i)
+  _num = num_zernike(_n_order);
+  
+  /* The number of entries in _poly_coeffs is equal to the Legendre order
+     plus 1, since each of these scalar aux variables represents all of the
+     expansion coefficients given a _fixed_ l value. */
+  for (int i = 0; i < _l_order + 1; ++i)
+  {
     _poly_coeffs.push_back(&coupledScalarValue("poly_coeffs", i));
+    
+    if ((*_poly_coeffs[i]).size() != _num)
+      mooseWarning("order of coupled scalar variable does not equal number\
+        of expected Zernike coefficients.");
+  }
+
 }
 
 ZernikeLegendreReconstruction::~ZernikeLegendreReconstruction()
@@ -67,22 +78,35 @@ ZernikeLegendreReconstruction::~ZernikeLegendreReconstruction()
 Real
 ZernikeLegendreReconstruction::value(Real t, const Point & p)
 {
+
   Real val = 0.0;
+  Real zfunc = 0.0;
+  Real lfunc = 0.0;
   int entry;
-  for (int l = 0; l < _l_order; ++l)
+
+  for (int l = 0; l <= _l_order; ++l)
   {
-    for (int n = 0; n < _num; ++n)
+    entry = 0;
+    for (int n = 0; n <= _n_order; ++n)
     {
-      entry = 0;
       for (int m = -n; m <= n; m += 2)
       {
-        val += (*_poly_coeffs[l])[entry] * \
-             _legendre_function.getPolynomialValue(t, p(_l_direction), l) * \
-             _zernike_function.getPolynomialValue(t, p(_fdir1), p(_fdir2), n, m);
-        entry += 1;
+        zfunc = _zernike_function.getPolynomialValue(t, p(_fdir1), p(_fdir2), m, n);
+        lfunc = _legendre_function.getPolynomialValue(t, p(_l_direction), l);
+        val += (*_poly_coeffs[l])[entry] * lfunc * zfunc;
+
+        if (_dbg)
+        {
+          std::cout << "(l, n, m): " << l << n << m << std::endl;
+          std::cout << "coefficient: " << (*_poly_coeffs[l])[entry] << std::endl;
+          std::cout << "legendre: " << lfunc << std::endl;
+          std::cout << "zernike: " << zfunc << std::endl;
+          std::cout << "overall value: " << val << std::endl;
+        }
+       
+         entry += 1;
       }
     }
   } 
-
   return val;
 }

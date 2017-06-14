@@ -55,7 +55,7 @@ ZernikePolynomial::getPolynomialValue(Real t, Real x, Real y, int m, int n)
 
   // Check that m is one of -n, -n + 2, -n + 4, ..., n
   Real is_int = (n - abs(m)) / 2;
-  if (is_int > 0.000001)
+  if (is_int - floor(is_int) > 0.001)
     mooseWarning("m order is not valid; m = -n, -n + 2, -n + 4, ..., n in Zernike order");
 
   // Check that n is non-negative
@@ -71,30 +71,31 @@ ZernikePolynomial::getPolynomialValue(Real t, Real x, Real y, int m, int n)
   Real theta = atan2(y_norm, x_norm);  
   Real r = sqrt(x_norm * x_norm + y_norm * y_norm);
 
-  Real N; // normalization factor multiplied by cosine or sine
-  
+  Real N = 0.0; // normalization factor multiplied by cosine or sine
+  Real f1, f2;   
+
   if (m == 0)
     N = sqrt(n + 1) * cos(m * theta);
   else if (m < 0)
-    N = - sqrt(2 * (n + 1)) * sin(m * theta);
+    N = - sqrt(2.0 * (n + 1)) * sin(m * theta);
   else
-    N = sqrt(2 * (n + 1)) * cos(m * theta);
+    N = sqrt(2.0 * (n + 1)) * cos(m * theta);
   
-  Real Rnm;
-  for (int s = 0; s < (n - abs(m)) / 2; ++s)
+  Real Rnm = 0.0;
+  for (int s = 0; s <= (n - abs(m)) / 2; ++s)
   {
-    Rnm += pow(-1.0, s) * factorial(n - s) / \
-           (factorial(s) * factorial(0.5 * (n + abs(m)) - s) * factorial(0.5 * (n - abs(m)) - s)) * \
-           pow(r, n - 2 * s);
+    f1 = factorial(0.5 * (n + abs(m)) - s);
+    f2 = factorial(0.5 * (n - abs(m)) - s);
+    Rnm += pow(-1.0, s) * (factorial(n - s) / (factorial(s) * f1 * f2)) * pow(r, n - 2.0 * s);
+
   }
 
-  if(_dbg)
+  if (_dbg)
   {
-    Moose::out << "Normalization factor: " << N;
-    Moose::out << "theta: " << theta;
-    Moose::out << "Normalized coordinates (x, y): (" <<\
+    std::cout << "Normalization factor: " << N << std::endl;
+    std::cout << "theta: " << theta << std::endl;
+    std::cout << "Normalized coordinates (x, y): (" <<\
        x_norm << ", " << y_norm << ")" << std::endl;
-    Moose::out << "Rnm: " << Rnm << std::endl;
   }
 
   return N * Rnm;

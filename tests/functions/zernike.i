@@ -1,3 +1,7 @@
+[GlobalParams]
+#  dbg = true
+[]
+
 [Mesh]
   type = GeneratedMesh
   dim = 2
@@ -19,13 +23,9 @@
 [AuxVariables]
   [./l_0_coeffs]
     family = SCALAR
-    order = THIRD
+    order = SIXTH
   [../]
   [./poly]
-  [../]
-  [./element_l2_error]
-    order = CONSTANT
-    family = MONOMIAL
   [../]
 []
 
@@ -33,7 +33,7 @@
   [./ic]
     type = ScalarComponentIC
     variable = 'l_0_coeffs'
-    values = '1.0 1.0 0.0'
+    values = '0.0 0.0 0.0 0.0 1.0 0.0'
   [../]
 []
 
@@ -43,23 +43,12 @@
     variable = poly
     function = 'reconstruction'
   [../]
-  [./l2_error_aux]
-    type = ElementL2ErrorFunctionAux
-    variable = element_l2_error
-    function = comparison
-    coupled_variable = poly
-  [../]
 []
 
 # When coupling, these aux variables will come from a multiapp, but for testing
 # the polynomial reconstruction, just set them to a arbitrary value.
 
 [Functions]
-  [./comparison]
-    type = ParsedFunction
-    value = 2*sqrt(x*x+y*y)*sin(atan(y/x))
-  [../]
-
   [./zernike]
     type = ZernikePolynomial
     radius = 0.5
@@ -73,7 +62,7 @@
   [./reconstruction] # function for comparing against (full reconstruction)
     type = ZernikeLegendreReconstruction
     l_order = 0
-    n_order = 1
+    n_order = 2
     l_direction = 2
     legendre_function = legendre
     zernike_function = zernike

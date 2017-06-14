@@ -24,7 +24,7 @@ protected:
   bool _dbg;
   int _fdir1;
   int _fdir2;
-  int _num; 
+  unsigned int _num; 
 private:  
     
 };
