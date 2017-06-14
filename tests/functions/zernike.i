@@ -18,18 +18,16 @@
   [./l_0_coeffs]
     family = SCALAR
     order = FIRST # this order should match the number of Zernike coefficients for a given Legendre order
-    initial_condition = '1.0'
   [../]
   [./poly]
   [../]
 []
 
 [ICs]
-active = ''
   [./ic]
     type = ScalarComponentIC
     variable = 'l_0_coeffs'
-    values = '1.0 1.0 0.0'
+    values = '3.0'
   [../]
 []
 
