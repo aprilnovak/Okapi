@@ -1,6 +1,6 @@
-[GlobalParams]
-#  dbg = true
-[]
+# This test computes the Zernike polynomials. Simply change the 
+# coefficients in the initial conditions block to "pick out" different
+# polynomials to verify that they are implemented correctly.
 
 [Mesh]
   type = GeneratedMesh
