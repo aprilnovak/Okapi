@@ -1,9 +1,14 @@
+#include <iostream>
+#include <stdio.h>
+
 #include "PolynomialOpenMC.h"
 
 // MOOSE includes
 #include "MooseTypes.h"
+#include "MooseVariableScalar.h" // new include
 #include "FEProblem.h"
 #include "MultiApp.h"
+#include "SubProblem.h"
 
 // libMesh includes
 #include "libmesh/meshfree_interpolation.h"
@@ -16,38 +21,63 @@ template<>
 InputParameters validParams<PolynomialOpenMC>()
 {
   InputParameters params = validParams<MultiAppTransfer>();
-  params.addRequiredParam<std::vector<VariableName> >("source_variable", "The auxiliary scalar variable to read values from");
-  params.addRequiredParam<std::vector<VariableName> >("to_aux_scalar", "The name of the scalar Aux variable in the MultiApp to transfer the value to.");
+  /* To MultiApp (MOOSE -> OkapiApp):
+     source_variable = SCALAR variables holding expansion coefficients
+     to_aux_scalar = dummy variable (OpenMC is only wrapped as a MOOSE App,
+                     there's no FEM-based variable to store anything in */
+
+  /* From MultiApp (OkapiApp -> MOOSE):
+     source_varibale = dummy variable
+     to_aux_scalar = expansion coefficients used in MOOSE */
+ 
+  /* Because we're transferring more than one scalar variable at a time 
+     to/from Okapi, we need to allow these parameters to be a vector of names. */
+  params.addRequiredParam<std::vector<VariableName>>("source_variable", \
+    "The auxiliary SCALAR variable to read values from");
+  params.addRequiredParam<std::vector<VariableName> >("to_aux_scalar", \
+    "The name of the SCALAR auxvariable in the MultiApp to transfer the value to.");
   return params;
 }
 
 PolynomialOpenMC::PolynomialOpenMC(const InputParameters & parameters) :
     MultiAppTransfer(parameters),
-    _source_variable_names(getParam<std::vector<VariableName> >("source_variable")),
-    _to_aux_names(getParam<std::vector<VariableName> >("to_aux_scalar"))
+    _source_variable_names(getParam<std::vector<VariableName>>("source_variable")),
+    _to_aux_names(getParam<std::vector<VariableName>>("to_aux_scalar"))
 {
 }
 
 void
 PolynomialOpenMC::execute()
 {
-  _console << "Beginning PolynomialToNekTransfer " << name() << std::endl;
+  _console << "Beginning PolynomialOpenMC Transfer " << name() << std::endl;
 
-  // Perform action based on the transfer direction
   switch (_direction)
   {
-    // MasterApp -> SubApp
+    /* MasterApp -> SubApp. For MOOSE-OpenMC coupling, this represents the transfer
+       of expansion coefficients from MOOSE to OpenMC. */
     case TO_MULTIAPP:
     {
-/*      FEProblem & from_problem = _multi_app->problem();
+      /* The MultiAppTransfer class defines a parameter _multi_app which gets the 
+         _fe_problem for the MultiApp according to the "multi_app = OkapiApp" 
+         provided in the input file. */
+      FEProblemBase & from_problem = _multi_app->problemBase();
 
+      /* Create a vector of pointers that will point to the source_variables and is
+         of the same length as the number of source_varibales. These
+         source variables are of MooseVariableScalar type. */
       std::vector<MooseVariableScalar *> source_variables(_source_variable_names.size());
       for (auto i = beginIndex(_source_variable_names); i < _source_variable_names.size(); ++i)
       {
         source_variables[i] = &from_problem.getScalarVariable(_tid, _source_variable_names[i]);
+//        std::cout << "Source variables ----------------- " << std::endl;
+//        std::cout << *(source_variables[i]) << std::endl;
         source_variables[i]->reinit();
+        
       }
 
+      
+
+/*
       // Loop through each of the sub apps
       for (unsigned int i=0; i<_multi_app->numGlobalApps(); i++)
         if (_multi_app->hasLocalApp(i))
