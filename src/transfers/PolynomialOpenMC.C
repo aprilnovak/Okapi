@@ -46,6 +46,7 @@ PolynomialOpenMC::PolynomialOpenMC(const InputParameters & parameters) :
 {
 }
 
+// This is the method that actually performs the transfer.
 void
 PolynomialOpenMC::execute()
 {
@@ -59,45 +60,44 @@ PolynomialOpenMC::execute()
     {
       /* The MultiAppTransfer class defines a parameter _multi_app which gets the 
          _fe_problem for the MultiApp according to the "multi_app = OkapiApp" 
-         provided in the input file. */
+         provided in the input file. This represents the MasterApp problem, and is 
+         from where we will retrieve the values of the source_variables. */
       FEProblemBase & from_problem = _multi_app->problemBase();
 
-      /* Create a vector of pointers that will point to the source_variables and is
-         of the same length as the number of source_varibales. These
-         source variables are of MooseVariableScalar type. */
+      /* Create a vector of pointers that will point to the source_variables (of 
+         MooseVariableScalar type) and is of the same length as the number of source_varibales. */
       std::vector<MooseVariableScalar *> source_variables(_source_variable_names.size());
       for (auto i = beginIndex(_source_variable_names); i < _source_variable_names.size(); ++i)
       {
         source_variables[i] = &from_problem.getScalarVariable(_tid, _source_variable_names[i]);
-//        std::cout << "Source variables ----------------- " << std::endl;
-//        std::cout << *(source_variables[i]) << std::endl;
-        source_variables[i]->reinit();
-        
+        source_variables[i]->reinit(); //?
       }
 
       
 
-/*
-      // Loop through each of the sub apps
-      for (unsigned int i=0; i<_multi_app->numGlobalApps(); i++)
-        if (_multi_app->hasLocalApp(i))
-        {
-          // TODO: Access Nek Common blocks and write values
-          for (auto i = beginIndex(_source_variable_names); i < _source_variable_names.size(); ++i)
-          {
-            _console << _source_variable_names[i] << '\n';
 
+      // Loop through each of the sub apps
+      /* The total number of global Apps is equal to the _total_num_apps. In the constructor
+         for the MultiApp class, the _total_num_apps is set to _positions.size()*/
+      std::cout << "Number of global Apps: " << _multi_app->numGlobalApps() << std::endl;
+      for (unsigned int i = 0; i < _multi_app->numGlobalApps(); i++)
+        if (_multi_app->hasLocalApp(i)) // if the global app number is on this processor, then...
+        {
+          std::cout << "has local App! " << std::endl;
+          for (auto i = beginIndex(_source_variable_names); i < _source_variable_names.size(); ++i)
+          { 
+            /* Extract the values of the MooseScalarVariable for each provided scalar variable,
+               and then do something with these values. */
             auto & solution_values = source_variables[i]->sln();
             for (auto j = beginIndex(solution_values); j < solution_values.size(); ++j)
             {
-              _console << solution_values[j] << ' ';
  //             Nek5000::expansion_fcoef_.coeff_fij[i*100+j] = solution_values[j];
             }
             _console << '\n';
           }
         }
    //   FORTRAN_CALL(Nek5000::flux_reconstruction)();
-*/
+
       break;
     }
 
