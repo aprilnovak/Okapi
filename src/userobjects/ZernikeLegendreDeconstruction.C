@@ -4,8 +4,9 @@ template<>
 InputParameters validParams<ZernikeLegendreDeconstruction>()
 {
   InputParameters params = validParams<ElementIntegralVariableUserObject>();
-  params.addRequiredParam<std::string>("legendre_function", "Name of function to compute Legendre polynomial value at a point");
-  params.addRequiredParam<std::string>("zernike_function", "Name of function to compute Fourier polynomial value at a point");
+  params.addRequiredCoupledVar("variable", "The name of the variable that will be integrated");
+  params.addRequiredParam<std::string>("legendre_function_name", "Name of function to compute Legendre polynomial value at a point");
+  params.addRequiredParam<std::string>("fourier_function_name", "Name of function to compute Fourier polynomial value at a point");
   params.addRequiredParam<int>("l_direction", "Direction of integration for Legendre polynomial");
   params.addRequiredParam<int>("l_order", "The order of the Legendre expansion");
   params.addRequiredParam<int>("f_order", "The order of the Fourier expansion");
@@ -18,13 +19,13 @@ InputParameters validParams<ZernikeLegendreDeconstruction>()
 }
 
 ZernikeLegendreDeconstruction::ZernikeLegendreDeconstruction(const InputParameters & parameters) :
-    // TODO we really shouldn't have to dynamic cast into FourierPolynomial and Legendre Polynomial here
+    // TODO we really shouldn't have to dynamic cast into ZernikePolynomial and Legendre Polynomial here
     // but this was a quick example
     ElementIntegralVariableUserObject(parameters),
     MooseVariableInterface(this, false),
     _u(coupledValue("variable")),
     _legendre_poly_function(dynamic_cast<LegendrePolynomial&>(_mci_feproblem.getFunction(parameters.get<std::string>("legendre_function_name")))),
-    _fourier_poly_function(dynamic_cast<FourierPolynomial&>(_mci_feproblem.getFunction(parameters.get<std::string>("fourier_function_name")))),
+    _fourier_poly_function(dynamic_cast<ZernikePolynomial&>(_mci_feproblem.getFunction(parameters.get<std::string>("fourier_function_name")))),
     _l_direction(parameters.get<int>("l_direction")),
     _l_order(parameters.get<int>("l_order")),
     _f_order(parameters.get<int>("f_order")),
