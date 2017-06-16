@@ -1,6 +1,7 @@
 #include "ZernikeLegendreDeconstruction.h"
 #include "MooseVariableScalar.h"
 #include "SystemBase.h"
+#include "ExtraFunctions.h"
 
 template<>
 InputParameters validParams<ZernikeLegendreDeconstruction>()
@@ -9,7 +10,7 @@ InputParameters validParams<ZernikeLegendreDeconstruction>()
      that the variable and/or domain blocks to which this integral is to be applied can be
      specified in the input file using the variable = `` and blocks = `` syntax. */
   InputParameters params = validParams<ElementIntegralUserObject>();
-  params.addRequiredCoupledVar("variable", "The name of the variable that will be integrated");
+  params.addRequiredCoupledVar("variable", "The variable that will be integrated");
   params.addRequiredParam<std::string>("legendre_function", \
     "Name of function to compute Legendre polynomial value at a point.");
   params.addRequiredParam<std::string>("zernike_function", \
@@ -18,6 +19,7 @@ InputParameters validParams<ZernikeLegendreDeconstruction>()
     "Direction of integration for Legendre polynomial");
   params.addRequiredParam<int>("l_order", "The order of the Legendre expansion");
   params.addRequiredParam<int>("n_order", "The order of the Zernike expansion");
+  params.addRequiredParam<int>("m_order", "The order of the Zernike expansion");
   params.addRequiredParam<std::string>("aux_scalar_name", \
     "Aux scalar to store the Legendre expansion coefficient");
   params.addRequiredParam<std::string>("volume_pp", "The name of the post processor that\
@@ -36,12 +38,13 @@ ZernikeLegendreDeconstruction::ZernikeLegendreDeconstruction(const InputParamete
     _l_direction(parameters.get<int>("l_direction")),
     _l_order(parameters.get<int>("l_order")),
     _n_order(parameters.get<int>("n_order")),
+    _m_order(parameters.get<int>("m_order")),
     _aux_scalar_name(parameters.get<std::string>("aux_scalar_name")),
     _volume_pp(getPostprocessorValueByName(parameters.get<std::string>("volume_pp")))
 {
   addMooseVariableDependency(mooseVariable());
  
-   if (_l_direction == 0) // Legendre in x-direction, Zernike in y-z
+  if (_l_direction == 0) // Legendre in x-direction, Zernike in y-z
   {
     _fdir1 = 1;
     _fdir2 = 2;
@@ -61,18 +64,40 @@ ZernikeLegendreDeconstruction::ZernikeLegendreDeconstruction(const InputParamete
 Real
 ZernikeLegendreDeconstruction::computeQpIntegral()
 {
-  Real l_func = _legendre_function.getPolynomialValue(_t,_q_point[_qp](_l_direction),_l_order);
-  Real z_func = _zernike_function.getPolynomialValue(_t,_q_point[_qp](_fdir1),_q_point[_qp](_fdir2), _n_order, _n_order);
+  Real l_func = _legendre_function.getPolynomialValue(_t, _q_point[_qp](_l_direction), _l_order);
+  Real z_func = _zernike_function.getPolynomialValue(_t, _q_point[_qp](_fdir1), _q_point[_qp](_fdir2),\
+    _m_order, _n_order);
   return _u[_qp] * l_func * z_func * 2.0 * M_PI / _volume_pp;
 }
+
 void
 ZernikeLegendreDeconstruction::finalize()
 {
-  // In the finalize step store the result of the integral in the scalar variable
+  /* In the finalize step, we store the result of the user object in a SCALAR variable. 
+     For now, this user object can only set one C_l^{nm} coefficient at a time. The entry
+     in the SCALAR variable that is to be filled depends on the values of n and m. */
   MooseVariableScalar & scalar =  _fe_problem.getScalarVariable(_tid, _aux_scalar_name);
   scalar.reinit();
-  // The dof indices for the scalar variable
+
   std::vector<dof_id_type> & dof = scalar.dofIndices();
-  scalar.sys().solution().set(dof[_l_order], getValue());
+
+  /* Determine the index at which the fixed n-values begin. */
+  int n_begin;
+  if (_n_order == 0)
+    n_begin = 0;
+  else
+    n_begin = num_zernike(_n_order - 1);
+
+  /* Then, determine the index relative to n_begin at which the m-value belongs. */
+  int m_begin = 0;
+  for (int m = -_n_order; m <= _n_order; m += 2)
+  {
+    if (m == _m_order)
+      break;
+    else
+      m_begin += 1;
+  }
+
+  scalar.sys().solution().set(dof[n_begin + m_begin], getValue());
   scalar.sys().solution().close();
 }

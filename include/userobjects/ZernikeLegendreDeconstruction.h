@@ -31,6 +31,7 @@ protected:
   int _fdir2;
   int _l_order;
   int _n_order;
+  int _m_order;
   std::string _aux_scalar_name;
   const PostprocessorValue & _volume_pp;
 };
