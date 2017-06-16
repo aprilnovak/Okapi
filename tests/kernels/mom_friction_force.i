@@ -1,5 +1,3 @@
-# This input file is used by the Master App (MOOSE)
-
 [Mesh]
   type = GeneratedMesh
   dim = 2
@@ -9,21 +7,6 @@
   xmax = 1.0
   ymin = 0.0
   ymax = 1.0
-[]
-
-[AuxVariables]
-  [./l_0_coeffs]
-    order = FIRST
-    family = SCALAR
-  [../]
-[]
-
-[ICs]
-  [./ic]
-    type = ScalarComponentIC
-    variable = 'l_0_coeffs'
-    values = '35.0'
-  [../]
 []
 
 [Variables]
@@ -49,8 +32,8 @@
 []
 
 [Kernels]
-  [./time]
-    type = TimeDerivative
+  [./friction1]
+    type = MomFrictionForce
     variable = rho_u
   [../]
   [./dummy1]
@@ -82,37 +65,8 @@
 []
 
 [Executioner]
-  type = Transient
-  num_steps = 3
-[]
-
-[MultiApps]
-  [./openmc]
-    type = TransientMultiApp
-    app_type = OkapiMCSApp
-    positions = '0 0 0'
-    input_files = 'picard.i'
-  [../]
-  [./pronghorn]
-    type = TransientMultiApp
-    app_type = OkapiMCSApp
-    positions = '0 0 0'
-    input_files = 'pronghorn.i'
-  [../]
-[]
-
-# A successful transfer to OpenMC is made by writing to a global variable
-# (n_batches). Deactivating this transfer causes the number of batches in
-# the settings.xml file to be used - otherwise, the number specified in
-# l_0_coeffs is used.
-[Transfers]
-  [./to_openmc]
-    type = PolynomialOpenMC
-    multi_app = openmc
-    direction = to_multiapp
-    source_variable = 'l_0_coeffs'
-    to_aux_scalar = 'dummy'
-  [../]
+  type = Steady
+  solve_type = 'PJFNK'
 []
 
 [Postprocessors]
