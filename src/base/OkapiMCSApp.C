@@ -4,13 +4,23 @@
 #include "ModulesApp.h"
 #include "MooseSyntax.h"
 
+// test kernels (not used)
 #include "MomFrictionForce.h"
+
+// executioner and timestepper
 #include "OpenMCExecutioner.h"
 #include "OpenMCTimeStepper.h"
+
+// functions for passing data
 #include "LegendrePolynomial.h"
 #include "ZernikePolynomial.h"
 #include "ZernikeLegendreReconstruction.h"
+
+// transfers
 #include "PolynomialOpenMC.h"
+
+// user objects
+#include "ZernikeLegendreDeconstruction.h"
 
 template <>
 InputParameters
@@ -61,6 +71,7 @@ OkapiMCSApp::registerObjects(Factory & factory)
   registerFunction(ZernikePolynomial);
   registerFunction(ZernikeLegendreReconstruction);
   registerTransfer(PolynomialOpenMC);
+  registerUserObject(ZernikeLegendreDeconstruction);
 }
 
 // External entry point for dynamic syntax association

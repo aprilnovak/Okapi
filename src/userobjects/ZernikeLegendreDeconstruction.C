@@ -1,9 +1,11 @@
 #include "ZernikeLegendreDeconstruction.h"
+#include "MooseVariableScalar.h"
+#include "SystemBase.h"
 
 template<>
 InputParameters validParams<ZernikeLegendreDeconstruction>()
 {
-  InputParameters params = validParams<ElementIntegralVariableUserObject>();
+  InputParameters params = validParams<SideIntegralUserObject>();
   params.addRequiredCoupledVar("variable", "The name of the variable that will be integrated");
   params.addRequiredParam<std::string>("legendre_function_name", "Name of function to compute Legendre polynomial value at a point");
   params.addRequiredParam<std::string>("fourier_function_name", "Name of function to compute Fourier polynomial value at a point");
@@ -21,7 +23,7 @@ InputParameters validParams<ZernikeLegendreDeconstruction>()
 ZernikeLegendreDeconstruction::ZernikeLegendreDeconstruction(const InputParameters & parameters) :
     // TODO we really shouldn't have to dynamic cast into ZernikePolynomial and Legendre Polynomial here
     // but this was a quick example
-    ElementIntegralVariableUserObject(parameters),
+    SideIntegralUserObject(parameters),
     MooseVariableInterface(this, false),
     _u(coupledValue("variable")),
     _legendre_poly_function(dynamic_cast<LegendrePolynomial&>(_mci_feproblem.getFunction(parameters.get<std::string>("legendre_function_name")))),
@@ -56,7 +58,7 @@ Real
 ZernikeLegendreDeconstruction::computeQpIntegral()
 {
   Real l_poly_val = _legendre_poly_function.getPolynomialValue(_t,_q_point[_qp](_l_direction),_l_order);
-  Real f_poly_val = _fourier_poly_function.getPolynomialValue(_t,_q_point[_qp](_f_direction_1),_q_point[_qp](_f_direction_2), _f_order);
+  Real f_poly_val = _fourier_poly_function.getPolynomialValue(_t,_q_point[_qp](_f_direction_1),_q_point[_qp](_f_direction_2), _f_order, _f_order);
   // There is an added correction factor that accounts for the surface area of the pin
   // The analytic expression is (2 / R / delta z) but we compute numerically as
   // (2 / (Surf Area / (2*PI) ) ) = 4PI / Surf Area
