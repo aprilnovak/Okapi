@@ -73,10 +73,10 @@ ZernikeLegendreDeconstruction::computeQpIntegral()
   Real z_func = _zernike_function.getPolynomialValue(_t, _q_point[_qp](_fdir1), _q_point[_qp](_fdir2),\
     _m_order, _n_order);
 
-  std::cout << "l_func: " << l_func << std::endl;
+  /*std::cout << "l_func: " << l_func << std::endl;
   std::cout << "z_func: " << z_func << std::endl;
   std::cout << "volume: " << _volume_pp << std::endl;
-  std::cout << "pi: " << M_PI << std::endl;
+  std::cout << "pi: " << M_PI << std::endl;*/
   return _u[_qp] * l_func * z_func * 2.0 * M_PI / _volume_pp;
 }
 
