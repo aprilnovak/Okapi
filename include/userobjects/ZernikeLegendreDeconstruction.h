@@ -1,7 +1,7 @@
 #ifndef ZERNIKELEGENDREDECONSTRUCTION_H
 #define ZERNIKELEGENDREDECONSTRUCTION_H
 
-#include "SideIntegralUserObject.h"
+#include "ElementIntegralUserObject.h"
 #include "MooseVariableInterface.h"
 #include "LegendrePolynomial.h"
 #include "ZernikePolynomial.h"
@@ -16,7 +16,7 @@ InputParameters validParams<ZernikeLegendreDeconstruction>();
  * This postprocessor computes the projection of solution field to an expansion
  */
 class ZernikeLegendreDeconstruction :
-  public SideIntegralUserObject,
+  public ElementIntegralUserObject,
   public MooseVariableInterface
 {
 public:
