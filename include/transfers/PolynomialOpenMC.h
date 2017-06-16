@@ -25,7 +25,7 @@ public:
   virtual void execute() override;
 
 protected:
-  std::vector<VariableName> _source_variable_names;
+  std::vector<VariableName> _source_var_names;
   std::vector<VariableName> _to_aux_names;
 };
 
