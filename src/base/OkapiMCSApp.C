@@ -10,6 +10,7 @@
 #include "LegendrePolynomial.h"
 #include "ZernikePolynomial.h"
 #include "ZernikeLegendreReconstruction.h"
+#include "PolynomialOpenMC.h"
 
 template <>
 InputParameters
@@ -59,6 +60,7 @@ OkapiMCSApp::registerObjects(Factory & factory)
   registerFunction(LegendrePolynomial);
   registerFunction(ZernikePolynomial);
   registerFunction(ZernikeLegendreReconstruction);
+  registerTransfer(PolynomialOpenMC);
 }
 
 // External entry point for dynamic syntax association

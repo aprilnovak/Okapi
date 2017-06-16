@@ -14,7 +14,7 @@
 #include "libmesh/meshfree_interpolation.h"
 #include "libmesh/system.h"
 
-//#include "NekInterface.h"
+#include "OpenMCInterface.h"
 
 // Define the input parameters
 template<>
@@ -92,6 +92,7 @@ PolynomialOpenMC::execute()
             for (auto j = beginIndex(solution_values); j < solution_values.size(); ++j)
             {
  //             Nek5000::expansion_fcoef_.coeff_fij[i*100+j] = solution_values[j];
+                OpenMC::change_batches(solution_values[j]);
             }
             _console << '\n';
           }
