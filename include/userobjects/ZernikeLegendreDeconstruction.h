@@ -6,7 +6,6 @@
 #include "LegendrePolynomial.h"
 #include "ZernikePolynomial.h"
 
-//Forward Declarations
 class ZernikeLegendreDeconstruction;
 
 template<>

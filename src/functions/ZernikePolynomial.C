@@ -1,5 +1,6 @@
 #include "ZernikePolynomial.h"
 #include "ExtraFunctions.h"
+#include "math.h"
 
 template<>
 InputParameters validParams<ZernikePolynomial>()
@@ -98,5 +99,5 @@ ZernikePolynomial::getPolynomialValue(Real t, Real x, Real y, int m, int n)
        x_norm << ", " << y_norm << ")" << std::endl;
   }
 
-  return N * Rnm;
+  return N * Rnm / sqrt(M_PI);
 }

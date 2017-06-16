@@ -8,7 +8,12 @@ InputParameters validParams<ZernikeLegendreDeconstruction>()
 {
   /* This class inherits from a class that uses the BlockRestrictable parameters, which means
      that the variable and/or domain blocks to which this integral is to be applied can be
-     specified in the input file using the variable = `` and blocks = `` syntax. */
+     specified in the input file using the variable = `` and blocks = `` syntax. 
+     
+     IMPORTANT: This user object should only be used over cylindrical domains! Because a 
+     postprocessor is used to compute volume, no error will be given if this is used over
+     a non-cylindrical region. */
+
   InputParameters params = validParams<ElementIntegralUserObject>();
   params.addRequiredCoupledVar("variable", "The variable that will be integrated");
   params.addRequiredParam<std::string>("legendre_function", \
@@ -67,6 +72,11 @@ ZernikeLegendreDeconstruction::computeQpIntegral()
   Real l_func = _legendre_function.getPolynomialValue(_t, _q_point[_qp](_l_direction), _l_order);
   Real z_func = _zernike_function.getPolynomialValue(_t, _q_point[_qp](_fdir1), _q_point[_qp](_fdir2),\
     _m_order, _n_order);
+
+  std::cout << "l_func: " << l_func << std::endl;
+  std::cout << "z_func: " << z_func << std::endl;
+  std::cout << "volume: " << _volume_pp << std::endl;
+  std::cout << "pi: " << M_PI << std::endl;
   return _u[_qp] * l_func * z_func * 2.0 * M_PI / _volume_pp;
 }
 
@@ -97,6 +107,8 @@ ZernikeLegendreDeconstruction::finalize()
     else
       m_begin += 1;
   }
+
+  std::cout << "Storing value " << getValue() << "in entry " << n_begin + m_begin << std::endl;
 
   scalar.sys().solution().set(dof[n_begin + m_begin], getValue());
   scalar.sys().solution().close();
