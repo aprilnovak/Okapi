@@ -13,7 +13,7 @@
 
 [AuxVariables]
   [./l_0_coeffs]
-    order = THIRD
+    order = FIRST
     family = SCALAR
   [../]
 []
@@ -22,7 +22,7 @@
   [./ic]
     type = ScalarComponentIC
     variable = 'l_0_coeffs'
-    values = '1.0 2.0 3.0 4.0'
+    values = '35.0'
   [../]
 []
 
@@ -95,6 +95,10 @@
   [../]
 []
 
+# A successful transfer to OpenMC is made by writing to a global variable
+# (n_batches). Deactivating this transfer causes the number of batches in
+# the settings.xml file to be used - otherwise, the number specified in
+# l_0_coeffs is used.
 [Transfers]
   [./to_openmc]
     type = PolynomialOpenMC
