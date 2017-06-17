@@ -1,4 +1,6 @@
-# This input file is used by the Master App (MOOSE)
+# This input file is used by the Master App (MOOSE). Note that this test
+# should use cross sections from nndc_hdf5 because I have not included
+# more temperature-dependent cross sections.
 
 [Mesh]
   type = GeneratedMesh
