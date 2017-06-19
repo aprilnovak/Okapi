@@ -22,7 +22,7 @@
   [./ic]
     type = ScalarComponentIC
     variable = 'l_0_coeffs'
-    values = '35.0'
+    values = '1000.0'
   [../]
 []
 
@@ -93,6 +93,7 @@
     direction = to_multiapp
     source_variable = 'l_0_coeffs'
     to_aux_scalar = 'dummy'
+    execute_on = timestep_end
   [../]
 []
 
