@@ -143,26 +143,6 @@ ZLDeconstruction::finalize()
 
   std::vector<dof_id_type> & dof = scalar.dofIndices();
 
-/*  // Determine the index at which the fixed n-values begin.
-  int n_begin;
-  if (_n_order == 0)
-    n_begin = 0;
-  else
-    n_begin = num_zernike(_n_order - 1);
-
-  // Then, determine the index relative to n_begin at which the m-value belongs.
-  int m_begin = 0;
-  for (int m = -_n_order; m <= _n_order; m += 2)
-  {
-    if (m == _m_order)
-      break;
-    else
-      m_begin += 1;
-  }
-
-  std::cout << "Storing value " << getValue() << "in entry " << n_begin + m_begin << std::endl; */
-
-
   for (int i = 0; i < _num_entries; ++i)
   {
     scalar.sys().solution().set(dof[i], getValue(i));

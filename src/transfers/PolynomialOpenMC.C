@@ -1,4 +1,6 @@
 #include "PolynomialOpenMC.h"
+#include "ExtraFunctions.h"
+#include "OpenMCInterface.h"
 
 #include "MooseTypes.h"
 #include "MooseVariableScalar.h"
@@ -9,14 +11,17 @@
 #include "libmesh/meshfree_interpolation.h"
 #include "libmesh/system.h"
 
-#include "OpenMCInterface.h"
-
 template<>
 InputParameters validParams<PolynomialOpenMC>()
 {
   InputParameters params = validParams<MultiAppTransfer>();
   /* To MultiApp (MOOSE -> OkapiApp):
-     source_variable = SCALAR variables holding expansion coefficients
+     source_variable = SCALAR variables holding expansion coefficients. 
+                       NOTE: the order of the variables is important here, 
+                       since they will be stored in the same order in the
+                       OpenMC expansion_coeffs global array, and hence will
+                       be interpreted as the Zernike coefficients for a given
+                       Legendre order, in order of increasing Legendre order.
      to_aux_scalar = dummy variable (OpenMC is only wrapped as a MOOSE App,
                      there's no FEM-based variable to store anything in */
 
@@ -51,6 +56,13 @@ PolynomialOpenMC::execute()
      (the local Master app). */
   unsigned int num_apps = _multi_app->numGlobalApps();
 
+  /* Store the legender and zernike expansion orders to pass them into OpenMC.
+     A check is made to ensure that the number of Zernike coefficients is the 
+     same for every coupled scalar auxvariable. */
+  int legendre_order_from_MOOSE = 0;
+  int zernike_order_from_MOOSE = 0;
+  int old_zernike_order = 0;
+  
   switch (_direction)
   {
     /* MasterApp -> SubApp. For MOOSE-OpenMC coupling, this represents the transfer
@@ -82,19 +94,38 @@ PolynomialOpenMC::execute()
       for (unsigned int i = 0; i < num_apps; i++)
         if (_multi_app->hasLocalApp(i)) // if the global app number is on this processor
         { 
-          // Loop through each SCALAR variables
+          // Loop through each SCALAR variable. The order of the Legendre expansion is
+          // equal to the number of source variables minus 1, since the Legendre order
+          // can be zero.
+          legendre_order_from_MOOSE = _source_var_names.size() - 1;
           for (auto i = beginIndex(_source_var_names); i < _source_var_names.size(); ++i)
           { 
             // Loop through each entry in a single SCALAR variable
             auto & solution_values = source_variables[i]->sln();
+
+            // Check that the Zernike order is the same for every coupled scalar auxvar
+            old_zernike_order = zernike_order_from_MOOSE;
+
+            if (i > 0)
+            {
+              if (old_zernike_order != zernike_order_from_MOOSE)
+              {
+                mooseError("The order of the Zernike expansion does not match each \
+                  coupling Legendre coefficient aux variable.");
+              }
+            }
+
+            zernike_order_from_MOOSE = zernike_order_from_coeffs(solution_values.size());
             for (auto j = beginIndex(solution_values); j < solution_values.size(); ++j)
             {
               //OpenMC::change_fuel_temp(solution_values[j]);  
               //OpenMC::change_batches(solution_values[j]);
-//              OpenMC::receive_coeffs(solution_values[j]);
+              OpenMC::receive_coeffs(solution_values[j]);
             }
             _console << '\n';
           }
+          // Transfer the order of the Zernike and Legendre expansions to OpenMC
+          OpenMC::receive_coupling_info(legendre_order_from_MOOSE, zernike_order_from_MOOSE);
         }
 
       /* Once you have read the data into OpenMC data structures, use it to perform somce
