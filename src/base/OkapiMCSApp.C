@@ -21,7 +21,7 @@
 
 // user objects
 #include "ZernikeLegendreDeconstruction.h"
-#include "ElementIntegralArray.h"
+#include "ZLDeconstruction.h"
 
 template <>
 InputParameters
@@ -73,7 +73,7 @@ OkapiMCSApp::registerObjects(Factory & factory)
   registerFunction(ZernikeLegendreReconstruction);
   registerTransfer(PolynomialOpenMC);
   registerUserObject(ZernikeLegendreDeconstruction);
-  registerUserObject(ElementIntegralArray);
+  registerUserObject(ZLDeconstruction);
 }
 
 // External entry point for dynamic syntax association

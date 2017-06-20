@@ -18,26 +18,26 @@ namespace OpenMC {
    we can get the names to correctly match up. */
 
   extern "C" {
-  /* Prototype a simple subroutine not in a module. This requires a different
-     macro than a subroutine in a module. This prototype is simply for testing. */
-    //void FORTRAN_CALL(openmc_fort_func)();
-
-  /* Prototype a subroutine in a module, which requires a different macro than
-     a subroutine not in a module. */
-    
     /* OpenMC can run in "serial" in two ways - using the MPI wrapper (with a 
        single process), or _actually_ in serial. "#ifdef MPI" is used within
        OpenMC to differentiate between these two cases, but because this variable
        is defined within the OpenMC CMake file, it is not known to MOOSE. I 
        assume that MPI is defined in OpenMC, such that openmc_init must be called
        with an intracommunicator. */
+
+    /* Routines that are used to run OpenMC. */
     void openmc_init(const int &);
     void openmc_reset();
     void openmc_run();
     void openmc_finalize();
-    //void FORTRAN_CALL_MOD(openmc_init, initialize)(const int &);
-    //void FORTRAN_CALL_MOD(run_simulation, simulation)();
-    //void FORTRAN_CALL_MOD(openmc_finalize, finalize)();
+
+    /* Routines that are used for data transfer between OpenMC and MOOSE. */
+    void change_batches(int);
+    void change_fuel_temp(double);
+    
+    // tell OpenMC about the order of the expansion for transfer
+    // _from_ MOOSE
+    void receive_coupling_info(int, int);
   }
 }
 

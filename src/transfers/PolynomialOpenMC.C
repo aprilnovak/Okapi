@@ -54,7 +54,8 @@ PolynomialOpenMC::execute()
   switch (_direction)
   {
     /* MasterApp -> SubApp. For MOOSE-OpenMC coupling, this represents the transfer
-       of information from MOOSE to OpenMC. */
+       of information from MOOSE to OpenMC. This transfers _all_ of the expansion 
+       coefficients, but one at a time. */
     case TO_MULTIAPP:
     {
       /* The MultiAppTransfer class defines a parameter _multi_app which gets the 
@@ -79,16 +80,19 @@ PolynomialOpenMC::execute()
          have multiple OpenMC sub apps. However, this would be relevant for BISON
          applications, where we would simulate each fuel pin as an independent solve. */
       for (unsigned int i = 0; i < num_apps; i++)
-        if (_multi_app->hasLocalApp(i)) // if the global app number is on this processor, then...
-        {
-          std::cout << "has local App! " << std::endl;
+        if (_multi_app->hasLocalApp(i)) // if the global app number is on this processor
+        { 
+          // Loop through each SCALAR variables
           for (auto i = beginIndex(_source_var_names); i < _source_var_names.size(); ++i)
           { 
-            /* Extract the values of the MooseScalarVariable for each provided scalar variable,
-               and then do something with these values. */
+            // Loop through each entry in a single SCALAR variable
             auto & solution_values = source_variables[i]->sln();
             for (auto j = beginIndex(solution_values); j < solution_values.size(); ++j)
-                OpenMC::change_batches(solution_values[j]);
+            {
+              //OpenMC::change_fuel_temp(solution_values[j]);  
+              //OpenMC::change_batches(solution_values[j]);
+//              OpenMC::receive_coeffs(solution_values[j]);
+            }
             _console << '\n';
           }
         }
