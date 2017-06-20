@@ -19,3 +19,19 @@ int num_zernike(int N)
 
   return number;
 }
+
+/* compute the order of the Zernike expansion given the number of 
+   expansion coefficients. */
+int zernike_order_from_coeffs(int N)
+{
+  int order = 0;
+  int remaining = N;
+  
+  while (remaining > 0)
+  {
+    order += 1;
+    remaining = remaining - order;
+  }
+  
+  return order - 1;
+}
