@@ -22,7 +22,7 @@
   [./ic]
     type = ScalarComponentIC
     variable = 'l_0_coeffs'
-    values = '1000.0'
+    values = '700.0'
   [../]
 []
 
