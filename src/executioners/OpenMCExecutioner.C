@@ -19,5 +19,5 @@ up MPI and HDF5 compound data types, allocates memory, etc. */
 void OpenMCExecutioner::init() {
   Transient::init();
   OpenMC::openmc_init(_communicator.get());
-//  OpenMC::FORTRAN_CALL_MOD(openmc_init, initialize)(_communicator.get());
+  OpenMC::initialize_coupling();
 }
