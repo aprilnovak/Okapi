@@ -73,6 +73,7 @@ OkapiMCSApp::registerObjects(Factory & factory)
   registerFunction(ZernikeLegendreReconstruction);
   registerTransfer(PolynomialOpenMC);
   registerUserObject(ZernikeLegendreDeconstruction);
+  registerUserObject(ElementIntegralArray);
 }
 
 // External entry point for dynamic syntax association
