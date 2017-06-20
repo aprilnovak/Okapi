@@ -1,8 +1,9 @@
 #ifndef ELEMENTINTEGRALARRAY_H
 #define ELEMENTINTEGRALARRAY_H
 
-// MOOSE includes
 #include "ElementUserObject.h"
+#include "LegendrePolynomial.h"
+#include "ZernikePolynomial.h"
 
 // Forward Declarations
 class ElementIntegralArray;
@@ -30,13 +31,19 @@ public:
   virtual Real getValue(int);
 
 protected:
-  virtual Real computeQpIntegral(int, int, int) = 0;
+  virtual Real computeQpIntegral(int, int, int);
   virtual Real computeIntegral(int, int, int);
 
   unsigned int _qp;
   int _l_order;
   int _n_order;
   int _num_entries;
+  LegendrePolynomial & _legendre_function;
+  ZernikePolynomial & _zernike_function;
+  int _l_direction;
+  int _fdir1;
+  int _fdir2;
+
   std::vector<Real> _integral_value;
 };
 
