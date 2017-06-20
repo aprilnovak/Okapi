@@ -27,15 +27,14 @@ public:
   virtual void threadJoin(const UserObject & y) override;
   virtual void finalize() override {}
 
-  /// Returns the integral value
-  virtual Real getValue();
+  virtual Real getValue(int);
 
 protected:
-  virtual Real computeQpIntegral() = 0;
-  virtual Real computeIntegral();
+  virtual Real computeQpIntegral(int) = 0;
+  virtual Real computeIntegral(int);
 
   unsigned int _qp;
-
+  int _num;
   std::vector<Real> _integral_value;
 };
 

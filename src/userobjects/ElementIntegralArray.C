@@ -9,48 +9,59 @@ InputParameters
 validParams<ElementIntegralArray>()
 {
   InputParameters params = validParams<ElementUserObject>();
+  params.addRequiredParam<int>("num", "Length of array to compute");
   return params;
 }
 
 ElementIntegralArray::ElementIntegralArray(const InputParameters & parameters)
-  : ElementUserObject(parameters), _qp(0)//, _integral_value(0)
+  : ElementUserObject(parameters),
+    _qp(0),
+    _num(getParam<int>("num"))
 {
-  _integral_value.assign(10, 0.0);
+  _integral_value.assign(_num, 0.0);
 }
 
 void
 ElementIntegralArray::initialize()
 {
-//  _integral_value = 0;
+  _integral_value.assign(_num, 0.0);
 }
 
+// called only once, so this computes _all_ of the integrals
 void
 ElementIntegralArray::execute()
 {
-//  _integral_value += computeIntegral();
+  for (int i = 0; i < _num; ++i)
+  {
+    _integral_value[i] += computeIntegral(i);
+  }
 }
 
+// return the n-th integral
 Real
-ElementIntegralArray::getValue()
+ElementIntegralArray::getValue(int n)
 {
-//  gatherSum(_integral_value);
-//  return _integral_value;
-return 0.0;
+  gatherSum(_integral_value[n]);
+  return _integral_value[n];
 }
 
 void
 ElementIntegralArray::threadJoin(const UserObject & y)
 {
-//  const ElementIntegralArray & pps = static_cast<const ElementIntegralArray &>(y);
-//  _integral_value += pps._integral_value;
+  for (int i = 0; i < _num; ++i)
+  {
+    const ElementIntegralArray & pps = static_cast<const ElementIntegralArray &>(y);
+    _integral_value[i] += pps._integral_value[i];
+  }
 }
 
+// Compute the n-th integral
 Real
-ElementIntegralArray::computeIntegral()
+ElementIntegralArray::computeIntegral(int n)
 {
-  /*Real sum = 0;
+  Real sum = 0;
 
   for (_qp = 0; _qp < _qrule->n_points(); _qp++)
-    sum += _JxW[_qp] * _coord[_qp] * computeQpIntegral();*/
-  return 0.0;
+    sum += _JxW[_qp] * _coord[_qp] * computeQpIntegral(n);
+  return sum;
 }
