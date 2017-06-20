@@ -30,11 +30,13 @@ public:
   virtual Real getValue(int);
 
 protected:
-  virtual Real computeQpIntegral(int) = 0;
-  virtual Real computeIntegral(int);
+  virtual Real computeQpIntegral(int, int, int) = 0;
+  virtual Real computeIntegral(int, int, int);
 
   unsigned int _qp;
-  int _num;
+  int _l_order;
+  int _n_order;
+  int _num_entries;
   std::vector<Real> _integral_value;
 };
 
