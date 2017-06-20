@@ -21,6 +21,7 @@
 
 // user objects
 #include "ZernikeLegendreDeconstruction.h"
+#include "ElementIntegralArray.h"
 
 template <>
 InputParameters
