@@ -1,17 +1,23 @@
+// Okapi includes
 #include "ElementIntegralArray.h"
 #include "ExtraFunctions.h"
-#include "libmesh/quadrature.h"
+
+// MOOSE includes
 #include "MooseVariableScalar.h"
 #include "SystemBase.h"
+
+// libMesh includes
+#include "libmesh/quadrature.h"
 
 template <>
 InputParameters
 validParams<ElementIntegralArray>()
 {
   /* This user object computes the expansion coefficients into which a continuous MOOSE
-     variable is decomposed for transfer _to_ OpenMC. */
+     variable is decomposed for transfer _to_ OpenMC for a _single_ value of l. */
   InputParameters params = validParams<ElementUserObject>();
-  params.addRequiredParam<int>("l_order_to_openmc", "Order of Legendre expansion used in OpenMC");
+  params.addRequiredCoupledVar("variable", "The variable that will be integrated");
+  params.addRequiredParam<int>("l_order", "Order of Legendre expansion.");
   params.addRequiredParam<int>("n_order_to_openmc", "Order of Zernike expansion used in OpenMC");
   params.addRequiredParam<std::string>("legendre_function", \
     "Name of function to compute Legendre polynomial value at a point.");
@@ -19,20 +25,30 @@ validParams<ElementIntegralArray>()
     "Name of function to compute Zernike polynomial value at a point");
   params.addRequiredParam<int>("l_direction", \
     "Direction of integration for Legendre polynomial");
-  return params;
+   params.addRequiredParam<std::string>("aux_scalar_name", \
+     "Aux scalar to store the expansion coefficients.");
+   params.addRequiredParam<std::string>("volume_pp", "The name of the post processor that\
+      calculates volume."); 
+ return params;
 }
 
 ElementIntegralArray::ElementIntegralArray(const InputParameters & parameters)
   : ElementUserObject(parameters),
+    MooseVariableInterface(this, false),
     _qp(0),
-    _l_order(getParam<int>("l_order_to_openmc")),
+    _u(coupledValue("variable")),
+    _l_order(getParam<int>("l_order")),
     _n_order(getParam<int>("n_order_to_openmc")),
     _legendre_function(dynamic_cast<LegendrePolynomial&>\
       (_mci_feproblem.getFunction(parameters.get<std::string>("legendre_function")))),
     _zernike_function(dynamic_cast<ZernikePolynomial&>\
       (_mci_feproblem.getFunction(parameters.get<std::string>("zernike_function")))),
-    _l_direction(getParam<int>("l_direction"))
+    _l_direction(getParam<int>("l_direction")),
+    _aux_scalar_name(parameters.get<std::string>("aux_scalar_name")),
+    _volume_pp(getPostprocessorValueByName(parameters.get<std::string>("volume_pp")))
 {
+  addMooseVariableDependency(mooseVariable());
+
   _num_entries = num_zernike(_n_order);
   _integral_value.assign(_num_entries, 0.0);
 
@@ -59,7 +75,7 @@ ElementIntegralArray::initialize()
   _integral_value.assign(_num_entries, 0.0);
 }
 
-// called only once, so this computes _all_ of the integrals
+// computes _all_ of the integrals
 void
 ElementIntegralArray::execute()
 {
@@ -113,6 +129,43 @@ ElementIntegralArray::computeQpIntegral(int l, int m, int n)
   std::cout << "z_func: " << z_func << std::endl;
   std::cout << "volume: " << _volume_pp << std::endl;
   std::cout << "pi: " << M_PI << std::endl;*/
-  return 1.0;
-//  return _u[_qp] * l_func * z_func * 2.0 * M_PI / _volume_pp;
+  return _u[_qp] * l_func * z_func * 2.0 * M_PI / _volume_pp;
+}
+
+void
+ElementIntegralArray::finalize()
+{
+  /* In the finalize step, we store the result of the user object in a SCALAR variable.
+     For now, this user object can only set one C_l^{nm} coefficient at a time. The entry
+     in the SCALAR variable that is to be filled depends on the values of n and m. */
+  MooseVariableScalar & scalar =  _fe_problem.getScalarVariable(_tid, _aux_scalar_name);
+  scalar.reinit();
+
+  std::vector<dof_id_type> & dof = scalar.dofIndices();
+
+/*  // Determine the index at which the fixed n-values begin.
+  int n_begin;
+  if (_n_order == 0)
+    n_begin = 0;
+  else
+    n_begin = num_zernike(_n_order - 1);
+
+  // Then, determine the index relative to n_begin at which the m-value belongs.
+  int m_begin = 0;
+  for (int m = -_n_order; m <= _n_order; m += 2)
+  {
+    if (m == _m_order)
+      break;
+    else
+      m_begin += 1;
+  }
+
+  std::cout << "Storing value " << getValue() << "in entry " << n_begin + m_begin << std::endl; */
+
+
+  for (int i = 0; i < _num_entries; ++i)
+  {
+    scalar.sys().solution().set(dof[i], getValue(i));
+    scalar.sys().solution().close();
+  }
 }

@@ -1,24 +1,20 @@
 #ifndef ELEMENTINTEGRALARRAY_H
 #define ELEMENTINTEGRALARRAY_H
 
+// MOOSE includes
+#include "MooseVariableInterface.h"
+
+// Okapi includes
 #include "ElementUserObject.h"
 #include "LegendrePolynomial.h"
 #include "ZernikePolynomial.h"
 
-// Forward Declarations
 class ElementIntegralArray;
 
 template <>
 InputParameters validParams<ElementIntegralArray>();
 
-/**
- * This postprocessor computes a volume integral of the specified
- * variable.
- *
- * Note that specializations of this integral are possible by deriving
- * from this class and overriding computeQpIntegral().
- */
-class ElementIntegralArray : public ElementUserObject
+class ElementIntegralArray : public ElementUserObject, public MooseVariableInterface
 {
 public:
   ElementIntegralArray(const InputParameters & parameters);
@@ -26,7 +22,7 @@ public:
   virtual void initialize() override;
   virtual void execute() override;
   virtual void threadJoin(const UserObject & y) override;
-  virtual void finalize() override {}
+  virtual void finalize() override;
 
   virtual Real getValue(int);
 
@@ -35,6 +31,7 @@ protected:
   virtual Real computeIntegral(int, int, int);
 
   unsigned int _qp;
+  const VariableValue & _u;
   int _l_order;
   int _n_order;
   int _num_entries;
@@ -43,6 +40,9 @@ protected:
   int _l_direction;
   int _fdir1;
   int _fdir2;
+
+  std::string _aux_scalar_name;
+  const PostprocessorValue & _volume_pp;
 
   std::vector<Real> _integral_value;
 };
