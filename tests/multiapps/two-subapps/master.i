@@ -19,15 +19,10 @@
   [../]
 []
 
-# wouldn't normally have ICs - this is only because we don't have 
-# transfers from OpenMC and BISON _to_ the Master App
+# We only need an initial condition for temperature, since OpenMC executes on
+# timestep_begin, and the initial temperatures are set in the Master App input file.
 [ICs]
   [./ic]
-    type = ScalarComponentIC
-    variable = 'l_0_coeffs_power'
-    values = '1.0 2.0 3.0 4.0 5.0 6.0'
-  [../]
-  [./ic2]
     type = ScalarComponentIC
     variable = 'l_0_coeffs_temp'
     values = '100.0 200.0 300.0 400.0 500.0 600.0'
@@ -72,7 +67,8 @@
   [./bison]
     type = TransientMultiApp
     app_type = OkapiMCSApp
-    positions = '0 0 0'
+    positions = '0 0 0
+                 1 1 1'
     input_files = 'bison.i'
     execute_on = timestep_end
   [../]
@@ -95,6 +91,7 @@
     to_aux_scalar = 'dummy_openmc'
     execute_on = timestep_begin
   [../]
+
   [./from_bison]
     type = PolynomialOpenMC
     multi_app = bison

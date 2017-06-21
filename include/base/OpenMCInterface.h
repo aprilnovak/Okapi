@@ -6,6 +6,7 @@
 #define PRONGHORN_INTERFACE_H
 
 #include "Moose.h" // include for access to FORTRAN_CALL macro
+#include <vector>
 
 // define a macro for name mangling of subroutines/functions in Fortran modules
 #define FORTRAN_CALL_MOD(name, mod) __##mod##_MOD_##name
@@ -18,6 +19,15 @@ namespace OpenMC {
    we can get the names to correctly match up. */
 
   extern "C" {
+
+    // Structure data types for transfer of geometric information
+/*    typedef struct CouplingGeom {
+      int l_dir;
+      double radius;
+      double center[2];
+      double height[2];
+    } CouplingGeom;*/
+
     /* OpenMC can run in "serial" in two ways - using the MPI wrapper (with a 
        single process), or _actually_ in serial. "#ifdef MPI" is used within
        OpenMC to differentiate between these two cases, but because this variable

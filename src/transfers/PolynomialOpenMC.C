@@ -35,13 +35,25 @@ InputParameters validParams<PolynomialOpenMC>()
     "The auxiliary SCALAR variable to read values from");
   params.addRequiredParam<std::vector<VariableName> >("to_aux_scalar", \
     "The name of the SCALAR auxvariable in the MultiApp to transfer the value to.");
+
+  /* This transfer is also associated with a radius, center, and l_geom_norm that
+     will be used in OpenMC to determine which cells this transfer maps to. */
+  params.addParam<Real>("radius","Radius of region with Zernike polynomials.");  
+  params.addParam<std::vector<Real>>("center", "center coordinates (x, y) of circle");
+  params.addParam<std::vector<Real>>("l_geom_norm", "min and max coordinates\
+    along the Legendre direction.");
+  params.addParam<int>("l_direction", "direction of integration for Legendre.");
   return params;
 }
 
 PolynomialOpenMC::PolynomialOpenMC(const InputParameters & parameters) :
     MultiAppTransfer(parameters),
     _source_var_names(getParam<std::vector<VariableName>>("source_variable")),
-    _to_aux_names(getParam<std::vector<VariableName>>("to_aux_scalar"))
+    _to_aux_names(getParam<std::vector<VariableName>>("to_aux_scalar")),
+    _radius(parameters.get<Real>("radius")),
+    _center(parameters.get<std::vector<Real>>("center")),
+    _geom_norm(parameters.get<std::vector<Real>>("l_geom_norm")),
+    _l_direction(parameters.get<int>("l_direction"))
 {
 }
 
@@ -56,12 +68,18 @@ PolynomialOpenMC::execute()
      (the local Master app). */
   unsigned int num_apps = _multi_app->numGlobalApps();
 
-  /* Store the legender and zernike expansion orders to pass them into OpenMC.
+  /* Store the legendre and zernike expansion orders to pass them into OpenMC.
      A check is made to ensure that the number of Zernike coefficients is the 
      same for every coupled scalar auxvariable. */
   int legendre_order_from_MOOSE = 0;
   int zernike_order_from_MOOSE = 0;
   int old_zernike_order = 0;
+
+/*  OpenMC::CouplingGeom geometry;
+  geometry.radius = _radius;
+  geometry.height = {_geom_norm[0], _geom_norm[1]};
+  geometry.center = {_center[0], _center[1]};
+  geometry.l_dir = _l_direction;*/
   
   switch (_direction)
   {
@@ -82,20 +100,21 @@ PolynomialOpenMC::execute()
       std::vector<MooseVariableScalar *> source_variables(_source_var_names.size());
       for (auto i = beginIndex(_source_var_names); i < _source_var_names.size(); ++i)
       {
-        source_variables[i] = &from_problem.getScalarVariable(_tid, _source_var_names[i]);
+        source_variables[i] = &from_problem.getScalarVariable(_tid,\
+          _source_var_names[i]);
         source_variables[i]->reinit(); //?
       }
 
       /* Loop through each of the sub apps. Because MC neutron transport simulations 
-         require knowledge of the entire domain (i.e. you cannot specify something like
-         a temperature boundary condition in a Monte Carlo code), we'll likely not ever
+         require knowledge of the entire domain (i.e. cannot specify something like
+         a temperature boundary condition in a Monte Carlo code), we'll likely never
          have multiple OpenMC sub apps. However, this would be relevant for BISON
-         applications, where we would simulate each fuel pin as an independent solve. */
+         applications, where each fuel pin is an independent solve. */
       for (unsigned int i = 0; i < num_apps; i++)
-        if (_multi_app->hasLocalApp(i)) // if the global app number is on this processor
+        if (_multi_app->hasLocalApp(i)) // if global app number is on this processor
         { 
-          // Loop through each SCALAR variable. The order of the Legendre expansion is
-          // equal to the number of source variables minus 1, since the Legendre order
+          // Loop through each SCALAR variable. The order of the Legendre expansion
+          // equals the number of source variables - 1, since the Legendre order
           // can be zero.
           legendre_order_from_MOOSE = _source_var_names.size() - 1;
           for (auto i = beginIndex(_source_var_names); i < _source_var_names.size(); ++i)
@@ -103,17 +122,15 @@ PolynomialOpenMC::execute()
             // Loop through each entry in a single SCALAR variable
             auto & solution_values = source_variables[i]->sln();
 
-            // Check that the Zernike order is the same for every coupled scalar auxvar
+            // Check that Zernike order is the same for every coupled scalar auxvar
             old_zernike_order = zernike_order_from_MOOSE;
 
             if (i > 0)
-            {
               if (old_zernike_order != zernike_order_from_MOOSE)
               {
                 mooseError("The order of the Zernike expansion does not match each \
                   coupling Legendre coefficient aux variable.");
               }
-            }
 
             zernike_order_from_MOOSE = zernike_order_from_coeffs(solution_values.size());
             for (auto j = beginIndex(solution_values); j < solution_values.size(); ++j)
@@ -124,8 +141,11 @@ PolynomialOpenMC::execute()
             }
             _console << '\n';
           }
-          // Transfer the order of the Zernike and Legendre expansions to OpenMC
-          OpenMC::receive_coupling_info(legendre_order_from_MOOSE, zernike_order_from_MOOSE);
+        
+        // Transfer the order of the Zernike and Legendre expansions to OpenMC
+        OpenMC::receive_coupling_info(legendre_order_from_MOOSE, zernike_order_from_MOOSE);
+
+        // Transfer geometrical information
         }
 
       /* Once you have read the data into OpenMC data structures, use it to perform somce
@@ -177,5 +197,5 @@ PolynomialOpenMC::execute()
     }
   }
 
-  _console << "Finished PolynomialToNekTransfer" << name() << std::endl;
+  _console << "Finished PolynomialOpenMC transfer" << name() << std::endl;
 }

@@ -1,5 +1,5 @@
-#ifndef MULTIAPPPOLYNOMIALTONEK_H
-#define MULTIAPPPOLYNOMIALTONEK_H
+#ifndef POLYNOMIALOPENMC_H
+#define POLYNOMIALOPENMC_H
 
 // MOOSE includes
 #include "MultiAppTransfer.h"
@@ -19,14 +19,15 @@ class PolynomialOpenMC :
 public:
   PolynomialOpenMC(const InputParameters & parameters);
 
-  /**
-   * Execute the transfer
-   */
   virtual void execute() override;
 
 protected:
   std::vector<VariableName> _source_var_names;
   std::vector<VariableName> _to_aux_names;
+  Real _radius;
+  std::vector<Real> _center;
+  std::vector<Real> _geom_norm;
+  int _l_direction;
 };
 
-#endif /* MULTIAPPPOLYNOMIALTONEK_H */
+#endif /* POLYNOMIALOPENMC_H */
