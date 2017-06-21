@@ -6,6 +6,7 @@
 #include "MooseVariableScalar.h"
 #include "FEProblem.h"
 #include "MultiApp.h"
+#include "SystemBase.h"
 #include "SubProblem.h"
 
 #include "libmesh/meshfree_interpolation.h"
@@ -135,7 +136,6 @@ PolynomialOpenMC::execute()
             zernike_order_from_MOOSE = zernike_order_from_coeffs(solution_values.size());
             for (auto j = beginIndex(solution_values); j < solution_values.size(); ++j)
             {
-              //OpenMC::change_fuel_temp(solution_values[j]);  
               //OpenMC::change_batches(solution_values[j]);
               OpenMC::receive_coeffs(solution_values[j]);
             }
@@ -144,14 +144,13 @@ PolynomialOpenMC::execute()
         
         // Transfer the order of the Zernike and Legendre expansions to OpenMC
         OpenMC::receive_coupling_info(legendre_order_from_MOOSE, zernike_order_from_MOOSE);
-
-        // Transfer geometrical information
         }
 
       /* Once you have read the data into OpenMC data structures, use it to perform somce
          action in OpenMC, such as using expansion coefficients to reconstruct a 
          continuous field. */
    //   FORTRAN_CALL(Nek5000::flux_reconstruction)();
+      OpenMC::change_fuel_temp();
       break;
     }
 
@@ -171,26 +170,16 @@ PolynomialOpenMC::execute()
         to_variables[i]->reinit();
       }
 
+      // Loop over the variables that we are going to write
       for (auto i = beginIndex(_to_aux_names); i < _to_aux_names.size(); ++i)
       {
-        // The dof indices for the scalar variable of interest
         std::vector<dof_id_type> & dof = to_variables[i]->dofIndices();
-
-//      // Error if there is a size mismatch between the scalar AuxVariable and the number of sub apps
-//      if (num_apps != scalar.sln().size())
-//        mooseError("The number of sub apps (" << num_apps << ") must be equal to the order of the scalar AuxVariable (" << scalar.order() << ")");
-
-        // Loop over each sub-app and populate the AuxVariable values from the postprocessors
-//        for (unsigned int i=0; i<_multi_app->numGlobalApps(); i++)
-
-//        if (_multi_app->hasLocalApp(i) && _multi_app->isRootProcessor())
-          // Note: This can't be done using MooseScalarVariable::insert() because different processors will be setting dofs separately.
-/*        auto & solution_values = to_variables[i]->sln();
+        auto & solution_values = to_variables[i]->sln();
         for (auto j = beginIndex(solution_values); j < solution_values.size(); ++j)
         {
-       //   to_variables[i]->sys().solution().set(dof[j], Nek5000::expansion_tcoef_.coeff_tij[i*100+j]);
-          //to_variables[i]->sys().solution().close();
-        }*/
+          to_variables[i]->sys().solution().set(dof[j], 600.0);
+          to_variables[i]->sys().solution().close();
+        }
       }
 
       break;
