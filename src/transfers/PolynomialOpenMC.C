@@ -136,13 +136,13 @@ PolynomialOpenMC::execute()
             zernike_order_from_MOOSE = zernike_order_from_coeffs(solution_values.size());
             for (auto j = beginIndex(solution_values); j < solution_values.size(); ++j)
             {
-              //OpenMC::change_batches(solution_values[j]);
               OpenMC::receive_coeffs(solution_values[j]);
             }
             _console << '\n';
           }
         
         // Transfer the order of the Zernike and Legendre expansions to OpenMC
+        // and print the expansion coefficients received.
         OpenMC::receive_coupling_info(legendre_order_from_MOOSE, zernike_order_from_MOOSE);
         }
 
@@ -162,7 +162,7 @@ PolynomialOpenMC::execute()
          we will store these expansion coefficients in the same type of data structure
          that is used to transfer from MOOSE to OpenMC. */
      // FORTRAN_CALL(Nek5000::nek_expansion)();
-
+      OpenMC::create_coeffs();
       std::vector<MooseVariableScalar *> to_variables(_to_aux_names.size());
       for (auto i = beginIndex(_to_aux_names); i < _to_aux_names.size(); ++i)
       {
