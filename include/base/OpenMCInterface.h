@@ -45,13 +45,20 @@ namespace OpenMC {
 
     /* Routines that are used for data transfer between OpenMC and MOOSE. */
     void change_batches(int);
-    void change_fuel_temp(double);
+    void change_fuel_temp();
     
     // tell OpenMC about the order of the expansion for transfer  _from_ MOOSE
     void receive_coupling_info(int, int);
 
     // read expansion coefficients into OpenMC array
     void receive_coeffs(double);
+    
+    // create expansion coefficients for transfer _to_ MOOSE
+    void create_coeffs();
+
+    // for comparing implementation of expansion functions
+    double zernike(int, int, double, double, double [], double);
+    double legendre(int, double, double []);
   }
 }
 
