@@ -13,19 +13,21 @@
     family = SCALAR
     order = SIXTH
   [../]
-  [./l_0_coeffs_temp]
+  [./l_0_coeffs_temp] # For now, just change the average rod temp in OpenMC
     family = SCALAR
-    order = SIXTH
+    order = FIRST
   [../]
 []
 
 # We only need an initial condition for temperature, since OpenMC executes on
 # timestep_begin, and the initial temperatures are set in the Master App input file.
+# This will set an initial temperature of 400 K in the corresponding cells in OpenMC.
+# Any other temperatures in OpenMC will come from the XML files.
 [ICs]
   [./ic]
     type = ScalarComponentIC
     variable = 'l_0_coeffs_temp'
-    values = '100.0 200.0 300.0 400.0 500.0 600.0'
+    values = '500.0'
   [../]
 []
 
@@ -67,8 +69,7 @@
   [./bison]
     type = TransientMultiApp
     app_type = OkapiMCSApp
-    positions = '0 0 0
-                 1 1 1'
+    positions = '0 0 0'
     input_files = 'bison.i'
     execute_on = timestep_end
   [../]
@@ -90,6 +91,10 @@
     source_variable = 'l_0_coeffs_temp'
     to_aux_scalar = 'dummy_openmc'
     execute_on = timestep_begin
+    center = '0.5 0.5'
+    radius = 0.5
+    l_geom_norm = '0.0 1.0'
+    l_direction = 2
   [../]
 
   [./from_bison]
