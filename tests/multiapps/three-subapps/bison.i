@@ -17,6 +17,7 @@
 []
 
 [AuxVariables]
+active = ''
   [./l_0_coeffs]
     family = SCALAR
     order = SIXTH

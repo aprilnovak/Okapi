@@ -55,58 +55,17 @@
 [MultiApps]
   [./bison]
     type = TransientMultiApp
-    app_type = OkapiMCSApp
+    app_type = BuffaloApp
     positions = '0 0 0'
     input_files = 'bison.i'
     execute_on = timestep_begin
+    library_path = /homes/anovak/projects/buffalo/lib
   [../]
-  [./nek]
+  [./openmc]
     type = TransientMultiApp
-    app_type = MoonApp
+    app_type = OkapiMCSApp
     positions = '0 0 0'
-    input_files = 'nek.i'
-    execute_on = timestep_end
-    library_path = /homes/anovak/projects/moon/examples/integration_example/lib
-  [../]
-[]
-
-[Transfers]
-active = ''
-  [./to_bison]
-    type = PolynomialOpenMC
-    multi_app = bison
-    direction = to_multiapp
-    source_variable = 'l_0_coeffs_power'
-    to_aux_scalar = 'l_0_coeffs'
-    execute_on = timestep_begin
-  [../]
-  [./to_openmc]
-    type = PolynomialOpenMC
-    multi_app = openmc
-    direction = to_multiapp
-    source_variable = 'l_0_coeffs_temp'
-    to_aux_scalar = 'dummy_openmc'
-    execute_on = timestep_begin
-    center = '0.5 0.5'
-    radius = 0.5
-    l_geom_norm = '0.0 1.0'
-    l_direction = 2
-  [../]
-
-  [./from_bison]
-    type = PolynomialOpenMC
-    multi_app = bison
-    direction = from_multiapp
-    source_variable = 'l_0_coeffs_temp_bison'
-    to_aux_scalar = 'l_0_coeffs_temp'
-    execute_on = timestep_end
-  [../]
-  [./from_openmc]
-    type = PolynomialOpenMC
-    multi_app = openmc
-    direction = from_multiapp
-    source_variable = 'dummy_openmc'
-    to_aux_scalar = 'l_0_coeffs_power'
+    input_files = 'openmc.i'
     execute_on = timestep_begin
   [../]
 []
