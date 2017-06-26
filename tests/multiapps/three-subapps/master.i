@@ -68,6 +68,14 @@
     input_files = 'openmc.i'
     execute_on = timestep_begin
   [../]
+  [./nek]
+    type = TransientMultiApp
+    app_type = MoonApp
+    positions = '0 0 0'
+    input_files = 'nek.i'
+    execute_on = timestep_begin
+    library_path = /homes/anovak/projects/moon/lib
+  [../]
 []
 
 [Outputs]
