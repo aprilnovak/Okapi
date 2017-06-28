@@ -462,59 +462,301 @@ This transfer object defines what routines are called to transfer data from MOOS
 This transfer object defines what routines are called to transfer data from MOOSE to Nek, and from Nek back to MOOSE.
 
 \subsection{OpenMC Data Transfer}
-This section describes the capabilities introduced into the OpenMC source code that allows evaluation of polynomials, and construction/deconstruction of continuous fields. 
+This section describes the capabilities introduced into the OpenMC source code that allows evaluation of polynomials, and construction/deconstruction of continuous fields. The information in this section is based upon the {\tt zernike} branch provided by Matt Ellis. 
+
+The following changes were made to Matt Ellis's work (I believe they were errors):
+
+\begin{itemize}
+\item Incorrect scaling is used for the Legendre polynomials - you'd need to carry around a \(\sqrt{(2l+1)/2}\) factor to ensure correct calculation of the orthogonal expansion coefficients. Incorrect scaling is also used for the Zernike polynomials (they should all be divided by \(\sqrt{\pi}\)). It's possible that something existed on the MOOSE side of things to ensure that these coefficients were taken account of, but this is bad software design practice, since all OpenMC features should be encapsulated in OpenMC.
+\item The {\tt MAX\_ANG\_ORDER} was changed from 10 to 18 to accommodate higher Zernike expansion orders, without changing the highest order of the Legendre expansions. If the user sets an order higher than 10 for the Legendre expansions, but less than 18, no error will be posted about this, and you'll unknowingly end up using \(P_{i}(z)=1\), which is incorrect.
+\item The {\tt get\_polynomial\_norm\_positions} subroutine only takes as argument the particle coordinates and the normalizing radius. This {\it only} gives correct scaled coordinates in the center of the circle is already centered at \(0, 0\). For instance, by testing with a circle centered at \((0.6, 0.6)\), normalized radii of greater than unity, and incorrectly-normalized \(\theta\) values were computed. 
+
+\begin{lstlisting}
+  <surface id="1" type="z-cylinder" coeffs="0.6 0.6 0.5" />
+
+  <surface id="4" type="x-plane" coeffs="0.0" boundary="reflective" />
+  <surface id="5" type="x-plane" coeffs="1.2" boundary="reflective" />
+  <surface id="6" type="y-plane" coeffs="0.0" boundary="reflective" />
+  <surface id="7" type="y-plane" coeffs="1.2" boundary="reflective" />
+
+  <cell id="1" material="8" name="fuel_in"  region="  -1" />
+  <cell id="4" material="12" name="water" region="1 4 -5 6 -7"/>
+\end{lstlisting}
+
+By assuming that the cell bin that is used as a filter for the Zernike expansion is a cylinder bounded by two z-planes, we can work backwards to find out what the center, radius, and height of the cylinder are. The {\tt region} member of the cell that is contributing to the tally is expected to have three values, one representing a cylinder, and two representing the \(z\)-planes that terminate the cylinder in height. The normalized coordinates are computed by reading the radius, center, and \(z\)-extents of the cylindrical region directly from the cell information, instead of relying on any information from the tally specification in the XML file. I removed the {\tt geom\_norm} quantity, since it is all done internally. To verify that this was done correctly, I ran the exact same geometry for two different cases - one with the geometry centered at \((0, 0)\), and one with the geometry centered at \((0.6, 0.6)\). Both cases give identical results for the Zernike expansion coefficients.
+
+\end{itemize}
+
+Minor changes that were made that do not constitute errors, but lead to more readable code, include:
+
+\begin{itemize}
+\item Replaced logic to calculate \(\theta\) in the {\tt get\_polynomial\_norm\_positions} subroutine by a single call to the {\tt atan2} intrinsic.
+\end{itemize}
 
 \subsubsection{Evaluation of Polynomials}
+OpenMC contains several functions in the {\tt math} module to compute polynomial values given a coordinate and order. 
+
+\subsubsubsection{{\tt calc\_pn(n, x)}}
+\label{sec:calc_pn}
+This elemental function computes a Legendre polynomial given an order \(n\) and a coordinate \(x\), where this \(x\)-coordinate must be within the valid range \(-1\leq x\leq1\). For performance, this function hard-codes the Legendre polynomials (does not use a recursive formulation) up to order 10. Above order 10, this function returns 1, which will obviously be incorrect. No checks are made to ensure that the order or coordinate are within the valid ranges. Note that this function does not compute the {\it scaled} Legendre polynomials that are needed for neat computation of expansion coefficients for an orthogonal expansion (they should be multiplied by \(\sqrt{(2l+1)/2}\)). 
+
+\subsubsubsection{{\tt calc\_pn\_scaled(n, x)}}
+This elemental function computes the scaled Legendre polynomials that are needed for correctly computing FET expansion coefficients (without needing to worry about carrying the \(\sqrt{(2l+1)/2}\) coefficient around). This function simply calls the {\tt calc\_pn} subroutine, and hence suffers the same limitations as those discussed in Section \ref{sec:calc_pn}. 
+
+\subsubsubsection{{\tt calc\_zn(n, rho, phi)}}
+\label{sec:calc_zn}
+This function computes the Zernike polynomial for an order \(n\), radial coordinate \(\rho\), and angular coordinate \(\phi\) assuming that these coordinates have already been correctly scaled to the unit circle. No checks are made to ensure that these coordinates are within the valid ranges. For a given value of \(n\), the output of this function is an array \(zn\) of length \(n+1\), i.e. the output array holds all of the \(n=\) fixed, \(m\) values for the given \(n\). Similar to {\tt calc\_pn}, this function does not correctly scale the Zernike polynomials - they should all be divided by a factor of \(\sqrt{\pi}\) to ensure that integration over the orthogonal domain directly gives the expansion coefficients, without other factors trailing around.
+
+\subsubsubsection{{\tt calc\_zn\_scaled(n, rho, phi)}}
+This function computes the scaled Zernike polynomials that are needed for correctly computing FET expansion coefficients (without needing to worry about carrying the \(1/\sqrt{\pi}\) coefficient around). This function simply calls the {\tt calc\_zn} subroutine, and hence suffers the same limitations as those discussed in Section \ref{sec:calc_zn}. 
 
 \subsubsection{Field Deconstruction}
-OpenMC deconstructs a statistical distribution of fission events into expansion coefficients for the fission source. Tallies are used to compute these expansion coefficients, and hence an understanding of the tally system in OpenMC is required. The following provides the sequence of events followed in reading in tally information from the tallies XML input file.
+OpenMC deconstructs a statistical distribution of fission events into expansion coefficients for the fission source. Tallies are used to compute these expansion coefficients, and hence an understanding of the tally system in OpenMC is required. A tally, at its most fundamental level, can be described almost entirely by its score and filter(s). A filter represents the region of phase space over which to tally, and the score the ``what'' to tally. 
+
+\beq
+X=\underbrace{\int dE\int d\bf{r}\int d\hat{\Omega}\int dt}_{\textrm{filters}} \underbrace{f(E,\bf{r},\hat{\Omega},t)}_{\textrm{score}}\psi(E,\bf{r},\hat{\Omega},t)
+\eeq
+
+Deconstructing the fission source into a set of expansion coefficients requires using tallies to compute the expansion coefficients. This capability was added to OpenMC by Matt Ellis. The following provides the sequence of events of reading in tally information from the tallies XML input file in order to describe the various data structures that hold the tallies. All actions to read the tallies XML file occur in the {\tt read\_tallies\_xml()} subroutine. New code that was introduced to implement FETs is shown for illustration.
+
+In order to permit FETs in OpenMC, a new score type, {\tt KAPPA\_FISSION\_ZN}, was added. This new score type is specified in the input file by the name {\tt kappa-fission-zn}. All tallies in OpenMC are set to tracklength tallies by default, but this type of score is set to an analog tally in the select-case statement in the {\tt read\_tallies\_xm()} subroutine for this new tally. At the very end of this routine, a check is made to see if the user specified an estimator in the input file. If the user specifies a collision estimator, but the estimator had already been changed to an analog estimator, then the estimator is kept as an analog estimator (since the estimator was set to an analog estimator presumably because it requires post-collision information). So, the FETs in OpenMC are {\it analog} estimators.
+
+This new analog score type required a single modification to the {\tt TallyObject} data type - a real, allocatable array {\tt fet\_geom\_norm(:)} array was added in order to hold the geometric normalization for the FET tallies. This array is allocated in the {\tt read\_tallies\_xml} subroutine to have a length of 1 (only one geometric norm can currently be specified in the input file). 
+
+Collision and track-length estimators cannot be used for tallies that need post-collision information.
+
+The {\tt MAX\_ANG\_ORDER} was increased from 10 to 18. Because this new score type scores multiple moments at once, it is added to the {\tt MOMENT\_STRS} character array that holds the name that will appear in input files to represent this new score - {\tt kappa-fission-z}. {\tt ZN\_LOC} is a new constant parameter that indicates at what position in the {\tt MOMENT\_STRS} array the Zernike expansions begin.
+
+Before discussing how the tallies XML file is used to populate OpenMC tally data structures, it is important to understand the meaning of the fields in the tally data structures. 
+
+\begin{itemize}
+\item All user-specified tallies are stored in the {\tt tallies} array, which is of type {\tt TallyObject}.
+\item All filters are specified in the {\tt filters} array, which is of type {\tt TallyFilterContainer}. Each element of the {\tt filters} array is of type {\tt TallyFilter}, which is an abstract type that is associated with an ID and number of bins. This abstract class is overridden based on the type of filter to the more specific type, such as {\tt CellFilter}. This is done in a case-select statement based on the type of filter specified in the input file, and is required because the different types of filters have different data structure requirements.
+\end{itemize}
 
 \begin{enumerate}
-\item Read the tallies XML file by calling the {\tt read \_tallies\_xml()} subroutine. The tallies XML file is optional. 
+\item {\bf Read any meshes specified}. A mesh can be used to specify the grid over which tallies are to be scored, instead of using other geometrical filters such as cells or universes. Allocate the global {\tt meshes(n\_meshes)} array to hold this mesh information. If the run does not use CMFD acceleration, then the number of meshes is simply equal to the number of meshes specified in the input file. Otherwise, the number of meshes is the sum of the CMFD meshes plus any user-specified meshes.  
+\item {\bf Read the number of user filters and assign to the {\tt filters} array}. The filters are allocated by calling {\tt add\_filters(n\_user\_filters)}, which allocates the global {\tt filters} array if it does not exist, or else extends the {\tt filters} array.
+\item {\bf Add user tallies to the global {\tt tallies} array} by calling the {\tt add\_tallies("user", n\_user\_tallies)} subroutine. If the global variable {\tt n\_tallies} is zero, then allocate {\tt tallies(n)}, otherwise extend the {\tt tallies} array with the additional tallies.
+\item Loop through the number of user meshes and read in XML data to the {\tt meshes(i)} structure. 
+\item Read data for derivatives. 
+\item {\bf Read data for user filters}. Loop through the {\tt n\_user\_filters}.
+
 	\begin{enumerate}
-	\item Allocate memory for the global {\tt tally\_derivs} array of type {\tt TallyDerivative}. This array is thread private. 
-	\item The global variable {\tt n\_meshes} is set equal to the number of meshes the user specifies in the tallies XML file. Then, allocate the global {\tt meshes} array of type {\tt RegularMesh} to hold this mesh information. 
-	\item The global variable {\tt n\_user\_filters} is read from the number of filters listed in the input file. The filters are allocated by calling {\tt add\_filters(n\_user\_filters)}, which allocates the global {\tt filters} array of type {\tt TallyFilterContainer} if it does not exist, or else extend the filters array. 
-	\item The tallies specified in the tallies XML file are user tallies, and are counted as the global variable {\tt n\_user\_tallies}. 
-	\item Allocate the global {\tt tallies} array by calling the {\tt add\_tallies("user", n\_user\_tallies)} subroutine. If the global variable {\tt n\_tallies} is zero, then allocate {\tt tallies(n)}, otherwise extend the {\tt tallies} array with the additional tallies. There are two types of "groups" that can be passed in - "user" and "cmfd". The index for the tally group is set as {\tt i\_user\_tallies = n\_tallies} (this index is the starting index, minus 1, in tallies for each tally group). Finally, because we moved indices in the global tallies array, we need to reassign pointers for each group. {\tt user\_tallies}, a point to tallies of type {\tt TallyObject}, is reset accordingly.
-	\item Loop through the number of user meshes and read in XML data to the {\tt meshes(i)} structure. 
-	\item Read data for derivatives. 
-	\item Read data for filters. Loop through the {\tt n\_user\_filters}. A filter must be associated with an ID. The filter type is read into the temporary string {\tt temp\_str}, and then in a case select statement, we determine the number of bins. The valid types of filters are then searched over in a select-case statement. For each filter type, we allocate and declare the filter type (?) (for each type of filter, there is a corresponding type similar to {\tt CellFilter} for cell-type filters). For filters of compatible types, the {\tt filters(i) \% obj \% n\_bins} is set equal to the number of bins that appear in the XML file. Finally, the filter is added to the filter dictionary.
-	\item Read data for tallies. Loop through the {\tt n\_user\_tallies}. The tally type {\tt tallies(i) \% type = TALLY\_VOLUME} is set by default. It's also better to use track length estimators for tallies, since more events will contribute (though we can't use this for tallies that require post-collision information). For now, set {\tt tallies(i) \% estimator = ESTIMATOR\_TRACKLENGTH}. 
+	\item In a select-case statement for the filter type, determine the number of bins, and save it in the local variable {\tt n\_words}. The number of bins here is simply the number specified in the input file.
+	\item Allocate and declare the filter type by instantiating from the abstract class {\tt TallyFilter} with the extended type (for each type of filter, there is a corresponding type similar to {\tt CellFilter} for cell-type filters that defines additional filter-specific parameters).
+	\item Store the number of bins that appear in the input file to the {\tt filters(i) \% obj \% n\_bins} member. 
+	\item Perform any other specific initialization of {\tt filters(i)} based on data from the input file. 
+	\end{enumerate}
+	
+\item {\bf Read data for tallies}. Loop through the {\tt n\_user\_tallies}.
+	
+	\begin{enumerate}
+	\item Set the tally type {\tt tallies(i) \% type = TALLY\_VOLUME} to volume by default default. 
+	\item It's better to use track length estimators for tallies, since more events will contribute (though we can't use this for tallies that require post-collision information). Set {\tt tallies(i) \% estimator = ESTIMATOR\_TRACKLENGTH} as the default in case the user doesn't specify anything in the input file. 
+	\item Read any filters specified within this particular tally (instead of as their own XML object). Store the filter IDs in the temporary array {\tt temp\_filter(n\_filter)}, where {\tt n\_filter} is the number of filter specified for this tally. Loop over the filters.
+		
 		\begin{enumerate}
-		\item Then, read data for filters for the tally - the number of filters for the tally is read into the local variable {\tt n\_filters}. Read any filters that are present, and store them in the temporary, local {\tt temp\_filter} array. For this tally, then loop through all of the filters for the tally. Set the filter index in the tally {\tt find\_filter} array (an array defined in the {\tt tally\_header} file that is initialized to zero, with a length equal to the constant {\tt N\_FILTER\_TYPES}. So, for each tally in {\tt tallies}, the {\tt find\_filter} array is all zeros except for any filters (type expressed as an integer) that are used for the tally (and then the number actually stored in each instance of {\tt find\_filter} corresponds to the filter index). It is here that the particular tallies that cannot use a tracklength estimator are set to {\tt ESTIMATOR\_ANALOG}. 
-		\item Read data for nuclides that you'd like to tally for the current tally. You can specify all nuclides, in which case {\tt tallies \% nuclide\_bins} is allocated with a size of the total number of nuclides in the simulation, {\tt n\_nuclides\_total}, plus 1, and is populated with all of the integers corresponding to the nuclides. For this special case, {\tt tallies(i) \% all\_nuclides} is set to true. For other cases, where only a subset of the nuclides are specified, then the {\tt tallies(i) \% nuclide\_bins(n\_words)} is allocated with the appropriate length. Looping over the number of nuclides specified, then set the {\tt nuclide\_bins(j)} to the index of the nuclide in the nuclides array. If no nuclides are specified, then the {\tt total} material is used, and only one nuclide bin is added to {\tt tallies(i)} (note that specifying no nuclides is different from specifying all nuclides!). 
-		\item Read data for scores. The number of scores listed is used to allocate the local array {\tt sarray(n\_words)} of type character to simply hold the names of the scores. Before allocating storage for the scores, we first need to determine the number of additional scores that would be required due to moment scores. This is only required if the score is of the form moment-p or moment-y. Now, allocate the global variable {\tt tallies(i) \% score\_bins(n\_scores)}, with the correct number of scores (for our case, this will just be the number of scores listed in the input file). Also allocate {\tt tallies(i) \% moment\_order(n\_scores)}. Then, loop over the number of scores. Additional checks are made here to ensure compatibility between the types of filters you specified above, and the types of scores. Then, enter a select-case statement that loops over all of the possible score types. For each type of score, set {\tt tallies(i) \% score\_bins(j) = SCORE\_FLUX}, or the appropriate type of scoring. Depending on the type of tally, other members of {\tt tallies(i)} such as {\tt moment\_order} may be set. Finally, at the end of the very large select-case statement for possible scores, we check to make sure that the tallies are compatible with MG mode. The number of scores specified in the input file may not necessarily be the actual number of scores that are used, since some tallies expand in spherical harmonics or Legendre polynomials, and return moments. Hence, {\tt tallies(i) \% n\_scores} contains the actual number of scores, while {|tt tallies(i) \% n\_words} contains the number of scores specified in the XML file. Finally, check that no duplicate scores exist by looping through the number of scores.
-		\item Check for tally derivatives. 
-		\item If {\tt trigger\_on} is true based on the settings XML file, then create tally triggers.
-		\item Set tally estimator - checks if the user specified an estimator in the input file (previously it was set according to the type of tally as either was strictly required to be an analog estimator, or by default as a track-length estimator). Collision and track-length estimators cannot be used for tallies that need post-collision information. If you don't need post-collision information, then the type specified by the user in the tallies XML file will supersede any defaults set earlier. 
+		\item Set the filter index in the {\tt tallies(i) \% find\_filter} array. For each filter, populate the numeric entry of {\tt find\_filter} corresponding to the filter type of this filter (i.e. set the {\tt FILTER\_CELL} entry to the filter number if the filter is a cell filter). Hence, the {\tt find\_filter} array holds all zeros except for entries that correspond to the number of filters for this tally. The location of these non-zeros directly translates to the {\it type} of filter, as defined in the constants module.
+		\item Any filters that cannot use a tracklength estimator (those that require you to have sampled the outgoing phase space following a collision) are set to analog.
 		\end{enumerate}
+	\item {\bf Read data for nuclides that you'd like to tally} for the current tally. 
+		
+		\begin{enumerate}
+		\item If you specify all nuclides, then {\tt tallies(i)\%nuclide\_bins} is allocated with a size equal to the total number of nuclides in the simulation. The entries in the {\tt nuclide\_bins} array hold the integer-equivalents of all of the nuclides in the simulation.
+		\item Otherwise, {\tt nuclide\_bins} is allocated with a length equal to the number of nuclides you specified for this tally. 
+		\item If no nuclides were specified, then set the length of {\tt nuclide\_bins} to 1, and set the numeric entry equal to \(-1\), which indicates that you'll be using the {\tt 'total'} material (i.e. everything scores regardless of the material bin).
+		\end{enumerate}
+	
+	\item {\bf Read data for scores}. Loop through the number of scores specified in the input file, stored locally as {\tt n\_words}.
+		
+		\begin{enumerate}
+		\item {\bf Determine number of additional scores required due to moment scores} before you allocate storage for the scores. This is only required for score types present in the {\tt MOMENT\_STRS} array, which holds the names of moment tallies. These tallies are invoked in the input file by following their name directly by a number indicating an order. If this trailing number is greater than {\tt MAX\_ANG\_ORDER}, a warning is thrown, and instead the order is gracefully set to the maximum angular order allowed, and stored in the local variable {\tt n\_order}.
+
+\begin{lstlisting}[language=Fortran]
+		character(*), parameter :: &
+          MOMENT_STRS(7)  = (/ "scatter-p      ",   &
+                               "nu-scatter-p   ",   &
+                               "flux-y         ",   &
+                               "total-y        ",   &
+                               "scatter-y      ",   &
+                               "nu-scatter-y   ",   &
+                               "kappa-fission-z"/), &
+          MOMENT_N_STRS(2)  = (/ "scatter-    ",   &
+                               "nu-scatter- "/)
+\end{lstlisting}
+
+		\item The number of bins is determined according to the order of the expansion requested. For Legendre expansions, the number of bins needed is \(n+1\), since the \(l\) summation has a lower bound of zero. For an order \(n\), \((n+1)^2\) tallies are required for spherical harmonics tallies and \(0.5(n+1)(n+2)\) for Zernike tallies. Hence, {\tt tallies(i) \% n\_scores} contains the actual number of scores (including {\it all} expansion orders for moment expansions, while {\tt tallies(i) \% n\_words} contains the number of scores specified in the XML file.  
+		\item Allocate {\tt tallies(i) \% score\_bins(n\_scores)} and {\tt tallies(i) \% moment\_order(n\_scores)}. Initialize the {\tt moment\_order} array to all zeros. 
+		\item {\bf Loop over the number of scores specified in the input file} ({\it not} the total number I actually allocated to account for moment scores). Ask Paul about duplication here...
+			
+			\begin{enumerate}
+			\item Enter a select-case statement that loops over all of the possible score types. Additional checks are made here to ensure compatibility between the types of filters you specified above, and the types of scores. 
+			\item For each type of score, set {\tt tallies(i) \% score\_bins(j) = SCORE\_FLUX}, or the appropriate type of scoring. For scores that inherently contain more than one score bins (the moment scores), simultaneously apply values for all of the {\tt score\_bins} and {\tt moment\_order} (where the order of the total Zernike expansion is held).
+		
+		To implement FETs, a new score is introduced called {\tt kappa-fission-zn}. The type of score for each bin is set to a new constant, {\tt SCORE\_KAPPA\_FISSION\_ZN}. The moment order for each of these bins is set to {\tt n\_order}, the requested order. The user may specify one value of {\tt geom\_norms} in the input file - then, {\tt tallies(i) \% fet\_geom\_norm(n\_fet\_norms)} is allocated, and set equal to the value from the input file. 
+		
+\begin{lstlisting}[language=Fortran]
+case ('kappa-fission-zn')
+  t % estimator = ESTIMATOR_ANALOG
+  t % score_bins(j : j + n_bins - 1) = SCORE_KAPPA_FISSION_ZN
+  t % moment_order(j : j + n_bins - 1) = n_order
+  j = j + n_bins - 1
+  n_fet_norms = node_word_count(node_tal, "geom_norms")
+  if (n_fet_norms /= 1) then
+    call fatal_error('Expecting one value for geometric& 
+      & norm of Zernike kappa-fission tally.')
+  end if
+
+  allocate(t % fet_geom_norm(n_fet_norms))
+  call get_node_array(node_tal, "geom_norms", t % fet_geom_norm)
+\end{lstlisting}
+		
+			\item Check to make sure that the tallies are compatible with MG mode.  
+			\item Check that no duplicate scores exist by looping through the number of scores.
+			\end{enumerate}
+		\end{enumerate}
+	\item Check for tally derivatives. 
+	\item If {\tt trigger\_on} is true based on the settings XML file, then create tally triggers.
+	\item {\bf Set tally estimator {\it if} specified in XML file} - this checks if the user specified an estimator in the input file (previously it was set according to the type of tally as either was strictly required to be an analog estimator, or by default as a track-length estimator).  If you don't need post-collision information, then the type specified by the user in the tallies XML file will supersede any defaults set earlier. 
 	\end{enumerate}
 \end{enumerate}
 
-To score a collision tally, the {\tt score\_collision\_tally(p)} routine is called after every collision. It is invalid for tallies that require post-collision information because it can score reactions that didn't actually happen, and without sampling, we don't know all of the outgoing information. 
+After the desired tallies are read from the input file, all scoring to the tallies occurs within the {\tt transport} subroutine. Within this main transport loop, after cross sections are calculated, the actions taken by a particle are determined. The particle is moved the minimum of the distance to the nearest boundary and the sampled distance to a collision. Before sampling any information about the type of collision, tracklength tallies are scored. If a particle has a collision, then first score to the collision estimate of \(k\), and score to surface current tallies that require us to not have yet sampled outgoing information. Then, perform the collision, and score to the collision and analog tallies. Perform some resetting, and then determine if any secondary particles were born. If so, then initialize them from the fission source. Otherwise, continue transporting the present particle until it suffers an absorption and produces no secondary particles.
 
 \begin{enumerate}
-\item Loop over all of the {\tt active\_collision\_tallies}. 
+\item {\bf Find distance to nearest boundary} by calling {\tt distance\_to\_boundary}.
+\item {\bf Sample a distance to collision} and store in {\tt d\_collision}. 
+\item {\bf Advance the particle}. Select the smaller of the two distances as the distance to move the particle, and then update the {\tt p \% coord(j) \% xyz} particle coordinates by looping through the number of particle coordinates and adjusting each accordingly.
+\item {\bf Score track-length tallies} by calling {\tt score\_tracklength\_tally(p, distance)}. This is only performed if {\tt active\_tracklength\_tallies} is greater than zero. If running in eigenvalue mode, then also score the tracklength estimate of \(k\).
+\item Score flux derivative accumulators for differential tallies.
+\item If the particle crosses a surface, then determine if it crossed either a lattice boundary or a surface boundary, and update the {\tt p \% event} field (to either {\tt EVENT\_LATTICE} or {\tt EVENT\_SURFACE}). Otherwise, the particle has a collision.
 	\begin{enumerate}
-	\item Find all valid bins for this filter. If there are no valid bins for this filter, then there is nothing to score, and you can move on to the next tally. Otherwise, loop over all of the filters until you've covered all of the valid bins on each of the filters. Loop over all nuclides, and determine if each nuclide is actually in the material. Finally, score for each bin by calling {\tt score\_general\_ce}.
+	\item Score to the collision estimate of \(k\).
+	\item Score to surface current tallies by calling {\tt score\_surface\_current(p)} before the particle direction changes, since we want to use the incident neutron direction for this tally.
+	\item Perform a collision by calling {\tt collision(p)}. 
+	\item {\bf Score collision estimator tallies} by calling {\tt score\_collision\_tally(p)} if there are collision tallies (size of {\tt active\_collision\_tallies} is greater than zero). 
+	\item {\bf Score analog tallies} by calling {\tt score\_analog\_tally(p)} if there are analog tallies (size of {\tt active\_analog\_tallies} is greater than zero).
+	\item Reset banked weight during collision by setting {\tt p \% n\_bank = 0, p \% wgt\_bank = ZERO, p \% n\_delayed\_bank(:) = 0}. 
+	\item Save coordinates for tallying purposes by writing to {\tt p \% last\_xyz\_current}. 
+	\item Set {\tt p \% last\_material = NONE} because cross sections will need to be re-evaluated. 
+	\item Check for secondary particles if this particle is dead. If any secondary particles exist, then initialize them by calling {\tt initialize\_from\_source}. 
+	\end{enumerate}
+	\item Repeat until particle is dead (no secondary particles and an absorption).
+\end{enumerate}
+
+Assuming that we are using an analog tally, analog tallies are scored by calling the {\tt score\_analog\_tally(p)} subroutine, which only takes as input the particle. 
+
+\begin{enumerate}
+\item Loop over all of the analog tallies (size of {\tt active\_analog\_tallies}).
+	\begin{enumerate}
+	\item Loop over all of the filters for this tally (size of {\tt tallies(i\_tally) \% filter}).
 		\begin{enumerate}
-		\item The {\tt score\_general\_ce(p, t, start\_index, filter\_index, i\_nuclide, atom\_density, flux)} subroutine adds scores to the tally array for a given filter and nuclide, and it is called by all volume tallies. Begin by looping over all of the score bins ({\tt n\_user\_score\_bins}). Then, enter a select-case statement to determine the type of tally - it is here that the actual ``formulas'' for tallying different scores are held. The end result of this select-case statement is to determine a value for the {\tt score}. 
-		\item After determining the correct value of the {\tt score}, expand the score if necessary and add it to the tally results by calling {\tt expand\_and\_score(p, t, score\_index, filter\_index, score\_bin, score, i)} subroutine. This routine takes a previously determined score value and adjusts it if needed, such as for functional expansion weighting, and then adds the resultant value to the tally results array. 
+			\item If there are no valid bins for this filter {\it for this particle}, then there is nothing to score, and you can move on to the next tally. Otherwise, loop over all of the filters until you've covered all of the valid bins on each of the filters. For example, suppose a tally has two filters, an energy filter and a cell filter. The energy filter may have three bins, and the cell filter two bins (two cells). If the particle's energy matches one of the energy bins {\it and} one of the cell bins, then score to this tally. Otherwise, if no bins match the particle's state, cycle back to the start of the tally loop to look at the next tally.
+		\end{enumerate}
+	\item In an indefinite do-loop...
+		\begin{enumerate}
+		\item Loop over the size of {\tt tallies(i)\%filter}.
 			\begin{enumerate}
-			\item Immediately enter a case-select statement that determines the type of score (such as {\tt SCORE\_SCATTER\_N}). This will add to the value of {\tt t \% results} by increasing the value by the previously-calculated {\tt score}. 
-			\item For tallies that expand in Legendre polynomials, {\tt calc\_pn} function computes the \(n\)-th order Legendre polynomial given an order and coordinate. 
+			\item .
+			\end{enumerate} 
+		\item Check for nuclide bins.
+			\begin{enumerate}
+			\item Score for this nuclide, this bin, and this filter for this tally by calling {\tt score\_general(p, t, (k - 1) * tallies(i)\%n\_score\_bins, filter\_index, i\_nuclide, ZERO, filter\_weight)}. 
 			\end{enumerate}
 		\end{enumerate}
 	\end{enumerate}
 \end{enumerate}
 
-In order to tally the expansion coefficients for a Zernike-Legendre expansion, a new type of score was created - {\tt SCORE\_FISSION\_ZL}, which is implemented in a manner very similarly to the tallies that expand a reaction rate in Legendre polynomials or spherical harmonics. The following changes were made to add this new type of score:
+All volume tallies call the {\tt score\_general\_ce(p, t, start\_index, filter\_index, i\_nuclide, atom\_density, flux)} subroutine. This subroutine adds scores to the tally array for a given filter and nuclide. This routine performs the following logic. Loop over all of the score bins, and then a select-case statement contains the actual ``formulas'' for tallying different scores are held. The end result of this select-case statement is to determine a value for the {\tt score}. The only change made in this section to accommodate the new {\tt SCORE\_KAPPA\_FISSION\_ZN} tally was to include its type in the same case statement as the {\tt SCORE\_KAPPA\_FISSION} tally. 
 
-\begin{itemize}
-\item Register a new type of tally, {\tt SCORE\_FISSION\_ZL}. 
-\item For the case statement in the {\tt score\_general\_ce}, we need to add the {\tt SCORE\_FISSION\_ZL} score type to the same case select statement for the {\tt SCORE\_FISSION} tally, since they both essentially tally the same thing, except that the new tally will compute multiple expansion coefficients.
-\end{itemize}
+This tally is chosen because it tallies the recoverable energy production rate due to fission, and includes the fission product kinetic energy, prompt and delayed neutron kinetic energies, prompt and delayed gamma ray energies, and the total energy released from \(\beta\) particles. Neutrino energies are assumed to not deposit in the system, and hence are not included. The prompt and delayed gamma ray energy is assumed to deposit locally, so this tally would not provide very accurate results for estimating fission energy deposition directly in the coolant, since no fission will occur directly in the coolant. The units for this tally are eV per source particle. We only score to this tally if the nuclide with which the neutron is interacting is fissionable. The {\tt KAPPA\_FISSION} tally computes the score in the following manner. For analog tallies:
+
+\beq
+X=\sum_{i}w_iQ\frac{\sigma_f}{\sigma_a}\phi
+\eeq
+
+where if there is no survival biasing, then we need to skip scoring to this tally for all absorption events (no absorption events occur with survival biasing, so we don't have to worry about this check for those cases). Note that the Q-value of the reaction is not dependent on the incident neutron energy (the {\tt FISSION\_Q\_RECOVERABLE} tally would be used for this purpose). For non-analog tallies, we no longer use the particle weight in the tally, and we score according to the material in which we are in:
+
+\beq
+X=\sum_{i}Q\sigma_{f,i}N_i\phi
+\eeq
+
+After determining the correct value of the score, expand the score if necessary and add it to the tally results by calling {\tt expand\_and\_score(p, t, score\_index, filter\_index, score\_bin, score, i)} subroutine. This routine takes a previously determined score value and adjusts it if needed, such as for functional expansion weighting, and then adds the resultant value to the tally results array. Enter a case-select statement based on the type of score. For FETs, this is where the heart of the expansion itself occurs. 
+
+In order to compute the Zernike expansion, we must use coordinates that have been normalized to the unit circle. Matt Ellis developed a function to perform this capability. While he developed this routine for 2-D Zernike expansions, it can be extended to allow calculation of normalized positions for other expansions, such as Legendre expansions, by changing the score type pass in. For Zernike polynomials, the {\tt norm\_pos1} represents the normalized radial coordinate, and {\tt norm\_pos2} the normalized angular coordinate. Based on the formula for {\tt norm\_pos2}, this subroutine assumes that the Zernike expansion is occurring in the \(xy\) plane, since we use the first and second coordinates to compute the angle. This subroutine also assumes that the circle is centered on \(0,0\), since no information is passed in about a center about which to normalize the particle's coordinates, and based on the logic for changing {\tt norm\_pos2} (such as looking at whether or not the \(x\)-coordinate is negative). 
+
+The {\tt geom\_norms} array provided from the input file is of length 2, and contains the actual radius of the circle as its first element. A particle is associated with {\tt n\_coord}, the integer number of current coordinates, and an array of type {\tt LocalCoord} or length {\tt MAX\_COORD} named {\tt coord} that stores the coordinates for all levels. So, {\tt p \% coord(p \% n\_coord)} represents the coordinates in the present cell? 
+
+\begin{lstlisting}[language=Fortran]
+  subroutine get_polynomial_norm_positions(coord, geom_norms, norm_pos1, &
+       norm_pos2, score_type)
+
+    type(LocalCoord), intent(in) :: coord    ! mphysics coord level
+    real(8), dimension(:), intent(in) :: geom_norms    ! Geometric norms for calculation
+    real(8), intent(inout) :: norm_pos1 ! Normalized positions for tally
+    real(8), intent(inout) :: norm_pos2 ! Normalized positions for tally
+    integer, intent(in) :: score_type   ! Constant for the tally score type
+
+    select case (score_type)
+    case (SCORE_KAPPA_FISSION_ZN)
+      norm_pos1 = sqrt(coord % xyz(1) * coord % xyz(1) + &
+           coord % xyz(2) * coord % xyz(2)) / geom_norms(1)
+           
+      norm_pos2 = atan(coord % xyz(2) / coord % xyz(1))
+      
+      if (norm_pos2 < ZERO .and. coord % xyz(1) < ZERO) then
+        ! Need to shift to second quadrant
+        norm_pos2 = norm_pos2 - PI
+        
+      else if (norm_pos2 > ZERO .and. coord % xyz(1) < ZERO) then
+        ! Need to shift to third quadrant
+        norm_pos2 = norm_pos2 + PI
+      end if
+    end select
+
+  end subroutine get_polynomial_norm_positions
+\end{lstlisting}
+
+Then, after computing the normalized coordinates, the score is expanded in Zernike polynomials and added to the tally results array.
+			
+\begin{lstlisting}[language=Fortran]
+case (SCORE_KAPPA_FISSION_ZN)
+  score_index = score_index - 1
+  num_nm = 1
+
+  ! Calculate normalized positions
+  call get_polynomial_norm_positions(p % coord(p % n_coord), t % fet_geom_norm, norm_pos1, norm_pos2, SCORE_KAPPA_FISSION_ZN)
+      
+  ! Loop over each moment and score the contribution of each moment in the appropriate bin
+  z = 0
+  do n = 0, t % moment_order(i)
+    ! Determine scoring bin index
+    score_index = score_index + num_nm
+    ! Update number of total n,m bins for this n
+    num_nm =  n + 1
+    z = z + num_nm
+    
+    ! multiply score by the zernike moments and store
+!$omp critical
+        t % results(RESULT_VALUE, score_index: score_index + num_nm - 1, filter_index) = &
+             t % results(RESULT_VALUE, score_index: score_index + num_nm - 1, filter_index) + &
+             score * calc_zn(n, norm_pos1, norm_pos2)
+!$omp end critical
+      end do
+      ! Advance bin counter by the number of coefficients minus one for later update
+      i = i + z - 1
+\end{lstlisting}
+
+To actually use Matt's FET in an input file requires the following syntax, where the {\tt geom\_norms} is forced to only have a length of 1, and represents the actual radius of the circle over which the Zernike polynomials are applied.
+
+\begin{lstlisting}
+<tally id="1">
+  <filter type="cell" bins="1" />
+  <geom_norms> 0.5</geom_norms>
+  <scores>kappa-fission-z4</scores>
+</tally>
+\end{lstlisting}
 
 \subsubsection{Field Reconstruction}
 
@@ -672,20 +914,7 @@ read entries into this \% kTs\;
 				}
 				\end{algorithm}
 		
-		\item Find distance to nearest boundary by calling {\tt distance\_to\_boundary}.
-		\item Sample a distance to collision and store in {\tt d\_collision}. 
-		\item Select the smaller of the two distances as the distance to move the particle, and then update the {\tt p \% coord(j) \% xyz} particle coordinates by looping through the number of particle coordinates.
-		\item Score track-length tallies by calling {\tt score\_tracklength\_tally(p, distance)}.
-		\item Score track-length estimate of \(k\) by adding to the {\tt global\_tally\_tracklength} variable.
-		\item If the particle crosses a surface, then determine if it crossed either a lattice boundary or a surface boundary, and update the {\tt p \% event} field. Otherwise, the particle has a collision, which is assumed for all following steps.
-		\item Score to the collision estimate of \(k\) by adding to the {\tt global\_tally\_collision} global variable. Note that this occurs before sampling the type of collision and the particle's phase space following the collision.
-		\item Score to surface current tallies by calling {\tt score\_surface\_current(p)} before the particle direction changes, since the direction is important for this tally. 
-		\item Perform a collision by calling {\tt collision(p)}. 
-		\item Score collision estimator tallies by calling {\tt score\_collision\_tally(p)}. This requires that {\tt active\_collision\_tallies \% size()} be greater than zero. This occurs after the collision has occurred, so why can't this be used for tallies that require outgoing information?
-		\item Reset banked weight during collision by setting {\tt p \% n\_bank = 0, p \% wgt\_bank = ZERO, p \% n\_delayed\_bank(:) = 0}. 
-		\item Save coordinates for tallying purposes by writing to {\tt p \% last\_xyz\_current}. 
-		\item Set {\tt p \% last\_material = NONE} because cross sections will need to be re-evaluated. 
-		\item Check for secondary particles if this particle is dead. If any secondary particles exist, then initialize them by calling {\tt initialize\_from\_source}. 
+		\item Transport the particle and score tallies... (no relation to temperatures, so this is not shown here). 
 		\end{enumerate}
 	\end{enumerate}
 \end{enumerate}
@@ -706,9 +935,15 @@ This section discusses the changes made in OpenMC to allow fluid densities to be
 \subsection{Nek Data Transfer}
 This section describes the capabilities introduced into the Nek source code that allows evaluation of polynomials, and construction/deconstruction of continuous fields. 
 
+Nek COMMON blocks map directly into C structs. 
+
 \subsubsection{Evaluation of Polynomials}
 \subsubsection{Field Deconstruction}
 \subsubsection{Field Reconstruction}
+MOOSE transfer a heat flux to Nek to apply on the boundary between the fuel and coolant. A structure is defined with an array {\tt coeff\_fij} of doubles, named {\tt expansion\_fcoef\_}. This array receives expansion coefficients {\it from} MOOSE, and hence stores expansion coefficients for a heat flux surface boundary condition. 
+
+
+
 \subsubsection{Using the Constructed Field}
 
 \section{Overall Coupling Methodology}
@@ -1016,11 +1251,560 @@ This section discusses the input files needed by OpenMC, and where they should b
 
 \subsection{Nek}
 
+Nek output files can be visualized using VisIt. Nek solves over brick elements, with typical orders between 8 and 16. The advantage of using a spectral method is that there is very little numerical dispersion and dissipation, which would require very fine meshes for high Reynolds number flows and for long time integrations. Nek has minimal use of external libraries, which significantly reduces compile times (but then you need to compile for each individual problem). 
+
+To improve performance, matrix operations are implemented in assembly code. At the beginning of each run, Nek chooses between one of three parallel implementations by determining which one works best for the current machine - in this way, Nek automatically tunes its parallelism to the machine {\it and} problem.
+
+Nek5000 has the following solvers:
+
+\begin{itemize}
+\item Incompressible Navier-Stokes; If the viscosity is constant over the entire domain, then the divergence of the stress tensor can be replaced by \(\mu\nabla^2\vv{V}\). The use of the stress tensor is sometimes referred to as the ``stress formulation,'' though they are the same. 
+
+\beqa
+\label{eq:INS}
+\nabla\cdot\vv{V}=&0\\
+\rho\frac{d\vv{V}}{dt}=&-\nabla P+\nabla\cdot\left\lbrack\mu\left(\nabla\vv{V}+(\nabla\vv{V})^T\right)\right\rbrack+\rho\vv{g}\\
+\eeqa
+
+\item Non-dimensional Navier-Stokes; this uses the normal choices of scaling parameters, and offers two formulations - one for high Reynolds number flows, in which case pressure scales as \(P^{+}=P/(\rho V^2)\), and for low Reynolds number flows, in which case pressure scales as \(P^{+}=PL/\mu V\). For high Reynolds number flow, the continuity equation is used to find the scales for velocity, and then the scaled momentum equation becomes:
+
+\beq
+\frac{du^{+}}{dt^+}=-\nabla P^++\frac{1}{Re}\nabla\cdot\tau^++\frac{1}{Fr}\frac{\vv{g}}{g}
+\eeq
+
+\item Low Mach number Navier-Stokes (Nek cannot solve the fully-compressible Navier-Stokes equations); the low Mach number approximation decouples the pressure from the velocity. Nek hard-codes the equation of state here to be the ideal gas equation, which permits variable density and viscosity. The equation of state for density is substituted into the continuity equation, giving a thermal divergence term. 
+
+\item Incompressible Stokes. These equations are the same as those shown in Eq. \eqref{eq:INS}, except that the advective term is absent. 
+
+\item Nondimensional Stokes; this scaling is obtained by selecting the low Reynolds number scaling of pressure discussed above.
+
+\item Steady Stokes.
+ 
+\item The energy equation (solved over both the fluid and solid). This can also be solved in steady form by setting the total time derivative of the temperature to zero.
+
+\beq
+\rho C_p\frac{dT}{dt}=\nabla\cdot(k\nabla T)+\dot{q}
+\eeq
+
+\item Non-dimensional energy equation. 
+
+\beq
+\frac{dT^+}{dt^+}=\frac{1}{Pe}\nabla\cdot\nabla T^++\dot{q}
+\eeq
+
+\item Passive scalar equation, which can be solved in either the fluid alone or the entire domain.
+
+\beq
+\rho C_p\frac{d\phi}{dt}=\nabla\cdot(k\nabla\phi)+\dot{q}
+\eeq
+
+\item Linearized Navier-Stokes, which evolves small perturbations about a base state by solving the linearized Navier-Stokes equation:
+
+\beq
+\rho\left(\frac{\partial \vv{V}'}{\partial t}+\vv{V}\cdot\nabla\vv{V}'+\vv{V}'\cdot\nabla\vv{V}\right)=-\nabla P'+\mu\nabla^2\vv{V}'
+\eeq
+
+These solutions can be solved at the same time as the base equations, and can provide solutions to be used for computing turbulence quantities.
+
+\item Incompressible magnetohydrodynamics equations.
+
+\end{itemize}
+
+solves the incompressible Stokes, incompressible Navier-Stokes, or compressible Navier-Stokes (low Mach number) equations with forced or natural convection heat transfer in both a fixed or moving geometry. Nek solves for the velocity, pressure, and temperature. In addition, Nek can solve for conjugate heat transfer problems (solid-fluid).
+
+Data is laid out as \(u(i, j, k, e)\), where \(e\) refers to the element.  Hence, all the \(x\)-coordinate data is grouped together, etc. So, because Fortran arrays are column-order, all data arrays are contiguous, even if the number of elements allocated for each processor are excessive given the number of actual elements (because the last array dimension occurs entirely at the end). Then, instead of looping over all four indices, one can do the following (eliminates the overhead of three additional loops):
+
+\begin{lstlisting}[language=Fortran]
+do i = 1, nx1*ny1*nz1*nelv
+  u(i, 1, 1, 1) = vx(i, 1, 1, 1)
+enddo
+\end{lstlisting}
+
+Nek can only handle Cartesian 2-D and 3-D geometries. The boundary between the fluid and solid must be representable, or suffer little approximation error, from expression as straight line segments, splines, or circular arcs. Nek can handle time-dependent geometries for boundary conditions that allow the boundary itself to move. For deformable geometries, a mesh velocity is defined at each collocation point of the mesh to describe the deformation of the mesh. This mesh velocity is computed using the appropriate kinematic conditions such as for free surfaces. For all other boundaries, the normal mesh velocity is set to zero. A BVP is solved for the mesh velocity using an elastostatic solver. The new mesh geometry is then computed by integrating the mesh velocity explicitly in time and updating the nodal coordinates of the collocation points. The program will automatically terminate if the mesh becomes of too poor quality (negative or zero Jacobian of transformation). 
+
+Nek can internally generate meshes, as well as provide capabilities for mesh extruding and mirroring. {\tt genmap} is a spectral graph partitioning tool, similar to METIS, which partitions graphs to obtain optimal communication in parallel algorithms. Constructing a matrix that shows how many other nodes are connected to the current node, {\tt genmap} implements a spectral bisection algorithm to decompose a mesh for domain decomposition.
+
+Parallelism in Nek is achieved using domain decomposition. The {\tt lglel} arrays distinguish which processor owns which elements (i.e. for processor zero this array might be {\tt (1, 3, 5, 6, 4)} if this processor contains elements 1, 3, 5, 6, and 4. Then, the {\tt gllel} array assigns the local corresponding node to each global node. For instance, if processor 0 owns 1, 3, 5, 6, and 4, while processor 1 owns 2 and 7, {\tt gllel=(1, 1, 2, 5, 3, 4, 2)}. Finally, {\tt gllnid} assigns the processor number for each global element, and would for this example have the form {\tt gllnid=(0, 1, 0, 0, 0, 0, 1)}. 
+
+
 \subsubsection{Build Configuration}
 This section discusses how Nek is built to allow its routines to be called from within the MOOSE framework.
 
 \subsubsection{Input Files}
-This section discusses the input files needed by Nek, and where they should be placed relative to the Master App executable.
+This section discusses the input files needed by Nek, and where they should be placed relative to the Master App executable. Each Nek simulation requires the following core input files:
+
+\begin{itemize}
+\item {\tt SESSION.NAME} file, which contains the name of the {\tt .rea} file and the full path to the needed files. Note that it does not need to refer to the same name of the user file, while allows for different {\tt .usr} files, with the same boundary and initial conditions ({\tt .rea} files). An example session file is shown below. 
+
+\begin{lstlisting}
+integration_example
+/Users/aprilnovak/projects/moon/examples/integration_example
+\end{lstlisting}
+
+\item {\tt SIZE} file, which controls, {\it at compile-time}, the polynomial order of the spectral method (i.e. the problem ``size'' refers to the number of points in each element that the solution is evaluated at), the numbers of elements per processor, and the memory allocation for most of the arrays (except those required by C utilities). An example {\tt SIZE} file is shown below to illustrate the parameters. 
+
+It may seem strange that so many parameters should be specified in the {\tt SIZE} file that could be specified at runtime, but this is related to the limitation of FORTRAN 77 in not allowing dynamic array allocation - all array sizes must be known at compile-time, so the user has to provide estimates of maximum values of many variables to ensure sufficient space. The total size of the problem {\it per process} is {\tt lx1*ly1*lz1*lelt} (i.e. this is the size that is actually allocated). Roughly 3.2 kB are required for each grid point, of which there will be \((N+1)^3\) for a 3-D simulation, with \(N\) being the polynomial order. This should be kept in mind to ensure that the total memory requirement of the simulation can be handled by the number of processors requested - if you request too few of processors, then the memory per processor will still exceed the memory available on a core, and hence you would not be able to run your simulation without using more cores. 
+
+\begin{lstlisting}[language=Fortran]
+! number of spatial dimensions (ldim). Set this to 2 for 2-D or axisymmetric calculations.
+      parameter (ldim=3)
+
+! number of GLL points in the x, y, and z directions for the velocity mesh (mesh1). For 2-D meshes, simply set lz1=1. lx2, ly2, and lz2 can also be set to specify the number of GLL points for the pressure mesh (mesh2) and for mesh 3. It is common to use a relatively low-order approximation such as lx1=5 and then to run this for several flow times and use it as an initial condition for a higher-order run that is used to obtain actual results. You should design the mesh to use a polynomial order of 7 or 9.
+      parameter (lx1=5,ly1=lx1,lz1=lx1)
+
+! lx2 determines the formulation of the Navier-Stokes solver and the approximation order for the pressure? (i.e. the choice between Pn-Pn or Pn-Pn-2)
+      parameter (lx2=lx1-2,ly2=ly1-2,lz2=lz1-2)
+      parameter(lx3=lx1,ly3=ly1,lz3=lz1)
+
+! maximum number of local elements for the temperature mesh per process. This must be at least as large as the maximum number of elements divided amongst the number of processes (plus one to catch non-even division of elements amongst processes). Likewise, lelv sets the maximum number of local elements for the velocity mesh per process. nelt and nelv are the actual number of temperature and velocity elements, respectively, for _each_ process.
+      parameter (lelt=960)
+      parameter (lelv=lelt)
+
+! number of points for integration using ``three half rule''. This should typically be set to lxd=1.5*lx1. On some platforms, however, you should set lxd to an even number. You should try to minimize this polynomial order used for the fine grid.
+      parameter (lxd=8,lyd=lxd,lzd=lxd)
+
+! maximum number of elements per rank for global Fast Diagonalization Method solver
+      parameter (lelx=1,lely=1,lelz=1)
+
+! for 2-D, set lzl to 1, and otherwise to 3
+      parameter (lzl=3 + 2*(ldim-3))
+
+! maximum number of ranks - this should be set high so that you don't need to recompile to run on larger numbers of processes
+      parameter (lp = 32)
+
+! maximum (global) number of elements, which is usually set to more than the number of elements in the mesh. This can be set to the exact number of elements for best memory usage. 
+      parameter (lelg = 1000)
+
+! number of elements in the perturbation field, and the number of perturbation fields
+      parameter (lpelv=1,lpelt=1,lpert=1)
+   
+! number of points in the x, y, and z directions of the perturbation field within each element of mesh 1 and mesh 2   
+      parameter (lpx1=1,lpy1=1,lpz1=1)
+      parameter (lpx2=1,lpy2=1,lpz2=1)
+
+
+c     parameter (lbx1=lx1,lby1=ly1,lbz1=lz1)     ! array sizes
+c     parameter (lbx2=lx2,lby2=ly2,lbz2=lz2)
+
+
+! total number of elements in the B-field (for MHD)
+      parameter (lbelv=1,lbelt=1)
+
+! number of points in the x, y, and z directions of the B-field within each element of mesh 1 and mesh 2
+      parameter (lbx1=1,lby1=1,lbz1=1)
+      parameter (lbx2=1,lby2=1,lbz2=1)
+
+!     LX1M=LX1 when there are moving meshes; =1 otherwise
+      parameter (lx1m=lx1,ly1m=ly1,lz1m=lz1)
+
+! maximum number of T-array fields (temperature and additional passive scalars)
+      parameter (ldimt= 4)    
+
+      parameter (ldimt1=ldimt+1)
+      parameter (ldimt3=ldimt+3)
+c
+c     Note:  In the new code, LELGEC should be about sqrt(LELG)
+c
+
+! deprecated parameters?
+      PARAMETER (LELGEC = 1)
+      PARAMETER (LXYZ2  = 1)
+      PARAMETER (LXZ21  = 1)
+      PARAMETER (LMAXV=LX1*LY1*LZ1*LELV)
+      PARAMETER (LMAXT=LX1*LY1*LZ1*LELT)
+      PARAMETER (LMAXP=LX2*LY2*LZ2*LELV)
+
+! ?      
+      PARAMETER (LXZ=LX1*LZ1)
+
+! maximum time integration order
+      PARAMETER (LORDER=3)
+
+! maximum number of objects
+      PARAMETER (MAXOBJ=4)
+
+! maximum number of members in an object
+      PARAMETER (MAXMBR=LELT*6)
+
+! maximum number of history points a single rank will read in from hpts.in. lhis*np > npoints in hpts.in.
+      PARAMETER (lhis=100)
+
+C
+C     Common Block Dimensions
+C
+! LCTMP0 is not in use?
+      PARAMETER (LCTMP0 =2*LX1*LY1*LZ1*LELT)
+      
+! 
+      PARAMETER (LCTMP1 =4*LX1*LY1*LZ1*LELT)
+C
+! The parameter LVEC controls whether an additional 42 field arrays are required for Steady State Solutions.  If you are not using Steady State, it is recommended that LVEC=1.
+      PARAMETER (LVEC=1)
+C
+C     Uzawa projection array dimensions
+C
+! maximum number of history entries for residual projection
+      parameter (mxprev = 40)
+
+! dimension of Krylov subspace in GMRES
+      parameter (lgmres = 40)
+C
+C     Split projection array dimensions
+C
+! not in use?
+      parameter(lmvec = 1)
+
+! not in use?
+      parameter(lsvec = 1)
+
+! not in use?
+      parameter(lstore=lmvec*lsvec)
+c
+c     NONCONFORMING STUFF
+c
+
+! 
+      parameter (maxmor = lelt)
+C
+C     Array dimensions
+C
+      COMMON/DIMN/NELV,NELT,NX1,NY1,NZ1,NX2,NY2,NZ2
+     $,NX3,NY3,NZ3,NDIM,NFIELD,NPERT,NID
+     $,NXD,NYD,NZD
+
+c automatically added by makenek
+      parameter(lxo   = lx1) ! max output grid size (lxo>=lx1)
+
+c automatically added by makenek
+      parameter(lpart = 62000) ! max number of particles
+
+c automatically added by makenek
+      integer ax1,ay1,az1,ax2,ay2,az2
+      parameter (ax1=1,ay1=1,az1=1,ax2=1,ay2=1,az2=1) ! running averages
+
+c automatically added by makenek
+      parameter (lxs=1,lys=lxs,lzs=(lxs-1)*(ldim-2)+1) !New Pressure Preconditioner
+
+c automatically added by makenek
+      parameter (lfdm=0)  ! == 1 for fast diagonalization method
+
+c automatically added by makenek
+      common/IOFLAG/nio  ! for logfile verbosity control
+
+c automatically added by makenek
+      integer toteq
+      parameter(toteq = 1  ) ! Number of conserved variables
+c IFCMT=FALSE  then toteq=1
+
+c automatically added by makenek
+      integer lelcmt
+      parameter(lelcmt = 1  ) ! # of cmt elements
+c IFCMT=FALSE  then lelcmt=1
+\end{lstlisting}
+
+\item {\tt .rea} file specifies the equations that you'd like to run, the relevant physical parameters, the solution algorithm, the geometry, boundary conditions, the time step size, and whether or not to run with adaptive time stepping. In order to illustrate the parameters defined in this file, an example {\tt .rea} file is shown below with detailed comments. 
+
+Not shown in this {\tt .rea} file are curvature specifications, which can be used to specify circle and sphere edges that are described with quadratic edge displacement. If no curved sections are present, this section remains empty. Curved elements allow you to have as high an order for the surface description as you use for the numerical method. 
+
+This file can also define boundary conditions, which are specified for each face of each element, for each field. 
+
+\begin{lstlisting}[language=Fortran]
+! The parameters section controls runtime parameters such as material properties, number of time steps, the order of the time integration, frequency of output, iteration tolerances, flow rate, etc. This section also contains several free parameters that the user can use as handles to be passed into the user defined routines in the user file. 
+ ****** PARAMETERS *****
+ 
+! version of Nek5000 that is being used
+   2.610000      NEKTON VERSION
+ 
+! number of spatial dimensions (should match that in SIZE file)
+   3 DIMENSIONAL RUN
+ 
+! the number of parameters that are to be defined in the rest of this file. In order to read these correctly, you cannot have any blank lines, since this determines how many lines to read. For commenting purposes, this is ignored here.
+   118  PARAMETERS FOLLOW
+   
+! density for the case of constant properties
+   1.00000     p001 DENSITY
+
+! kinematic viscosity (if less than zero, use Re, otherwise 1/Re ?)
+   1.00000     p002 VISCOS
+
+! if > 0, then natural convection is turned on with the Boussinesq approximation (not in use?)
+   0.00000     p003 : : : BETAG
+   
+! model parameter for Boussinesq approximation (not in use?)
+   0.00000     p004 : : : GTHETA
+   
+! not in use
+   0.00000     p005 : : : PGRADX
+   0.00000     p006
+   1.00000     p007 RHOCP
+   
+! conductivity for the case of constant properties (if < 0, it defines the Peclet number)
+   1.00000     p008 CONDUCT
+   
+! not in use
+   0.00000     p009
+   
+! simulation end time if > 0, otherwise use the number of steps NSTEPS
+   0.00000     p010 FINTIME
+
+! number of time steps
+ 10000.000     p011 NSTEPS
+ 
+! upper bound on the time step size. If < 0, then the time step is some multiple of the number of time steps.
+  -0.00100     p012 DT
+  
+! frequency of iteration histories
+   0.00000     p013 IOCOMM
+   
+! time interval to dump the fld file if > 0. Otherwise, use IOSTEP. 
+   0.00000     p014 IOTIME
+
+! dump frequency, number of time steps between dumps
+   100.0       p015 IOSTEP
+   
+! heat/passive scalar solver (1 = Helmholtz, 2 = CVODE, 3 = CVODE with user-supplied Jacobian. A negative number sets source terms to zero).
+   0.00000     p016 PSSOLVER: 0=default
+
+! not in use
+   0.00000     p017
+   0.00000     p018 GRID < 0 --> # cells on screen
+   0.00000     p019 INTYPE
+   0.00000     p020 NORDER
+
+! tolerance for pressure solver
+   1.00000E-06 p021 DIVERGENCE
+   
+! tolerance for velocity solver
+   1.00000E-08 p022 HELMHOLTZ
+   
+! number of passive scalars
+   0.00000     p023 NPSCAL
+   
+! relative tolerance for the passive scalar solver
+   0.00000E-08 p024 TOLREL
+   
+! absolute tolerance for the passive scalar solver
+   0.00000E-08 p025 TOLABS
+   
+! maximum Courant number
+   2.00000     p026 COURANT/NTAU
+   
+! temporal discretization order
+   2.00000     p027 TORDER
+
+! order of temporal integration for mesh velocity
+   0.00000     p028 TORDER: mesh velocity (0: p28=p27)
+   
+! MHD viscosity
+   0.00000     p029 = magnetic visc if > 0, = -1/Rm if < 0
+   
+! if 0, then use constant properties, if 1 then defined each scalar separately, and if 2 then set all scalars at once in the USERVP subroutine
+   0.00000     p030 > 0 ==> properties set in uservp()
+
+! if not equal to zero, then this is the number of perturbation modes in linearized N-S
+   0.00000     p031 NPERT: #perturbation modes
+
+! number of BCs in re2 file if > 0. If 0, then all are defined in the re2 file
+   0.00000     p032
+   
+! not in use
+   100.000     p033 : : : MXGEOM
+   100.000     p034 : : : MAXNEW
+   0.10000E-03 p035 : : :
+   0.10000E-03 p036 : : : XMAGNET
+   0.10000E-01 p037 : : : NGRIDS
+   0.00000     p038 : : : NORDER2
+   0.00000     p039 : : : NORDER3
+   0.00000     p040
+   0.00000     p041 1-->multiplicative SEMG
+
+! linear solver for the pressure equation
+   0.00000     p042 0=gmres/1=pcg
+   
+! additive multilevel scheme
+   0.00000     p043 0=semg/1=schwarz
+   0.00000     p044 0=E-based/1=A-based prec.
+   0.00000     p045 Relaxation factor for DTFS
+   0.00000     p046 reserved
+   0.00000     p047 vnu: mesh matieral prop.
+   0.00000     p048 : : : PGEOM
+   0.00000     p049 : : : MIXLFAC
+   0.00000     p050 : : : MAXCGFS
+   0.00000     p051
+   0.00000     p052 IOHIS
+   0.00000     p053
+   0.00000     p054 fixed flow rate dir: |p54|=1,2,3=x,y,z
+   0.00000     p055 vol.flow rate (p54>0) or Ubar (p54<0)
+   0.00000     p056 : : :
+   0.00000     p057 : : :
+   0.00000     p058
+
+! force Nek to recognize element deformation
+   0.00000     p059 !=0 --> full Jac. eval. for each el.
+   
+   0.00000     p060 !=0 --> init. velocity to small nonzero
+   0.00000     p061
+   0.00000     p062 >0 --> force byte_swap for output
+   0.00000     p063 =8 --> force 8-byte output
+   0.00000     p064 =1 --> perturbation restart
+
+! number of I/O files
+   1.00000     p065 #iofiles (eg, 0 or 64); <0 --> sep. dirs
+   4.00000     p066 output : <0=ascii, else binary
+   4.00000     p067 restart: <0=ascii, else binary
+   0.00000     p068 iastep: freq for avg_all (0=iostep)
+
+! not in use
+   0.00000     p069 : : : frequency of srf dump
+   0.00000     p070 : : :
+   0.00000     p071 : : :
+   0.00000     p072 : : :
+   0.00000     p073
+
+! if > 0, print Helmholtz solver iterations
+   0.00000     p074
+
+! not in use
+   0.00000     p075 : : :
+   0.00000     p076 : : : p77 = Oscillation frequency (omega
+   0.00000     p077 : : :
+   0.00000     p078 : : :
+   0.00000     p079 : : :
+   0.00000     p080 : : :
+   0.00000     p081 : : :
+   0.00000     p082 : : :
+   0.00000     p083
+
+! if < 0, force initial time step to this value
+   0.00000     p084 !=0 --> sets initial timestep if p12>0
+   0.00000     p085 dt ratio if p84 !=0, for timesteps>0
+   0.00000     p086 reserved
+   0.00000     p087 : : :
+   0.00000     p088 : : :
+   0.00000     p089 : : :   coarse grid weighting (default=1
+   0.00000     p090 : : :
+   0.00000     p091 : : :
+   0.00000     p092
+  20.00000     p093 Number of previous pressure solns saved
+   5.00000     p094 start projecting velocity after p94 step
+   5.00000     p095 start projecting pressure after p95 step
+   0.00000     p096 : : :   which saving algorithm 1 = disca
+   0.00000     p097 : : :   0 == > no iterative refinement
+   0.00000     p098
+   3.00000     p099 dealiasing: <0--> off/3--> old/4--> new
+   0.00000     p100
+   0.00000     p101 Number of additional modes to filter
+   1.00000     p102 Dump out divergence at each time step
+   0.00000     p103 weight of stabilizing filter (.01)
+   0.00000     p104 : : :
+   0.00000     p105 : : :
+   0.00000     p106
+   0.00000     p107 !=0 --> add to h2 array in hlmhotz eqn
+   0.00000     p108 : : :
+   0.00000     p109 : : :
+   0.00000     p110 : : :
+   0.00000     p111 : : :
+   0.00000     p112 : : :
+   0.00000     p113 : : :
+   0.00000     p114 : : :
+   0.00000     p115
+   0.00000     p116 !=0: x elements for fast tensor product
+   0.00000     p117 !=0: y elements for fast tensor product
+   0.00000     p118 !=0: z elements for fast tensor product
+
+! Passive scalar data, which can also be specified in the uservp() routine in the user file, can also be specified in this file. These lines list the values of conductivity in ascending order, followed by the heat capacity coefficients. A total of 9 passive scalars can be transported.
+      4  Lines of passive scalar data follows2 CONDUCT; 2RHOCP
+   1.00000       1.00000       1.00000       1.00000       1.00000
+   1.00000       1.00000       1.00000       1.00000
+   1.00000       1.00000       1.00000       1.00000       1.00000
+   1.00000       1.00000       1.00000       1.00000
+
+! These logical switches determine whether you are computing a steady or unsteady solution and whether advection is turned on.
+          13   LOGICAL SWITCHES FOLLOW
+ T      IFFLOW
+ T      IFHEAT
+ T      IFTRAN
+ T T F F F F F F F F F  IFNAV & IFADVC (convection in P.S. fields)
+ F F T T T T T T T T T T  IFTMSH (IF mesh for this field is T mesh)
+ F      IFAXIS
+ F      IFSTRS
+ F      IFSPLIT
+ F      IFMGRID
+ F      IFMODEL
+ F      IFKEPS
+ F      IFMVBD
+ F      IFCHAR
+ 
+! The origin is set to (-0.95, -0.45). This line has no impact on the mesh being read in Nek.
+   2.00000       2.00000     -0.950000     -0.450000     XFAC,YFAC,XZERO,YZERO
+
+! This header is used to specify how many elements are available in total, the dimension of the problem, and how many elements are in the flow mesh (the fluid region?). 
+ **MESH DATA** 6 lines are X,Y,Z;X,Y,Z. Columns corners 1-4;5-8
+        -480  3           480     NELT,NDIM,NELV
+        
+! specify a restart file to read data from to provide initial conditions (used commonly for these nonlinear equations). This is used to reduce error, since the rod12.run1 file likely was run with a much lower order. For a higher-order timestepping scheme, you'll need an equivalently larger number of restart files to provide the data points for method of lines time integration. This initial condition does not need to be of the same order as the current simulation. You can also specify the velocity and temperature from different files. The initial time is taken from the last specified restart file, but this can be overridden.
+           1  PRESOLVE/RESTART OPTIONS  *****
+rod12.run1 U
+
+! Initial conditions can be zero (default), from a function in the user file, based on a ``pre-solve'', where a steady-state solution such as the Stokes equation is used as the initial condition for the transient solve, or from a restart file.
+           7          INITIAL CONDITIONS *****
+C Default
+C Default
+C Default
+C Default
+C Default
+C Default
+C Default
+  ***** DRIVE FORCE DATA ***** BODY FORCE, FLOW, Q
+           4                  Lines of Drive force data follow
+C
+C
+C
+C
+  ***** Variable Property Data ***** Overrrides Parameter data.
+           1  Lines follow.
+
+! This section defined history points. The number of points indicated is the number of lines that should follow. This can be used to write velocity components and pressure to the .sch file at each output step (when mod(istep, iohis) = 0).
+           0  PACKETS OF DATA FOLLOW
+  ***** HISTORY AND INTEGRAL DATA *****
+           0    POINTS.  Hcode, I,J,H,IEL
+
+! specify output fields. You must set the coordinates to true if you want any mesh modifications made in the user file to be recognizable to postx. 
+  ***** OUTPUT FIELD SPECIFICATION *****
+           6  SPECIFICATIONS FOLLOW
+ T       COORDINATES
+ T       VELOCITY
+ T       PRESSURE
+ T       TEMPERATURE
+ F       TEMPERATURE GRADIENT
+           0       PASSIVE SCALARS
+  ***** OBJECT SPECIFICATION *****
+       0 Surface Objects
+       0 Volume  Objects
+       0 Edge    Objects
+       0 Point   Objects
+\end{lstlisting}
+
+\item {\tt .re2} file, which is a binary version of the {\tt .re2} file that contains all input file components that would normally go in the {\tt .rea} file, but are too large, and hence are stored in binary format. Hence, all sections of the {\tt .rea} file that scale with the number of elements are moved to the {\tt .re2} binary file. To indicate that a section is held in the binary file, numbers are negative in the read file.
+
+\item {\tt .usr} file, which contains a set of Fortran subroutines that allow direct access to all runtime variables. Here, the user can specify spatially varying properties, volumetric heating sources, body forces, boundary and initial conditions, etc. The following routines are used to perform the following actions:
+	\begin{itemize}
+	\item {\tt useric()}: set an initial condition
+	\item {\tt userbc()}: set a boundary condition for both the fluid and all other scalars. 
+	\item {\tt userchk()}: interrogate the solution at the end of each time step for diagnostic purposes. This is called once per processor after each time step. This is where the solution can be interrogated, and subsequent changes made.
+	\item {\tt uservp()}: specify variable properties. This is called once per processor, and once for every discrete point.
+	\item {\tt usrdat()}: this routine is called right after the geometry is loaded into Nek5000, and allows you to modify the elements as long as you preserve the topology. You can also use this routine to override the boundary conditions that are initially specified in the {\tt .rea} file. 
+	\item {\tt userdat2()}: this routine is called afer the GLL points have been distributed, and only allows for affine transformations of the geometry. This can be used to move the geometry to match intended surfaces, such as with curved surfaces. Then, the {\tt fixgeom()} routine can be called to realign point distribution in the interior of the element.
+	\item {\tt userf()}: This is called once for each point, and provides the form term in the momentum equation (which in most cases will simply be the gravitational vector). 
+	\item {\tt userq()}: set the volumetric heat source in the energy equation or in the passive scalar equations
+	\end{itemize}
+\end{itemize}
+
+Each Nek simulation also requires the following auxiliary files, which are {\it created} from the above fundamental files.
+
+\begin{itemize}
+\item {\tt .map} file, which is created from the {\tt .rea} file by running {\tt genmap}, which will determine how the elements are split amongst parallel processes. 
+\end{itemize}
 
 \section{Nested Parallelism}
 When using the MultiApp system in MOOSE, flexible capabilities exist for nesting parallelism. For instance, if MOOSE is run with 4 MPI processes, then passing in a communicator to OpenMC will run OpenMC with 4 MPI processes as well. 
