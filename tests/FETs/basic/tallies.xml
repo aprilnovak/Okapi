@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<tallies>
+
+  <filter id="25">
+    <type> cell</type>
+    <bins> 20 10</bins>
+  </filter>
+  
+  <filter id="30">
+    <type> material</type>
+    <bins> 12 8</bins>
+  </filter>
+  
+  <tally id="1">
+    <filters> 25 30</filters>
+    <nuclides> total </nuclides>
+    <scores>fission kappa-fission-z2</scores>
+  </tally>
+
+   
+
+</tallies>
