@@ -71,7 +71,7 @@
     input_files = 'openmc.i'
     execute_on = timestep_begin
   [../]
-  [./bison]
+  [./bison] # currently some problem with Buffalo, use OkapiMCS for now
     type = TransientMultiApp
     app_type = OkapiMCSApp
     positions = '0 0 0'
@@ -82,26 +82,26 @@
 []
 
 [Transfers]
-active = ''
+active = 'from_openmc'
   [./to_bison]
     type = PolynomialOpenMC
     multi_app = bison
     direction = to_multiapp
     source_variable = 'l_0_coeffs_power'
-    to_aux_scalar = 'l_0_coeffs'
+    to_aux_scalar = 'l_0_coeffs_power_bison'
     execute_on = timestep_end
   [../]
+
+# This transfer specifies the cell index in the OpenMC cells array so that
+# we know which cell to pass the information to/receive the information from.
   [./to_openmc]
     type = PolynomialOpenMC
     multi_app = openmc
     direction = to_multiapp
+    openmc_cell = 1
     source_variable = 'l_0_coeffs_temp'
     to_aux_scalar = 'dummy_openmc'
     execute_on = timestep_begin
-    center = '0.5 0.5'
-    radius = 0.5
-    l_geom_norm = '0.0 1.0'
-    l_direction = 2
   [../]
 
   [./from_bison]
@@ -112,10 +112,12 @@ active = ''
     to_aux_scalar = 'l_0_coeffs_temp'
     execute_on = timestep_end
   [../]
+
   [./from_openmc]
     type = PolynomialOpenMC
     multi_app = openmc
     direction = from_multiapp
+    openmc_cell = 1
     source_variable = 'dummy_openmc'
     to_aux_scalar = 'l_0_coeffs_power'
     execute_on = timestep_begin
