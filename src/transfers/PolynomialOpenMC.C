@@ -35,17 +35,11 @@ InputParameters validParams<PolynomialOpenMC>()
   params.addRequiredParam<std::vector<VariableName>>("source_variable", \
     "The auxiliary SCALAR variable to read values from");
   params.addRequiredParam<std::vector<VariableName> >("to_aux_scalar", \
-    "The name of the SCALAR auxvariable in the MultiApp to transfer the value to.");
+    "The name of the SCALAR auxvariable in the MultiApp to transfer the \
+    value to.");
 
-  /* This transfer is also associated with a radius, center, and l_geom_norm that
-     will be used in OpenMC to determine which cells this transfer maps to. */
-  params.addParam<Real>("radius","Radius of region with Zernike polynomials.");
-  params.addParam<std::vector<Real>>("center", "center coordinates (x, y) of circle");
-  params.addParam<std::vector<Real>>("l_geom_norm", "min and max coordinates\
-    along the Legendre direction.");
-  params.addParam<int>("l_direction", "direction of integration for Legendre.");
-  params.addRequiredParam<int>("openmc_cell", "index in the OpenMC cells(:) array that\
-    this transfer is associated with.");
+  params.addRequiredParam<int>("openmc_cell", "index in the OpenMC cells(:)\
+    array that this transfer is associated with.");
   return params;
 }
 
@@ -53,10 +47,6 @@ PolynomialOpenMC::PolynomialOpenMC(const InputParameters & parameters) :
     MultiAppTransfer(parameters),
     _source_var_names(getParam<std::vector<VariableName>>("source_variable")),
     _to_aux_names(getParam<std::vector<VariableName>>("to_aux_scalar")),
-    _radius(parameters.get<Real>("radius")),
-    _center(parameters.get<std::vector<Real>>("center")),
-    _geom_norm(parameters.get<std::vector<Real>>("l_geom_norm")),
-    _l_direction(parameters.get<int>("l_direction")),
     _cell(parameters.get<int>("openmc_cell"))
 {
 }
@@ -79,54 +69,47 @@ PolynomialOpenMC::execute()
   int zernike_order_from_MOOSE = 0;
   int old_zernike_order = 0;
 
-/*  OpenMC::CouplingGeom geometry;
-  geometry.radius = _radius;
-  geometry.height = {_geom_norm[0], _geom_norm[1]};
-  geometry.center = {_center[0], _center[1]};
-  geometry.l_dir = _l_direction;*/
-
   switch (_direction)
   {
-    /* MasterApp -> SubApp. For MOOSE-OpenMC coupling, this represents the transfer
-       of information from MOOSE to OpenMC. This transfers _all_ of the expansion
-       coefficients, but one at a time. */
+    /* MasterApp -> SubApp. For MOOSE-OpenMC coupling, this represents the
+       transfer of information from MOOSE to OpenMC. This transfers _all_
+       of the expansion coefficients, but one at a time. */
     case TO_MULTIAPP:
     {
       /* The MultiAppTransfer class defines a parameter _multi_app which gets the
          _fe_problem for the MultiApp according to the "multi_app = OkapiApp"
-         provided in the input file. This represents the MasterApp problem, and is
-         from where we will retrieve the values of the source_variables. */
+         provided in the input file. This represents the MasterApp problem,
+         and is from where we will retrieve the values of the source_variables. */
       FEProblemBase & from_problem = _multi_app->problemBase();
 
-      /* Create a vector of pointers that will point to the source_variables (of
-         MooseVariableScalar type) and is of the same length as the number of
-         source_varibales. */
-      std::vector<MooseVariableScalar *> source_variables(_source_var_names.size());
-      for (auto i = beginIndex(_source_var_names); i < _source_var_names.size(); ++i)
+      // number of variables from MOOSE to read and use in OpenMC
+      int num_vars_to_read = _source_var_names.size();
+
+      std::vector<MooseVariableScalar *> source_variables(num_vars_to_read);
+      for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
       {
         source_variables[i] = &from_problem.getScalarVariable(_tid,\
           _source_var_names[i]);
         source_variables[i]->reinit(); //?
       }
 
-      /* Loop through each of the sub apps. Because MC neutron transport simulations
-         require knowledge of the entire domain (i.e. cannot specify something like
-         a temperature boundary condition in a Monte Carlo code), we'll likely never
-         have multiple OpenMC sub apps. However, this would be relevant for BISON
-         applications, where each fuel pin is an independent solve. */
+      /* Loop through each of the sub apps. Because MC neutron transport
+         simulations require knowledge of the entire domain (i.e. cannot specify
+         something like a temperature boundary condition in a Monte Carlo code),
+         we'll likely never have multiple OpenMC sub apps. */
       for (unsigned int i = 0; i < num_apps; i++)
-        if (_multi_app->hasLocalApp(i)) // if global app number is on this processor
+        if (_multi_app->hasLocalApp(i))
         {
-          // Loop through each SCALAR variable. The order of the Legendre expansion
-          // equals the number of source variables - 1, since the Legendre order
-          // can be zero.
-          legendre_order_from_MOOSE = _source_var_names.size() - 1;
-          for (auto i = beginIndex(_source_var_names); i < _source_var_names.size(); ++i)
+          /* Loop through each SCALAR variable. The order of the Legendre
+             expansion equals the number of source variables - 1, since the
+             Legendre order can be zero. */
+          legendre_order_from_MOOSE = num_vars_to_read - 1;
+          for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
           {
             // Loop through each entry in a single SCALAR variable
-            auto & solution_values = source_variables[i]->sln();
+            auto & soln_values = source_variables[i]->sln();
 
-            // Check that Zernike order is the same for every coupled scalar auxvar
+            // Check that Zernike order is the same for each coupled scalar auxvar
             old_zernike_order = zernike_order_from_MOOSE;
 
             if (i > 0)
@@ -136,24 +119,23 @@ PolynomialOpenMC::execute()
                   coupling Legendre coefficient aux variable.");
               }
 
-            zernike_order_from_MOOSE = zernike_order_from_coeffs(solution_values.size());
-            for (auto j = beginIndex(solution_values); j < solution_values.size(); ++j)
+            zernike_order_from_MOOSE = \
+              zernike_order_from_coeffs(soln_values.size());
+            for (auto j = beginIndex(soln_values); j < soln_values.size(); ++j)
             {
-//              OpenMC::receive_coeffs(solution_values[j]);
+              //OpenMC::receive_coeffs(soln_values[j]);
             }
             _console << '\n';
           }
-        
-        // Transfer the order of the Zernike and Legendre expansions to OpenMC
-        // and print the expansion coefficients received.
- //       OpenMC::receive_coupling_info(legendre_order_from_MOOSE, zernike_order_from_MOOSE);
         }
 
-      /* Once you have read the data into OpenMC data structures, use it to perform somce
-         action in OpenMC, such as using expansion coefficients to reconstruct a 
-         continuous field. */
-   //   FORTRAN_CALL(Nek5000::flux_reconstruction)();
-//      OpenMC::change_fuel_temp();
+      /* Change a temperature in OpenMC. For now, only use a single coefficient,
+         since there's no continuous material tracking yet. Note that changing
+         a temperature in OpenMC requires that you've loaded cross section data
+         at that temperature, so use the temperature_range parameter in the
+         settings XML file. */
+      OpenMC::openmc_cell_set_temperature(_cell, \
+        (source_variables[0]->sln())[0]);
       break;
     }
 
@@ -205,8 +187,8 @@ PolynomialOpenMC::execute()
       for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
       {
         std::vector<dof_id_type> & dof = to_variables[i]->dofIndices();
-        auto & solution_values = to_variables[i]->sln();
-        for (auto j = beginIndex(solution_values); j < solution_values.size(); ++j)
+        auto & soln_values = to_variables[i]->sln();
+        for (auto j = beginIndex(soln_values); j < soln_values.size(); ++j)
         {
           to_variables[i]->sys().solution().set(dof[j],\
             omc_coeffs[i * num_zernike_coeffs_per_var + j]);

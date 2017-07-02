@@ -12,26 +12,18 @@
 #define FORTRAN_CALL_MOD(name, mod) __##mod##_MOD_##name
 
 namespace OpenMC {
-/* need to prevent name mangling between C++ and Fortran, since C++ permits 
+/* need to prevent name mangling between C++ and Fortran, since C++ permits
    function overloading, which to distinguish between different versions of
-   a function with the same name, means that the C++ compiler changes the 
+   a function with the same name, means that the C++ compiler changes the
    name in the symbol table in the object file. We need to avoid this so that
    we can get the names to correctly match up. */
 
   extern "C" {
 
-    // Structure data types for transfer of geometric information
-/*    typedef struct CouplingGeom {
-      int l_dir;
-      double radius;
-      double center[2];
-      double height[2];
-    } CouplingGeom;*/
-
-    /* OpenMC can run in "serial" in two ways - using the MPI wrapper (with a 
+    /* OpenMC can run in "serial" in two ways - using the MPI wrapper (with a
        single process), or _actually_ in serial. "#ifdef MPI" is used within
        OpenMC to differentiate between these two cases, but because this variable
-       is defined within the OpenMC CMake file, it is not known to MOOSE. I 
+       is defined within the OpenMC CMake file, it is not known to MOOSE. I
        assume that MPI is defined in OpenMC, such that openmc_init must be called
        with an intracommunicator. */
 
@@ -42,23 +34,23 @@ namespace OpenMC {
     void openmc_run();
     void openmc_finalize();
 
-
-    /* Routines that are used for data transfer between OpenMC and MOOSE. */
-    void change_batches(int);
-    void change_fuel_temp();
-    
     // tell OpenMC about the order of the expansion for transfer  _from_ MOOSE
-    void receive_coupling_info(int, int);
+//    void receive_coupling_info(int, int);
 
     // read expansion coefficients into OpenMC array
-    void receive_coeffs(double);
-    
-    // create expansion coefficients for transfer _to_ MOOSE
-    void create_coeffs();
+//    void receive_coeffs(double);
 
-    // for comparing implementation of expansion functions
-    double zernike(int, int, double, double, double [], double);
-    double legendre(int, double, double []);
+    // set a cell temperature given a temperature. This is used for transferring
+    // data from MOOSE to OpenMC.
+    int openmc_cell_set_temperature(int, double);
+
+    // store expansion coefficients by cell. This is used for transferring data
+    // from OpenMC to MOOSE.
+    void fet_deconstruction();
+
+    // obtain coefficients given cell index. This is used for transferring data
+    // from OpenMC to MOOSE.
+    void get_coeffs_from_cell(int *, double [], int *);
   }
 }
 
