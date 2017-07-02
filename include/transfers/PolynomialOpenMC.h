@@ -28,6 +28,7 @@ protected:
   std::vector<Real> _center;
   std::vector<Real> _geom_norm;
   int _l_direction;
+  int _cell;
 };
 
 #endif /* POLYNOMIALOPENMC_H */
