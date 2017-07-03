@@ -75,27 +75,19 @@ MultiAppAuxScalarToAuxScalarTransfer::execute()
           to_variable->reinit();
 
           // Determine number of DOFs that we're going to read and write
-          std::vector<dof_id_type> & from_dof = from_variable->dofIndices();
           std::vector<dof_id_type> & to_dof = to_variable->dofIndices();
+          auto & from_values = from_variable->sln();
 
           // Check that the DOF matches
-//          if (from_dof != to_dof)
-//            mooseError("Order of SCALAR AuxVariabls do not match for sending and\
+          if (from_variable->sln().size() != to_variable->sln().size())
+            mooseError("Order of SCALAR AuxVariabls do not match for sending and\
 receiving data for the MultiAppAuxScalarToAuxScalarTransfer!");
 
-          auto & from_values = from_variable->sln();
           for (auto j = beginIndex(from_values); j < from_values.size(); ++j)
           {
-            to_variable->sys().solution().set(to_dof[j], 1.0/* value of from_variable index j */);
+            to_variable->sys().solution().set(to_dof[j], from_values[j]);
             to_variable->sys().solution().close();
           }
-
-          // Set all values of the AuxVariable to the value of the postprocessor
-          //scalar->setValues(pp_value);
-
-          // Update the solution
-          //scalar->insert(scalar->sys().solution());
-          //scalar->sys().solution().close();
         }
       break;
     }
@@ -103,39 +95,46 @@ receiving data for the MultiAppAuxScalarToAuxScalarTransfer!");
     // SubApp -> MasterApp
     case FROM_MULTIAPP:
     {
-/*
       // The number of sub applications
       unsigned int num_apps = _multi_app->numGlobalApps();
 
-      // The AuxVariable for storing the postprocessor values from the sub app
-      MooseVariableScalar * scalar =
+      // The AuxVariable that will be read from the subApp
+      MooseVariableScalar * to_variable =
           &_multi_app->problemBase().getScalarVariable(_tid, _to_aux_name);
 
       // Ensure that the variable is up to date
-      scalar->reinit();
+      to_variable->reinit();
 
       // The dof indices for the scalar variable of interest
-      std::vector<dof_id_type> & dof = scalar->dofIndices();
+      std::vector<dof_id_type> & to_dof = to_variable->dofIndices();
 
-      // Error if there is a size mismatch between the scalar AuxVariable and the number of sub apps
-      if (num_apps != scalar->sln().size())
-        mooseError("The number of sub apps (",
-                   num_apps,
-                   ") must be equal to the order of the scalar AuxVariable (",
-                   scalar->order(),
-                   ")");
-
-      // Loop over each sub-app and populate the AuxVariable values from the postprocessors
+      // Loop over each sub-app and populate the AuxVariable values
       for (unsigned int i = 0; i < _multi_app->numGlobalApps(); i++)
+      {
         if (_multi_app->hasLocalApp(i) && _multi_app->isRootProcessor())
-          // Note: This can't be done using MooseScalarVariable::insert() because different
-          // processors will be setting dofs separately.
-          scalar->sys().solution().set(
-              dof[i], _multi_app->appProblemBase(i).getPostprocessorValue(_from_pp_name));
+        {
+          // Extract the scalar variable that is being transferred
+          FEProblemBase & from_problem = _multi_app->appProblemBase(i);
+          MooseVariableScalar * from_variable =
+            &from_problem.getScalarVariable(_tid, _from_aux_name);
 
-      scalar->sys().solution().close();
+          // Loop over the scalar aux variable that we're going to write
+          auto & from_values = from_variable->sln();
 
-      break;*/
+          // Check that DOFs match
+          if (from_variable->sln().size() != to_variable->sln().size())
+            mooseError("Order of SCALAR AuxVariables do not match for sending and\
+receiving data for the MultiAppAuxScalarToAuxScalarTransfer!");
+
+          for (auto j = beginIndex(from_values); j < from_values.size(); ++j)
+          {
+            to_variable->sys().solution().set(to_dof[j], from_values[j]);
+            to_variable->sys().solution().close();
+          }
+        }
+      }
+
+      break;
     }
   }
 
