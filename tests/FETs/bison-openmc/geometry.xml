@@ -9,7 +9,7 @@
   <surface id="6" type="y-plane" coeffs="-0.6" boundary="reflective" />
   <surface id="7" type="y-plane" coeffs=" 0.6" boundary="reflective" />
 
-  <cell id="1" material="8" name="fuel"  region="  -1" />        <!-- UO2 Fuel -->
-  <cell id="4" material="12" name="water" region="1 4 -5 6 -7"/> <!-- Borated water -->
+  <cell id="1" material="8" name="fuel"  region="  -1" />
+  <cell id="4" material="12" name="water" region="1 4 -5 6 -7"/>
 
 </geometry>

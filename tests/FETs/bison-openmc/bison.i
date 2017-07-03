@@ -14,13 +14,11 @@
 []
 
 [AuxVariables]
-  [./l_0_coeffs_power_bison] # receive from l_0_coeffs_power
+  [./l_0_coeffs_temp_bison] # send to l_0_coeffs_temp
     family = SCALAR
-    order = SIXTH
+    order = THIRD
   [../]
-  [./l_0_coeffs_temp_bison] # send temp back to MOOSE
-    family = SCALAR
-    order = SIXTH
+  [./bison_power]
   [../]
 []
 
