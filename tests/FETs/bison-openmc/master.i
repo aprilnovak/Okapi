@@ -6,10 +6,27 @@
 # but _only_ Zernike expansions, so there is a constant scaling factor that
 # is incorrect for this coupling, but the mechanics are correct.
 
+# In order to transfer a continuous field variable to BISON, we need to
+# have solve = true in order to get the AuxKernels to evaluate. But, we
+# dont need to perform a _nonlinear_ solve, so we can set no kernels for
+# the dummy variable "u".
+
+[Problem]
+  solve = true
+  kernel_coverage_check = false
+[]
+
 [Mesh]
-  type = GeneratedMesh
-  dim = 1
-  nx = 1
+  file = 3D_sideset.exo
+  block_id = '1'
+  block_name = 'interior'
+  boundary_id = '100 200 300'
+  boundary_name = 'top bottom wall'
+[]
+
+[Variables] # dummy variable
+  [./u]
+  [../]
 []
 
 [AuxVariables]
@@ -21,7 +38,7 @@
     family = SCALAR
     order = THIRD
   [../]
-  [./openmc_power] # power sent to BISON, already expanded by MOOSE
+  [./openmc_kappa_fission] # sent to BISON, already expanded by MOOSE
   [../]
 []
 
@@ -41,6 +58,8 @@
 # The expansion for power produced by OpenMC is expanded in the Master App.
 # Then, an aux variable in the Master App (FunctionAux kernel) is used to
 # take advantage of normal MOOSE transfer capabilities to send it to BISON.
+# The only disadvantage here is that we would need to duplicate these
+# functions for every pin...
 [Functions]
   [./legendre]
     type = LegendrePolynomial
@@ -65,25 +84,8 @@
 [AuxKernels]
   [./openmc_power]
     type = FunctionAux
-    variable = openmc_power
+    variable = openmc_kappa_fission
     function = reconstruction
-  [../]
-[]
-
-# The MasterApp does not perform any solve
-[Variables]
-  [./dummy]
-  [../]
-[]
-
-[Kernels]
-  [./time]
-    type = TimeDerivative
-    variable = dummy
-  [../]
-  [./dummy]
-    type = Diffusion
-    variable = dummy
   [../]
 []
 
@@ -100,13 +102,12 @@
     input_files = 'openmc.i'
     execute_on = timestep_begin
   [../]
-  [./bison] # currently some problem with Buffalo, use OkapiMCS for now
+  [./bison]
     type = TransientMultiApp
     app_type = OkapiMCSApp
     positions = '0 0 0'
     input_files = 'bison.i'
     execute_on = timestep_end
-#    library_path = /homes/anovak/projects/buffalo/lib
   [../]
 []
 
@@ -116,10 +117,18 @@ active = 'from_openmc to_openmc to_bison'
     type = MultiAppInterpolationTransfer
     multi_app = bison
     direction = to_multiapp
-    source_variable = 'openmc_power'
-    variable = 'bison_power'
+    source_variable = 'openmc_kappa_fission'
+    variable = 'bison_kappa_fission'
     execute_on = timestep_end
   [../]
+  #[./to_bison]
+  #  type = MultiAppCopyTransfer
+  #  multi_app = bison
+  #  direction = to_multiapp
+  #  source_variable = l_0_coeffs_power
+  #  variable = l_0_coeffs_power
+  #  execute_on = timestep_end
+  #[../]
   [./from_bison]
     type = PolynomialOpenMC
     multi_app = bison
@@ -128,7 +137,6 @@ active = 'from_openmc to_openmc to_bison'
     to_aux_scalar = 'l_0_coeffs_temp'
     execute_on = timestep_end
   [../]
-
 
 # This transfer specifies the cell index in the OpenMC cells array so that
 # we know which cell to pass the information to/receive the information from.
@@ -150,9 +158,6 @@ active = 'from_openmc to_openmc to_bison'
     to_aux_scalar = 'l_0_coeffs_power'
     execute_on = timestep_begin
   [../]
-[]
-
-[Postprocessors]
 []
 
 [Outputs]

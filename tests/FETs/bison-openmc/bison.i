@@ -18,7 +18,19 @@
     family = SCALAR
     order = THIRD
   [../]
+  [./bison_kappa_fission] # holds eV/particle field from OpenMC
+  [../]
+  [./bison_heat]
+  [../]
+[]
+
+[AuxKernels]
   [./bison_power]
+    type = KappaFissionToHeatSource
+    variable = bison_heat
+    kappa_fission_source = bison_kappa_fission
+    power = 10.0
+    volume_pp = 'volume'
   [../]
 []
 
@@ -35,5 +47,13 @@
 
 [Executioner]
   type = Transient
+[]
+
+[Postprocessors]
+  [./volume]
+    type = VolumePostprocessor
+    block_id = '1'
+    execute_on = timestep_begin
+  [../]
 []
 
