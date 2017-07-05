@@ -1,6 +1,7 @@
 #include "PolynomialOpenMC.h"
 #include "ExtraFunctions.h"
 #include "OpenMCInterface.h"
+#include "math.h"
 
 #include "MooseTypes.h"
 #include "MooseVariableScalar.h"
@@ -130,9 +131,11 @@ PolynomialOpenMC::execute()
          since there's no continuous material tracking yet. Note that changing
          a temperature in OpenMC requires that you've loaded cross section data
          at that temperature, so use the temperature_range parameter in the
-         settings XML file. */
+         settings XML file. Because this isn't expanded in OpenMC, here we have
+         to apply the scaling factors for a zero-th order Legendre and zero-th
+         order Zernike expansion. */
       OpenMC::openmc_cell_set_temperature(_cell, \
-        (source_variables[0]->sln())[0]);
+        (source_variables[0]->sln())[0] / sqrt(2.0 * M_PI));
       break;
     }
 
