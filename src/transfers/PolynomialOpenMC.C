@@ -30,14 +30,11 @@ InputParameters validParams<PolynomialOpenMC>()
      source_varibale = dummy variable
      to_aux_scalar = expansion coefficients used in MOOSE */
 
-  /* Because we're transferring more than one scalar variable at a time
-     to/from Okapi, we need to allow these parameters to be a vector of names. */
   params.addRequiredParam<std::vector<VariableName>>("source_variable", \
     "The auxiliary SCALAR variable to read values from");
   params.addRequiredParam<std::vector<VariableName> >("to_aux_scalar", \
     "The name of the SCALAR auxvariable in the MultiApp to transfer the \
     value to.");
-
   params.addRequiredParam<int>("openmc_cell", "index in the OpenMC cells(:)\
     array that this transfer is associated with.");
   return params;
@@ -60,7 +57,12 @@ PolynomialOpenMC::execute()
      of (x,y,z) coordinate pairs in the input file. Each of these positions
      represents an offset of a sub-application in the space of the master App
      (the local Master app). */
-  unsigned int num_apps = _multi_app->numGlobalApps();
+  int num_apps = _multi_app->numGlobalApps();
+
+  int num_vars_to_read = _source_var_names.size();
+  int num_vars_to_write = _to_aux_names.size();
+
+  FEProblemBase & from_problem = _multi_app->problemBase();
 
   /* Store the legendre and zernike expansion orders to pass them into OpenMC.
      A check is made to ensure that the number of Zernike coefficients is the
@@ -69,28 +71,23 @@ PolynomialOpenMC::execute()
   int zernike_order_from_MOOSE = 0;
   int old_zernike_order = 0;
 
+  int legendre_order_from_OpenMC = 0;
+  int zernike_order_from_OpenMC = 0;
+  int old_zernike_order_OpenMC = 0;
+
   switch (_direction)
   {
     /* MasterApp -> SubApp. For MOOSE-OpenMC coupling, this represents the
-       transfer of information from MOOSE to OpenMC. This transfers _all_
-       of the expansion coefficients, but one at a time. */
+       transfer of information from MOOSE to OpenMC. This transfers all
+       of the expansion coefficients. */
     case TO_MULTIAPP:
     {
-      /* The MultiAppTransfer class defines a parameter _multi_app which gets the
-         _fe_problem for the MultiApp according to the "multi_app = OkapiApp"
-         provided in the input file. This represents the MasterApp problem,
-         and is from where we will retrieve the values of the source_variables. */
-      FEProblemBase & from_problem = _multi_app->problemBase();
-
-      // number of variables from MOOSE to read and use in OpenMC
-      int num_vars_to_read = _source_var_names.size();
-
       std::vector<MooseVariableScalar *> source_variables(num_vars_to_read);
       for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
       {
         source_variables[i] = &from_problem.getScalarVariable(_tid,\
           _source_var_names[i]);
-        source_variables[i]->reinit(); //?
+        source_variables[i]->reinit();
       }
 
       /* Loop through each of the sub apps. Because MC neutron transport
@@ -114,15 +111,15 @@ PolynomialOpenMC::execute()
 
             if (i > 0)
               if (old_zernike_order != zernike_order_from_MOOSE)
-              {
-                mooseError("The order of the Zernike expansion does not match each \
-                  coupling Legendre coefficient aux variable.");
-              }
+                mooseError("The order of the Zernike expansion does not "
+                  "match each coupling Legendre coefficient aux variable.");
 
-            zernike_order_from_MOOSE = \
+            zernike_order_from_MOOSE =
               zernike_order_from_coeffs(soln_values.size());
+
             for (auto j = beginIndex(soln_values); j < soln_values.size(); ++j)
             {
+              //TODO:  store the coefficients in OpenMC data structures
               //OpenMC::receive_coeffs(soln_values[j]);
             }
             _console << '\n';
@@ -147,14 +144,11 @@ PolynomialOpenMC::execute()
          OpenMC cell index. */
       OpenMC::fet_deconstruction();
 
-      // number of variables we're going to write
-      int num_vars_to_write = _to_aux_names.size();
-
       // initialize variables we're going to write
       std::vector<MooseVariableScalar *> to_variables(num_vars_to_write);
       for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
       {
-        to_variables[i] = &_multi_app->problemBase().getScalarVariable(_tid,\
+        to_variables[i] = &from_problem.getScalarVariable(_tid,\
           _to_aux_names[i]);
         to_variables[i]->reinit();
       }
@@ -169,19 +163,27 @@ PolynomialOpenMC::execute()
          A check is provided in OpenMC to make sure that the length of the
          t % coeffs array) matches what is allocated in C++ to receive it.*/
 
+      // Check that all of the coupled variables are of the same length
+     int zernike_order_from_OpenMC = zernike_order_from_coeffs(
+       to_variables[beginIndex(_to_aux_names)]->sln().size());
+     for (int i = 0; i < num_vars_to_write; ++i)
+     {
+       if (i > 0)
+         if (old_zernike_order_OpenMC != zernike_order_from_OpenMC)
+           mooseError("The order of the Zernike expansion does not "
+             "match each coupling Legendre coefficient aux variable.");
+       old_zernike_order_OpenMC = (to_variables[i]->sln()).size();
+     }
+
       // Determine size of array to allocate based on size of MOOSE variables
-      int num_zernike_coeffs_per_var = (to_variables[beginIndex(_to_aux_names)]\
-        ->sln()).size();
+      int num_zernike_coeffs_per_var =
+        (to_variables[beginIndex(_to_aux_names)]->sln()).size();
+
       int num_coeffs_from_openmc = num_vars_to_write * num_zernike_coeffs_per_var;
       double omc_coeffs[num_coeffs_from_openmc];
 
       // store coefficients from OpenMC into the omc_coeffs array
       OpenMC::get_coeffs_from_cell(&_cell, omc_coeffs, &num_coeffs_from_openmc);
-
-      // print results
-      std::cout << "MOOSE received coefficients: " << std::endl;
-      for (int i = 0; i < num_coeffs_from_openmc; ++i)
-        std::cout << omc_coeffs[i] << std::endl;
 
       // Loop over the variables that we are going to write
       for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
@@ -190,7 +192,7 @@ PolynomialOpenMC::execute()
         auto & soln_values = to_variables[i]->sln();
         for (auto j = beginIndex(soln_values); j < soln_values.size(); ++j)
         {
-          to_variables[i]->sys().solution().set(dof[j],\
+          to_variables[i]->sys().solution().set(dof[j],
             omc_coeffs[i * num_zernike_coeffs_per_var + j]);
           to_variables[i]->sys().solution().close();
         }
