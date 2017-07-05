@@ -17,11 +17,10 @@
 []
 
 [Mesh]
-  file = 3D_sideset.exo
-  block_id = '1'
-  block_name = 'interior'
-  boundary_id = '100 200 300'
-  boundary_name = 'top bottom wall'
+  type = GeneratedMesh
+  dim = 1
+  nx = 1
+  ny = 1
 []
 
 [Variables] # dummy variable
@@ -55,40 +54,6 @@
   [../]
 []
 
-# The expansion for power produced by OpenMC is expanded in the Master App.
-# Then, an aux variable in the Master App (FunctionAux kernel) is used to
-# take advantage of normal MOOSE transfer capabilities to send it to BISON.
-# The only disadvantage here is that we would need to duplicate these
-# functions for every pin...
-[Functions]
-  [./legendre]
-    type = LegendrePolynomial
-    l_geom_norm = '0.0 1.0'
-  [../]
-  [./zernike]
-    type = ZernikePolynomial
-    radius = 0.5
-    center = '0.0 0.0'
-  [../]
-  [./reconstruction]
-    type = ZernikeLegendreReconstruction
-    l_order = 0
-    n_order = 1
-    l_direction = 2
-    legendre_function = legendre
-    zernike_function = zernike
-    poly_coeffs = 'l_0_coeffs_power'
-  [../]
-[]
-
-[AuxKernels]
-  [./openmc_power]
-    type = FunctionAux
-    variable = openmc_kappa_fission
-    function = reconstruction
-  [../]
-[]
-
 [Executioner]
   type = Transient
   num_steps = 3
@@ -112,25 +77,16 @@
 []
 
 [Transfers]
-active = 'from_openmc to_openmc to_bison'
   [./to_bison]
-    type = MultiAppInterpolationTransfer
+    type = MultiAppScalarToAuxScalarTransfer
     multi_app = bison
     direction = to_multiapp
-    source_variable = 'openmc_kappa_fission'
-    variable = 'bison_kappa_fission'
+    source_variable = 'l_0_coeffs_power'
+    to_aux_scalar = 'l_0_coeffs_power_bison'
     execute_on = timestep_end
   [../]
-  #[./to_bison]
-  #  type = MultiAppCopyTransfer
-  #  multi_app = bison
-  #  direction = to_multiapp
-  #  source_variable = l_0_coeffs_power
-  #  variable = l_0_coeffs_power
-  #  execute_on = timestep_end
-  #[../]
   [./from_bison]
-    type = PolynomialOpenMC
+    type = MultiAppScalarToAuxScalarTransfer
     multi_app = bison
     direction = from_multiapp
     source_variable = 'l_0_coeffs_temp_bison'

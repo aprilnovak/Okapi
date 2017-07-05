@@ -8,7 +8,7 @@
     <nuclide name="O16"   ao="4.5829e-02" />
     <nuclide name="O17"   ao="1.1164e-04" />
   </material>
-  
+
   <material id="2" temperature="400">
     <density value="10.29769" units="g/cm3" />
     <nuclide name="U235"  ao="5.5815e-04" />
@@ -104,7 +104,7 @@
     <nuclide name="H2"   ao="7.4196e-06" />
     <nuclide name="O16"  ao="2.4672e-02" />
     <nuclide name="O17"  ao="6.0099e-05" />
-    <sab name="c_H_in_H2O" />
+<!--    <sab name="c_H_in_H2O" />-->
   </material>
 
 </materials>
