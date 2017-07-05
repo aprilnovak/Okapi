@@ -142,9 +142,101 @@
 
 \section{Introduction}
 
-This document is intended to describe the coupling methodology between Nek, a \gls{cfd} code developed by \gls{anl}, OpenMC, a Monte Carlo code developed by \gls{anl}, and BISON, a nuclear fuel performance code developed by \gls{inl}. Previous work by Matthew Ellis resulted in the coupling of OpenMC to MOOSE, and work by a joint effort of \gls{anl} and \gls{inl} resulted in the coupling of Nek to MOOSE. So, the coupling of all three codes together will utilize as much as possible regarding this previous work. The purpose of this report is to document the coupling process, justify decisions made, and illustrate how to use these coupled codes.
+This document is intended to describe the coupling methodology between Nek, a \gls{cfd} code developed by \gls{anl}, OpenMC, a Monte Carlo code developed by \gls{anl}, and BISON, a nuclear fuel performance code developed by \gls{inl}. Previous work by Matthew Ellis and others at MIT resulted in the coupling of OpenMC to MOOSE, and work by a joint effort of \gls{anl} and \gls{inl} resulted in the coupling of Nek to MOOSE. So, the coupling of all three codes together will attempt to utilize as much as possible regarding this previous work. The purpose of this report is to document the coupling process, justify decisions made, and illustrate how to use these codes in a coupled manner.
 
 This report is organized beginning with a description of the overall coupling methodology, followed by a discussion of the nuts-and-bolts requirements for coupling two codes in terms of the data transfer between the codes and executing non-MOOSE codes from within the MOOSE framework.
+
+\section{Overall Coupling Methodology}
+This section discusses the overall coupling methodology that was pursued between OpenMC-BISON, BISON-Nek, and finally OpenMC-BISON-Nek. The immediate jump to the coupling of all three codes together was not performed because taking smaller steps often helps reveal difficulties that would otherwise be compounded and confusing when performing the full three-way coupling. 
+
+When coupling two or more distinct projects (code bases), there are generally three ways to perform the coupling:
+
+\begin{enumerate}
+\item Make virtually no changes to the source code of the two projects, and instead write an external script that will:
+	\begin{enumerate}
+	\item Run the first code.
+	\item Read the text output file of the first code and modify the text input file for the second code.
+	\item Run the second code.
+	\item Read the text output file of the second code and modify the text input file for the first code. 
+	\item Repeat (a)-(d) until convergence, then move to the next time step.
+	\end{enumerate}
+	This approach is necessary for proprietary codes for which you have no access to the source code, and the only interaction with the software is through text files.
+\item Write a custom driver that will call routines from each code. This may be fast to develop, but limits the reusability of the driver itself or changes made to the two codes to meld to the driver structure. For example, pseudo-code for a driver written to couple OpenMC and Nek may have the following overall structure:
+
+	\begin{algorithm}[H]
+	{\tt initialize OpenMC}\;
+	{\tt initialize Nek}\;
+	\;
+	\While{t $<$ end time}{
+	  \While{not converged}{
+	    run OpenMC\;
+	    transfer data to Nek\;
+	    run Nek\;
+	    transfer data to OpenMC\;
+	    evaluate convergence\;
+	  }
+	}
+	\end{algorithm}
+	
+\item Use an existing driver with a sufficiently general structure that the codes you want to couple can be structurally modified to be callable from within the existing driver by directly calling code routines (no editing of text files). This approach, by virtue of using an existing driver, allows you to immediately take advantage of the ability to couple to any other codes that have been cast in terms of the existing driver's methods. However, this approach requires a good understanding of the existing driver, which can be much more time consuming than developing a custom driver from scratch. In addition, the downsides of using an existing coupling framework include potentially less control over parallelism and performance, since applications must be mapped to the structure of the existing driver, which may not be ideal for every application.
+\end{enumerate}
+
+The third approach of using an existing driver framework was selected for this work given the reasons above. More specifically, the MOOSE framework was selected for the following reasons:
+
+\begin{enumerate}
+\item Many applications have been developed with the MOOSE framework, such as nuclear fuels simulations (BISON), porous media thermal-hydraulics (PRONGHORN), radiation damage and structural modeling (GRIZZLY), and many other physics. Using the MOOSE coupling framework allows OpenMC and Nek to essentially become "MOOSE" Animals in that they can not only be coupled to each other, as the scope of this project seeks, but to these other codes with relatively minor effort.
+\item Significant work has already been performed with coupling OpenMC to MOOSE and Nek to MOOSE, so the coupling of OpenMC with Nek in principle can directly take advantage of this existing work.
+\item The MOOSE framework is easy-to-use and has significant coupling capabilities already developed, as well as an accessible development team for assistance.
+\end{enumerate}
+
+If the parallel performance is not acceptable, then the work developed in constructing OpenMC and Nek as MOOSE applications can still be reused for a custom driver due to MOOSE's modular structure. The MOOSE coupling framework performs coupling in a tree-like structure. A Master App controls the entire coupled solver, and is the App that performs actions such as initializing MPI. For the Master App, there may be any number of sub-applications. The terminology "Sub-app" and "MultiApp" are essentially the same, where the use of sub app is used primarily to denote that a MultiApp is "down-the-tree" from another MultiApp. 
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=10cm]{multiapp_hierarchy.png}
+\caption{MasterApp and MultiApp structure for a MOOSE simulation.}
+\end{figure}
+
+The Master App coordinates the main solve, and will call the execution methods of its immediate MultiApps when needed. Those immediate MultiApps may have their own MultiApps, and hence act somewhat locally as Master Apps. 
+
+The remainder of this section discusses the high-level coupling strategy for OpenMC-MOOSE, Nek-MOOSE, and finally OpenMC-Nek-BISON. 
+
+\subsection{OpenMC and BISON Coupling}
+This section discusses the OpenMC-BISON coupling, illustrated through a pair of specific example input files that can be found in {\tt okapimcs/tests/FETs/bison-openmc}. For the most generic OpenMC-BISON coupling, MOOSE is the Master App, and OpenMC is wrapped as a MOOSE App so that it can be called as a MultiApp to the MOOSE Master App. BISON is already a MOOSE animal, and hence does not require any wrapping. So, for this coupling scheme, MOOSE is the Master App, and Okapi and BISON are same-level MultiApps. In a coupled solve, the following steps occur. We arbitrarily choose OpenMC to execute before BISON, so we choose to execute OpenMC on {\tt timestep\_begin}, and BISON on {\tt timestep\_end}. 
+
+\begin{enumerate}
+\item Initialize the MasterApp. The MasterApp does not perform any solves, but only exists to transfer data between its MultiApps.
+\item Initialize OpenMC. This calls the {\tt OpenMCExecutioner::init()} method, which performs the regular initialization steps for any MOOSE App, followed by calling the {\tt openmc\_init} subroutine found in the OpenMC source. This subroutine performs basic tasks such as reading in the XML files that control OpenMC parameters (none are set in the MOOSE input files), allocating memory for data structures, etc.
+\item Initialize BISON. Because BISON is a Moose ``animal,'' this simply calls initialization method of the MOOSE executioner that we chose to use (for most cases, this will be {\tt Transient::init()}).
+\item Perform any transfers that are defined on {\tt timestep\_begin} to the MultiApps. 
+	\begin{enumerate}
+	\item This calls the {\tt PolynomialOpenMC::execute()} method to pass the {\tt l\_0\_coeffs\_temp} scalar variable to OpenMC. Because OpenMC is not a MOOSE ``animal,'' we cannot simply use the {\tt MultiAppScalarToAuxScalarTransfer}. For this step, we are transferring from MOOSE to Okapi, so we call the {\tt OpenMC::openmc\_cell\_set\_temperature} method, which takes as its arguments the OpenMC cell to change temperature and a single value. Without continuous material tracking implemented yet in OpenMC, this only selects the first expansion coefficient for temperature (so this transfer is incomplete). This is where an initial condition on temperature is applied in OpenMC.
+	\end{enumerate}
+\item Execute OpenMC by calling the {\tt OpenMCExecutioner::execute()} method, which calls the {\tt openmc\_reset} and {\tt openmc\_run} subroutines in the OpenMC source. This performs a full Monte Carlo solve.
+\item Transfer information back from OpenMC to the MOOSE Master App. This is done by calling the {\tt PolynomialOpenMC::execute} method, for a direction from OpenMC to a Master App. This method then calls the {\tt fet\_deconstruction} subroutine in the OpenMC source, which stores the expansion coefficients for the FETs (which we indicated in the tallies XML input) by cell index. Then, the {\tt get\_coeffs\_from\_cell} subroutine is called to store the expansion coefficients in OpenMC in a C++ array. Finally, those values are stored in the {\tt l\_0\_coeffs\_power} scalar variable in the MOOSE Master App.
+\item ``Solve'' the Master App. This is purely a dummy solve, but is required for any auxkernels to evaluate, and for any further transfers to occur.
+\item Transfer information from the MOOSE Master App to BISON. This uses the {\tt MultiAppScalarToAuxScalarTransfer} to simply copy the coefficients for power held in {\tt l\_0\_coeffs\_power} to the {\tt l\_0\_coeffs\_power\_bison} variable in BISON.
+\item BISON uses these coefficients to expand a continuous field variable {\tt bison\_kappa\_fission}, which holds the kappa fission distribution that was calculated by OpenMC. Functions for the Legendre, Zernike, and reconstruction are included in the BISON input file.
+\item BISON then applies the {\tt KappaFissionToHeatSource} auxkernel on the {\tt bison\_heat} auxvariable to convert the kappa fission source to the correct units of W/volume that is used as a heat source in the {\tt HeatSource} kernel.
+\item Solve BISON to solve for the temperature, {\tt bison\_temp}.
+\item BISON deconstructs this continuous temperature field into a set of expansion coefficients, stored in {\tt l\_0\_coeffs\_temp\_bison} by calling the {\tt ZLDeconstruction} user object.
+\item Transfer coefficients for temperature from BISON to MOOSE by calling the {\tt MultiAppScalarToAuxScalarTransfer} transfer. These coefficients are stored in the {\tt l\_0\_coeffs\_temp} variable in MOOSE. 
+\item Repeat steps 4-13 for each Picard step until reaching the end of the coupled simulation.
+\end{enumerate}
+
+To summarize the above detailed steps, the following graphic shows the generic data flow for a single Picard step (i.e. the first three steps of initializing the Master App and two MultiApps are assumed to have occurred). Individual steps are numbered in the order in which they occur.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=15cm]{OpenMC-BISON-simple.png}
+\end{figure}
+
+And, in more detail, the following figure provides the names of the methods that are called to perform each step and shows the deconstruction and reconstruction actions in BISON.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=15cm]{OpenMC-BISON-complicated.png}
+\end{figure}
 
 \section{Data Transfer}
 
@@ -456,7 +548,22 @@ where the first index represents the \(l\) order, the second the \(n\) order, an
 MOOSE controls all data transfers between the coupled external codes. This section describes the MOOSE {\tt Transfer} objects that were created to perform data transfer to/from OpenMC and to/from Nek.
 
 \subsubsubsection{{\tt PolynomialOpenMC}}
-This transfer object defines what routines are called to transfer data from MOOSE to OpenMC, and from OpenMC back to MOOSE.
+This transfer object defines what routines are called to transfer data from MOOSE to OpenMC (to MultiApp), and from OpenMC back to MOOSE (from MultiApp). 
+
+For transferring data to OpenMC, the syntax to use for a second-order Legendre expansion is as follows. The source variable holds a list of the scalar auxvariables that hold all of the expansion coefficients for a given Legendre order. These must be present in ascending Legendre order so that OpenMC interprets these coefficients correctly. In order to be flexible such that the {\tt PolynomialOpenMC} transfer can be used for both transfer to OpenMC and from OpenMC, we must include the {\tt to\_aux\_scalar} parameter, which will be a dummy variable for the transfer {\it to} OpenMC, since OpenMC does not perform any finite element solve. Finally, the OpenMC subroutines that are called from {\tt PolynomialOpenMC} methods require the OpenMC cell index in the {\tt cells(:)} array so that we know which cells to change the temperatures of. 
+
+For sending data to OpenMC, we loop over all of the source variables, and then over each component of the present source variable. For each coupled variable, we store the Zernike order (computed by simply counting the number of values stored in each scalar auxvariable) in a variable and check to make sure that all of the {\tt source\_variable} entries are of the same order. If one or more of the variables are not of the same size, then a runtime error is thrown. 
+
+\begin{lstlisting}
+[Transfers]
+  [./to_openmc]
+      type = PolynomialOpenMC
+      source_variable = 'l_0_coeffs l_1_coeffs l_2_coeffs'
+      to_aux_scalar = 'dummy'
+      openmc_cell = 1
+  [../]
+[]
+\end{lstlisting}
 
 \subsubsubsection{{\tt MultiAppPolynomialToNek}}
 This transfer object defines what routines are called to transfer data from MOOSE to Nek, and from Nek back to MOOSE.
@@ -532,6 +639,11 @@ Before discussing how the tallies XML file is used to populate OpenMC tally data
 \begin{itemize}
 \item All user-specified tallies are stored in the {\tt tallies} array, which is of type {\tt TallyObject}.
 \item All filters are specified in the {\tt filters} array, which is of type {\tt TallyFilterContainer}. Each element of the {\tt filters} array is of type {\tt TallyFilter}, which is an abstract type that is associated with an ID and number of bins. This abstract class is overridden based on the type of filter to the more specific type, such as {\tt CellFilter}. This is done in a case-select statement based on the type of filter specified in the input file, and is required because the different types of filters have different data structure requirements.
+\end{itemize}
+
+\begin{itemize}
+\item All user-specified tallies are stored in the {\tt tallies} array, which is of type {\tt TallyObject}.
+\item The {\tt filter\_matches} array, of length equal to the number of filters defined ({\tt n\_filters}), holds all of the valid bins and weights for each filter.
 \end{itemize}
 
 \begin{enumerate}
@@ -645,32 +757,9 @@ After the desired tallies are read from the input file, all scoring to the talli
 	\item Repeat until particle is dead (no secondary particles and an absorption).
 \end{enumerate}
 
-Assuming that we are using an analog tally, analog tallies are scored by calling the {\tt score\_analog\_tally(p)} subroutine, which only takes as input the particle. 
-
-\begin{enumerate}
-\item Loop over all of the analog tallies (size of {\tt active\_analog\_tallies}).
-	\begin{enumerate}
-	\item Loop over all of the filters for this tally (size of {\tt tallies(i\_tally) \% filter}).
-		\begin{enumerate}
-			\item If there are no valid bins for this filter {\it for this particle}, then there is nothing to score, and you can move on to the next tally. Otherwise, loop over all of the filters until you've covered all of the valid bins on each of the filters. For example, suppose a tally has two filters, an energy filter and a cell filter. The energy filter may have three bins, and the cell filter two bins (two cells). If the particle's energy matches one of the energy bins {\it and} one of the cell bins, then score to this tally. Otherwise, if no bins match the particle's state, cycle back to the start of the tally loop to look at the next tally.
-		\end{enumerate}
-	\item In an indefinite do-loop...
-		\begin{enumerate}
-		\item Loop over the size of {\tt tallies(i)\%filter}.
-			\begin{enumerate}
-			\item .
-			\end{enumerate} 
-		\item Check for nuclide bins.
-			\begin{enumerate}
-			\item Score for this nuclide, this bin, and this filter for this tally by calling {\tt score\_general(p, t, (k - 1) * tallies(i)\%n\_score\_bins, filter\_index, i\_nuclide, ZERO, filter\_weight)}. 
-			\end{enumerate}
-		\end{enumerate}
-	\end{enumerate}
-\end{enumerate}
-
 All volume tallies call the {\tt score\_general\_ce(p, t, start\_index, filter\_index, i\_nuclide, atom\_density, flux)} subroutine. This subroutine adds scores to the tally array for a given filter and nuclide. This routine performs the following logic. Loop over all of the score bins, and then a select-case statement contains the actual ``formulas'' for tallying different scores are held. The end result of this select-case statement is to determine a value for the {\tt score}. The only change made in this section to accommodate the new {\tt SCORE\_KAPPA\_FISSION\_ZN} tally was to include its type in the same case statement as the {\tt SCORE\_KAPPA\_FISSION} tally. 
 
-This tally is chosen because it tallies the recoverable energy production rate due to fission, and includes the fission product kinetic energy, prompt and delayed neutron kinetic energies, prompt and delayed gamma ray energies, and the total energy released from \(\beta\) particles. Neutrino energies are assumed to not deposit in the system, and hence are not included. The prompt and delayed gamma ray energy is assumed to deposit locally, so this tally would not provide very accurate results for estimating fission energy deposition directly in the coolant, since no fission will occur directly in the coolant. The units for this tally are eV per source particle. We only score to this tally if the nuclide with which the neutron is interacting is fissionable. The {\tt KAPPA\_FISSION} tally computes the score in the following manner. For analog tallies:
+This tally is chosen because it tallies the recoverable energy production rate due to fission, and includes the fission product kinetic energy, prompt and delayed neutron kinetic energies, prompt and delayed gamma ray energies, and the total energy released from \(\beta\) particles. Neutrino energies are assumed to not deposit in the system, and hence are not included. The prompt and delayed gamma ray energy is assumed to deposit locally, so this tally would not provide very accurate results for estimating fission energy deposition directly in the coolant, since no fission will occur directly in the coolant. The units for this tally are eV per source particle. We only score to this tally if the nuclide with which the neutron is interacting is fissionable. This tally differs from the {\tt FISSION\_Q\_RECOVERABLE} tally because it does not use \(Q\)-values that are a function of the neutron energy (though they are functions of the particular fissioning nuclide). The {\tt KAPPA\_FISSION} tally computes the score in the following manner. For analog tallies:
 
 \beq
 X=\sum_{i}w_iQ\frac{\sigma_f}{\sigma_a}\phi
@@ -757,6 +846,14 @@ To actually use Matt's FET in an input file requires the following syntax, where
   <scores>kappa-fission-z4</scores>
 </tally>
 \end{lstlisting}
+
+Finally, before passing the expansion coefficients to an external code, the FETs must be statistically summed in order to compute the mean (since it is the mean value that is of interest to the external code, not each individual score). Normally, this computation of the means and standard deviations is performed in the {\tt write\_tallies} subroutine. But, this routine is only called from {\tt openmc\_finalize}, which in the context of a coupled MOOSE-OpenMC simulation, would only be called at the very end of the coupled run, which would not permit transferring the expansion coefficient information from OpenMC to MOOSE at each Picard step. So, a new subroutine is needed to calculate statistical quantities associated with FETs and accumulate them into an array for transfer to an external code.
+
+
+
+
+
+
 
 \subsubsection{Field Reconstruction}
 
@@ -945,11 +1042,7 @@ MOOSE transfer a heat flux to Nek to apply on the boundary between the fuel and 
 
 
 \subsubsection{Using the Constructed Field}
-
-\section{Overall Coupling Methodology}
-This section discusses the code added to MOOSE to compute the expansion coefficients for the surface heat flux transferred to Nek, and reconstruct a surface temperature given coefficients from Nek.
-
-Both codes were modified to include the capabilities to perform these two generic abilities, since the boundary coupling is a two-way coupling - Nek transfers a surface temperature to MOOSE, and MOOSE transfers a surface heat flux to Nek. 
+ 
 
 \section{Executioners and Timesteppers}
 This section describes how an external code can be run from within the MOOSE framework by developing custom MOOSE {\tt Executioner} and {\tt TimeStepper} classes that run the external code. For this three-way coupling, both OpenMC and Nek are run by MOOSE by wrapping calls to their routines that run a simulation from within MOOSE class structures. In order to understand how to run an external code from within the MOOSE framework, a discussion of the MOOSE executioner and time stepper classes is given. 
