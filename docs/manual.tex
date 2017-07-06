@@ -421,8 +421,14 @@ Hence, all that is required to deconstruct a continuous field into a set of expa
 
 As opposed to deconstruction, constructing a continuous variable from a set of expansion coefficients is more straightforward, since all that is required is repeated evaluation of the orthogonal polynomials, multiplied by expansion coefficients.
 
-\subsection{MOOSE Data Transfer}
-This section describes the capabilities introduced into the MOOSE source code that allows evaluation of polynomials, and construction/deconstruction of continuous fields. 
+\subsection{MOOSE (a.k.a. BISON) Data Transfer}
+This section describes the capabilities introduced into the MOOSE source code that allows evaluation of polynomials, and construction/deconstruction of continuous fields. Because BISON is a Moose ``Animal,'' we can simply use MOOSE as a surrogate for BISON to avoid all of the complicated physics until the entire coupling framework is in place. So, some of these new classes developed would actually be implemented in BISON, and {\it not} in MOOSE. In this section, the only classes that would not be strictly implemented in BISON are:
+
+{\bf Complete this categorization:}
+
+\begin{itemize}
+\item PolynomialOpenMC (this isn't called by BISON - it's called by the MOOSE MasterApp)
+\end{itemize}
 
 \subsubsection{Evaluation of Polynomials}
 This section discusses the generic functions added to MOOSE to compute orthogonal polynomials.
@@ -543,23 +549,71 @@ l_3_coeffs = 'C300 C31n1 C311 C32n2 C320 C322'
 where the first index represents the \(l\) order, the second the \(n\) order, and the third the \(m\) order, where {\tt n} represents a negative number. Note that the choice in MOON was for each of these {\tt poly\_scalars} aux variables to hold all of the Legendre coefficients for a given Fourier order, which is the opposite of the choice here. 
 
 \subsubsection{Using the Constructed Field}
+This section discusses the capabilities added to MOOSE to use the constructed field to enact physical feedback with other physics.
+
+\subsubsubsection{{\tt KappaFissionToHeatSource}}
+OpenMC provides a set of kappa fission expansion coefficients to MOOSE, which then passes those coefficients to MOOSE (BISON). In order to use those coefficients, they must be converted to a heat source with units of W/volume (the FE mesh is units-agnostic). The {\tt ZernikeLegendreReconstruction} is used to expand these coefficients into a continuous distribution, and then this auxkernel converts the continuous tally distribution to a heat source. There are two general methods in which to do this, both of which assume the user has knowledge of the power of the reactor. The power of the reactor is the sum of the power produced by fission directly in the fuel rod and the power produced by gamma heating (fuel, structural materials, and coolant). The expansion coefficients record the recoverable energy produced from {\it fission}, and hence will only have nonzero values over the fuel. So, assuming the user knows the power produced in each domain over which expansion coefficients are defined (a fuel pin, for example), the heat source can be determined by: 
+
+\begin{itemize}
+\item Multiplying the kappa fission distribution obtained from OpenMC by the user-specified pin fission power, divided by the integrated kappa fission distribution (over the pin). For a kappa fission distribution (units of eV/source particle) from OpenMC \(\kappa\), the fission power is:
+
+\beq
+\textrm{fission power}=\kappa(\bf{r})\times\frac{\textrm{user-defined pin fission power}}{\int d\bf{r}\kappa({\bf r})}
+\eeq
+
+The only thing that is required here is that the user know the pin fission power. 
+
+\item Alternatively, if an average energy released per fission \(E_f\), and an average number of source particles born from fission \(\nu\), are known, the fission power may be computed as:
+
+\beq
+\textrm{fission power}=\kappa(\bf{r})\times\textrm{user-defined pin fission power}\times\frac{\nu}{E_f}
+\eeq
+\end{itemize}
+
+To avoid the need to perform integration, this second approach is currently used, with an energy per fission of 200 MeV and the average number of neutrons born from fission of 2.45. In the future, this can be made more accurate by obtaining more representative average values from tallies.
 
 \subsubsection{Performing the Data Transfer}
-MOOSE controls all data transfers between the coupled external codes. This section describes the MOOSE {\tt Transfer} objects that were created to perform data transfer to/from OpenMC and to/from Nek.
+MOOSE controls all data transfers between the coupled external codes. This section describes the MOOSE {\tt Transfer} objects that were created to perform data transfer to/from OpenMC and to/from Nek. The OpenMC and Nek routines that are called from within the MOOSE transfer classes developed are discussed in later sections of this report.
 
 \subsubsubsection{{\tt PolynomialOpenMC}}
 This transfer object defines what routines are called to transfer data from MOOSE to OpenMC (to MultiApp), and from OpenMC back to MOOSE (from MultiApp). 
-
-For transferring data to OpenMC, the syntax to use for a second-order Legendre expansion is as follows. The source variable holds a list of the scalar auxvariables that hold all of the expansion coefficients for a given Legendre order. These must be present in ascending Legendre order so that OpenMC interprets these coefficients correctly. In order to be flexible such that the {\tt PolynomialOpenMC} transfer can be used for both transfer to OpenMC and from OpenMC, we must include the {\tt to\_aux\_scalar} parameter, which will be a dummy variable for the transfer {\it to} OpenMC, since OpenMC does not perform any finite element solve. Finally, the OpenMC subroutines that are called from {\tt PolynomialOpenMC} methods require the OpenMC cell index in the {\tt cells(:)} array so that we know which cells to change the temperatures of. 
-
-For sending data to OpenMC, we loop over all of the source variables, and then over each component of the present source variable. For each coupled variable, we store the Zernike order (computed by simply counting the number of values stored in each scalar auxvariable) in a variable and check to make sure that all of the {\tt source\_variable} entries are of the same order. If one or more of the variables are not of the same size, then a runtime error is thrown. 
+\\\\
+{\it Transfer to OpenMC}\\
+For transferring data to OpenMC, the associated syntax is shown below. In order to be flexible such that the {\tt PolynomialOpenMC} transfer can be used for both transfer to OpenMC and from OpenMC, the {\tt to\_aux\_scalar} parameter will be a dummy parameter for transfer to OpenMC (because OpenMC does not perform any finite element solve in the MOOSE context), while {\tt source\_variable} will be a dummy variable for transfer from OpenMC for the same reason.
 
 \begin{lstlisting}
 [Transfers]
   [./to_openmc]
       type = PolynomialOpenMC
+      direction = to_multiapp
       source_variable = 'l_0_coeffs l_1_coeffs l_2_coeffs'
       to_aux_scalar = 'dummy'
+      openmc_cell = 1
+  [../]
+[]
+\end{lstlisting}
+
+The source variable holds a list of the scalar auxvariables that hold all of the expansion coefficients for a given Legendre order for the temperature in MOOSE (Legendre order of two shown here). These must be present in ascending Legendre order so that OpenMC interprets these coefficients correctly.  Finally, the OpenMC subroutines that are called from {\tt PolynomialOpenMC} methods require the OpenMC cell index in the {\tt cells(:)} array so that we know which cells to change the temperature of. 
+
+Loop over all of the source variables, and then over each component of the present source variable. A check is performed to ensure that the order of each of the {\tt source\_variable}s is the same, since each should represent all of the Zernike coefficients given a fixed Legendre order.
+
+{\bf A routine needs to be developed to receive the expansion coefficients in OpenMC, and store them as a function of the OpenMC cell to which they pertain. This routine will need to not only read the coefficients, but also determine the Zernike and Legendre expansion orders (since they need not be the same orders as those used to expand the kappa fission tally)}. 
+
+After OpenMC receives these coefficients, without continuous material tracking implemented, for simplicity and to illustrate the data flow for coupling, the {\tt openmc\_cell\_set\_temperature} subroutine is called and passed the OpenMC cell index and the first expansion coefficient (essentially performing a zero-th order expansion for the temperature. Because the temperature expansion coefficients are computed in BISON using a zeroth order Legendre expansion and an \(n\)-th order Zernike expansion, no additional scaling factors are needed (though we need to apply a \(1/\sqrt{2}\) correction factor for passing coefficients from OpenMC to BISON, since OpenMC currently only has Zernike expansion tallies implemented, which to extend to zeroth-order Legendre, \(n\)-th order Zernike requires multiplication by \(\tilde{P}_0(x)=1/\sqrt{2}\)). Note that to change a temperature in OpenMC requires that you have loaded cross sections at that temperature; a range of temperatures can be loaded during the initialization step by specifying the {\tt temperature\_range} parameter in the settings XML file.
+
+
+
+For transferring data from OpenMC to MOOSE, the {\tt fet\_deconstruction} OpenMC subroutine is first called in order to collect all of the expansion coefficients by tally into the {\tt t \% coeffs(:, :)} array. This array is organized so that the first index refers to the cell index in the cells array, and the second index holds the coefficients. This subroutine sums over all other filters except the cell filter. For instance, if the user specifies multiple material filters, the expansion coefficients are summed over all of those materials, simply returning coefficients by cell. 
+
+For data transfer from OpenMC to MOOSE, because OpenMC does not perform a finite element solve, the source of the data is not any finite element variable, so we use a dummy variable. The auxiliary scalar variables that are to be written represent the expansion coefficients in MOOSE that hold the kappa fission tally distribution. Finally, we must specify which OpenMC cell is acting as the source of the coefficients. Then, we check that all of the {\tt to\_aux\_scalar} variables are of the same length. In order to extract the expansion coefficients from OpenMC, the {\tt get\_coeffs\_from\_cell} OpenMC subroutine stores the expansion coefficients for a specified cell in a C++ array. The size of this C++ array is assumed to be the total length of the auxiliary scalar variables specified in the {\tt to\_aux\_scalar} field (which have already been checked to be the same length). In the {\tt get\_coeffs\_from\_cell} subroutine, a check is made that the C++ array allocated to hold the expansion coefficients is of the appropriate length, so between the equal-length check made in MOOSE, and the total-length check made in OpenMC, there is no possibility of incorrect sizes in this transfer.
+
+\begin{lstlisting}
+[Transfers]
+  [./to_openmc]
+      type = PolynomialOpenMC
+      direction = from_multiapp
+      source_variable = 'dummy'
+      to_aux_scalar = 'l_0_coeffs l_1_coeffs l_2_coeffs'
       openmc_cell = 1
   [../]
 []
@@ -569,71 +623,58 @@ For sending data to OpenMC, we loop over all of the source variables, and then o
 This transfer object defines what routines are called to transfer data from MOOSE to Nek, and from Nek back to MOOSE.
 
 \subsection{OpenMC Data Transfer}
-This section describes the capabilities introduced into the OpenMC source code that allows evaluation of polynomials, and construction/deconstruction of continuous fields. The information in this section is based upon the {\tt zernike} branch provided by Matt Ellis. 
-
-The following changes were made to Matt Ellis's work (I believe they were errors):
-
-\begin{itemize}
-\item Incorrect scaling is used for the Legendre polynomials - you'd need to carry around a \(\sqrt{(2l+1)/2}\) factor to ensure correct calculation of the orthogonal expansion coefficients. Incorrect scaling is also used for the Zernike polynomials (they should all be divided by \(\sqrt{\pi}\)). It's possible that something existed on the MOOSE side of things to ensure that these coefficients were taken account of, but this is bad software design practice, since all OpenMC features should be encapsulated in OpenMC.
-\item The {\tt MAX\_ANG\_ORDER} was changed from 10 to 18 to accommodate higher Zernike expansion orders, without changing the highest order of the Legendre expansions. If the user sets an order higher than 10 for the Legendre expansions, but less than 18, no error will be posted about this, and you'll unknowingly end up using \(P_{i}(z)=1\), which is incorrect.
-\item The {\tt get\_polynomial\_norm\_positions} subroutine only takes as argument the particle coordinates and the normalizing radius. This {\it only} gives correct scaled coordinates in the center of the circle is already centered at \(0, 0\). For instance, by testing with a circle centered at \((0.6, 0.6)\), normalized radii of greater than unity, and incorrectly-normalized \(\theta\) values were computed. 
-
-\begin{lstlisting}
-  <surface id="1" type="z-cylinder" coeffs="0.6 0.6 0.5" />
-
-  <surface id="4" type="x-plane" coeffs="0.0" boundary="reflective" />
-  <surface id="5" type="x-plane" coeffs="1.2" boundary="reflective" />
-  <surface id="6" type="y-plane" coeffs="0.0" boundary="reflective" />
-  <surface id="7" type="y-plane" coeffs="1.2" boundary="reflective" />
-
-  <cell id="1" material="8" name="fuel_in"  region="  -1" />
-  <cell id="4" material="12" name="water" region="1 4 -5 6 -7"/>
-\end{lstlisting}
-
-By assuming that the cell bin that is used as a filter for the Zernike expansion is a cylinder bounded by two z-planes, we can work backwards to find out what the center, radius, and height of the cylinder are. The {\tt region} member of the cell that is contributing to the tally is expected to have three values, one representing a cylinder, and two representing the \(z\)-planes that terminate the cylinder in height. The normalized coordinates are computed by reading the radius, center, and \(z\)-extents of the cylindrical region directly from the cell information, instead of relying on any information from the tally specification in the XML file. I removed the {\tt geom\_norm} quantity, since it is all done internally. To verify that this was done correctly, I ran the exact same geometry for two different cases - one with the geometry centered at \((0, 0)\), and one with the geometry centered at \((0.6, 0.6)\). Both cases give identical results for the Zernike expansion coefficients.
-
-\end{itemize}
-
-Minor changes that were made that do not constitute errors, but lead to more readable code, include:
-
-\begin{itemize}
-\item Replaced logic to calculate \(\theta\) in the {\tt get\_polynomial\_norm\_positions} subroutine by a single call to the {\tt atan2} intrinsic.
-\end{itemize}
+This section describes the capabilities introduced into the OpenMC source code that allow evaluation of polynomials, construction/deconstruction of continuous fields, and the use of this transferred data to enact physical changes, such as changing temperatures and densities. The information in this section is based upon the {\tt zernike} branch provided by Matt Ellis, and corrections and extensions that were made are indicated where applicable.
 
 \subsubsection{Evaluation of Polynomials}
-OpenMC contains several functions in the {\tt math} module to compute polynomial values given a coordinate and order. 
+OpenMC contains several functions in the {\tt math} module to compute polynomial values given a coordinate and order and in the {\tt tally} module to compute normalized positions.
 
 \subsubsubsection{{\tt calc\_pn(n, x)}}
 \label{sec:calc_pn}
 This elemental function computes a Legendre polynomial given an order \(n\) and a coordinate \(x\), where this \(x\)-coordinate must be within the valid range \(-1\leq x\leq1\). For performance, this function hard-codes the Legendre polynomials (does not use a recursive formulation) up to order 10. Above order 10, this function returns 1, which will obviously be incorrect. No checks are made to ensure that the order or coordinate are within the valid ranges. Note that this function does not compute the {\it scaled} Legendre polynomials that are needed for neat computation of expansion coefficients for an orthogonal expansion (they should be multiplied by \(\sqrt{(2l+1)/2}\)). 
 
 \subsubsubsection{{\tt calc\_pn\_scaled(n, x)}}
-This elemental function computes the scaled Legendre polynomials that are needed for correctly computing FET expansion coefficients (without needing to worry about carrying the \(\sqrt{(2l+1)/2}\) coefficient around). This function simply calls the {\tt calc\_pn} subroutine, and hence suffers the same limitations as those discussed in Section \ref{sec:calc_pn}. 
+This elemental function computes the scaled Legendre polynomials that are needed for correctly computing FET expansion coefficients (without needing to worry about carrying the \(\sqrt{(2l+1)/2}\) coefficient around). This function simply calls the {\tt calc\_pn} subroutine, and hence suffers the same limitations as those discussed in Section \ref{sec:calc_pn} with regards to order and position checking. 
 
 \subsubsubsection{{\tt calc\_zn(n, rho, phi)}}
 \label{sec:calc_zn}
-This function computes the Zernike polynomial for an order \(n\), radial coordinate \(\rho\), and angular coordinate \(\phi\) assuming that these coordinates have already been correctly scaled to the unit circle. No checks are made to ensure that these coordinates are within the valid ranges. For a given value of \(n\), the output of this function is an array \(zn\) of length \(n+1\), i.e. the output array holds all of the \(n=\) fixed, \(m\) values for the given \(n\). Similar to {\tt calc\_pn}, this function does not correctly scale the Zernike polynomials - they should all be divided by a factor of \(\sqrt{\pi}\) to ensure that integration over the orthogonal domain directly gives the expansion coefficients, without other factors trailing around.
+This function computes the Zernike polynomial for an order \(n\), radial coordinate \(\rho\), and angular coordinate \(\phi\) assuming that these coordinates have already been correctly scaled to the unit circle. No checks are made to ensure that these coordinates are within the valid ranges. For a given value of \(n\), the output of this function is an array \(zn\) of length \(n+1\), i.e. the output array holds all of the \(n=\) fixed, \(m\) values for the given \(n\). Similar to {\tt calc\_pn}, this function does not correctly scale the Zernike polynomials - they should all be divided by a factor of \(\sqrt{\pi}\) to ensure that integration over the orthogonal domain directly gives the expansion coefficients, without other factors trailing around. The original {\tt zernike} branch incorrectly computed Zernike expansion coefficients using this function, where each coefficient would be off by a factor of \(\sqrt{\pi}\) (and hence the fission power as well).
 
 \subsubsubsection{{\tt calc\_zn\_scaled(n, rho, phi)}}
-This function computes the scaled Zernike polynomials that are needed for correctly computing FET expansion coefficients (without needing to worry about carrying the \(1/\sqrt{\pi}\) coefficient around). This function simply calls the {\tt calc\_zn} subroutine, and hence suffers the same limitations as those discussed in Section \ref{sec:calc_zn}. 
+This function computes the scaled Zernike polynomials that are needed for correctly computing FET expansion coefficients (without needing to worry about carrying the \(1/\sqrt{\pi}\) coefficient around). This function simply calls the {\tt calc\_zn} subroutine, and hence suffers the same limitations as those discussed in Section \ref{sec:calc_zn} with regards to order and position checking.
+
+\subsubsubsection{{\tt get\_polynomial\_norm\_positions(...)}}
+This subroutine obtains normalized coordinate positions to be used as input to the functions discussed above. This function computes normalized \(r, \theta, z\) coordinates, where the \(r, \theta\) coordinates are normalized to the unit circle and the \(z\) coordinate to the \([-1, 1]\) orthogonal domain for Legendre polynomials. The type of score passed into this routine determines which type of normalization is performed. This subroutine was extended from Matt's implementation by back-determining certain geometric information so that the user does not need to redundantly specify it in the input file. In addition, it was previously implicitly assumed that the geometry were centered on \(0, 0\) - this has been made more general. 
+
+A particle is input to this subroutine, and the {\tt region} array for the particle's cell looped over until finding the surfaces that are \(z\)-cylinders and \(z\)-planes. From these surfaces, the cylinder center, radius, and axial distance between the \(z\)-planes is determined. Note that because only \(z\)-cylinders and surfaces are investigated, this limits the FETs to being defined in the \(z\)-direction. {\bf Additional improvements here would make this more general so that the expansion could be performed in any direction, and for any type of expansion tally (calculating normalized coordinates over a cylinder assumes we're using Zernike, Legendre, or Zernike-Legendre expansions), such as Legender-Legendre expansions in 2D.}
 
 \subsubsection{Field Deconstruction}
-OpenMC deconstructs a statistical distribution of fission events into expansion coefficients for the fission source. Tallies are used to compute these expansion coefficients, and hence an understanding of the tally system in OpenMC is required. A tally, at its most fundamental level, can be described almost entirely by its score and filter(s). A filter represents the region of phase space over which to tally, and the score the ``what'' to tally. 
+OpenMC deconstructs a statistical distribution of fission events into expansion coefficients for the fission source. Tallies are used to compute these expansion coefficients. A tally \(X\), at its most fundamental level, can be described almost entirely by its score and filter(s). A filter represents the region of phase space over which to tally, and the score the ``what'' to tally. 
 
 \beq
 X=\underbrace{\int dE\int d\bf{r}\int d\hat{\Omega}\int dt}_{\textrm{filters}} \underbrace{f(E,\bf{r},\hat{\Omega},t)}_{\textrm{score}}\psi(E,\bf{r},\hat{\Omega},t)
 \eeq
 
-Deconstructing the fission source into a set of expansion coefficients requires using tallies to compute the expansion coefficients. This capability was added to OpenMC by Matt Ellis. The following provides the sequence of events of reading in tally information from the tallies XML input file in order to describe the various data structures that hold the tallies. All actions to read the tallies XML file occur in the {\tt read\_tallies\_xml()} subroutine. New code that was introduced to implement FETs is shown for illustration.
+For coupling to an external code, a Monte Carlo code computes a fission power distribution (W/volume) in the fuel that is used by that external code to perform a simulation to determine an updated temperature. Deconstructing the fission power distribution into a set of expansion coefficients requires using tallies to compute the expansion coefficients. OpenMC already has the {\tt kappa-fission} tally, which compute the recoverable energy production due to fission. This energy includes the fission product kinetic energy, prompt and delayed neutron kinetic energies, prompt and delayed gamma ray energies, and the total energy released from \(\beta\) particles. Neutrino energies are assumed to not deposit in the system. The prompt and delayed gamma ray energy is assumed to deposit locally, so this tally would not provide any estimate of the fission energy deposition (by photons) directly in the coolant, since no fission will occur directly in the coolant (and OpenMC does not have photon transport capabilities, anyways). The units for this tally are eV per source particle, and with proper transformations, this can be converted to a fission power density. Note that the {\tt kappa-fission} tally does not use energy-dependent \(Q\)-values, but does use nuclide-dependent values (the {\tt fission-q-recoverable} tally uses energy-dependent \(Q\)-values, which requires a cross section library with this information). The {\tt kappa-fission} tally computes the score \(X\) for analog tallies as:
 
-In order to permit FETs in OpenMC, a new score type, {\tt KAPPA\_FISSION\_ZN}, was added. This new score type is specified in the input file by the name {\tt kappa-fission-zn}. All tallies in OpenMC are set to tracklength tallies by default, but this type of score is set to an analog tally in the select-case statement in the {\tt read\_tallies\_xm()} subroutine for this new tally. At the very end of this routine, a check is made to see if the user specified an estimator in the input file. If the user specifies a collision estimator, but the estimator had already been changed to an analog estimator, then the estimator is kept as an analog estimator (since the estimator was set to an analog estimator presumably because it requires post-collision information). So, the FETs in OpenMC are {\it analog} estimators.
+\beq
+X=\sum_{i}w_iQ_i\frac{\sigma_{f,i}}{\sigma_{a,i}}\phi
+\eeq
 
-This new analog score type required a single modification to the {\tt TallyObject} data type - a real, allocatable array {\tt fet\_geom\_norm(:)} array was added in order to hold the geometric normalization for the FET tallies. This array is allocated in the {\tt read\_tallies\_xml} subroutine to have a length of 1 (only one geometric norm can currently be specified in the input file). 
+where if there is no survival biasing, then we need to skip scoring to this tally for all absorption events (no absorption events occur with survival biasing). For non-analog tallies:
 
-Collision and track-length estimators cannot be used for tallies that need post-collision information.
+\beq
+X=\sum_{i}Q_i\sigma_{f,i}N_i\phi
+\eeq
 
-The {\tt MAX\_ANG\_ORDER} was increased from 10 to 18. Because this new score type scores multiple moments at once, it is added to the {\tt MOMENT\_STRS} character array that holds the name that will appear in input files to represent this new score - {\tt kappa-fission-z}. {\tt ZN\_LOC} is a new constant parameter that indicates at what position in the {\tt MOMENT\_STRS} array the Zernike expansions begin.
+Matt Ellis implemented an analog Zernike FET under the name {\tt kappa-fission-zn} to perform 2-D functional expansion. The effort to initialize, score, and expand FETs builds upon his work. The remainder of this section discusses the changes made to the OpenMC source in order to compute FETs, how the coefficients are stored, and additional subroutines and functions developed to interrogate the expansions.
 
+% The kappa-fission-zn tally is set to analog in the read_tallies_xml. If the user specifies a different estimator in the XML file, it will not be used, since presumably if the estimator was hard-coded to analog, then the developer knew that the tally required post-collision information, and could not be changed.
+
+% Collision and track-length estimators cannot be used for tallies that need post-collision information.
+
+%The {\tt MAX\_ANG\_ORDER} was increased from 10 to 18.
+
+\begin{comment}
 Before discussing how the tallies XML file is used to populate OpenMC tally data structures, it is important to understand the meaning of the fields in the tally data structures. 
 
 \begin{itemize}
@@ -642,48 +683,57 @@ Before discussing how the tallies XML file is used to populate OpenMC tally data
 \end{itemize}
 
 \begin{itemize}
-\item All user-specified tallies are stored in the {\tt tallies} array, which is of type {\tt TallyObject}.
 \item The {\tt filter\_matches} array, of length equal to the number of filters defined ({\tt n\_filters}), holds all of the valid bins and weights for each filter.
 \end{itemize}
+\end{comment}
+
+The tally system in OpenMC is modular, and uses separate arrays to hold the tallies and the filters, with arrays in the tally objects that store information about which filters in the filter array are used with the tally. Scores are stored for the tally as the score bins, and are a multiplication of the number of bins in all of the filters specified for a tally. For instance, if a cell filter with two cells and an energy filter with three energy bins are specified, then the tally will have six score bins. Instead of implementing nuclides as a type of filter, they are implemented as a score bin. To implement a new score, no changes need to be made to the filters. Due to the structure of the {\tt tallies(i) \% find\_filter} array, no more than one filter of each type can be specified for a tally. For FETs, the only type of filter that we require is a cell filter, since this tally is inherently tied to a volume. 
+
+When using scores for FETs, the only changes that need to be made are in the interpretation of the number of score bins and the the specific formulas for the score and how to expand it. The type of score is indicated with a numeric constant. The addition of a FET requires modification to the OpenMC tally data structures to add arrays to hold the expansion coefficients. Because this type of tally will always be associated with expansion coefficients, the storage of these expansion coefficients is linked to the tally object itself. For a single tally, because duplicate cells of the geometry cannot be specified in the cell filter (of which only one is allowed to be specified in the input file), the coefficients can be stored by cell index in the bins array of the cell filter. The {\tt TallyObject} data structure was modified to include two new arrays - {\tt coeffs(:, :)} and {\tt received\_coeffs(:, :)}, where the first of these arrays stores expansion coefficients computed {\it by the tally}, and the second stores expansion coefficients {\it received from an external physics code} that correspond to the same cells that the tally scores (as defined in the XML input). These arrays are only allocated if the tally score is of FET type. Note that this decision to store both the computed and received expansion coefficients together assumes that the FET defined in an OpenMC input is used to define coefficients that will be sent to an external physics code, since the corresponding coefficients to {\it receive} back are also associated with this tally. The downsides of this approach are:
+
+\begin{itemize}
+\item If the user simply wants to defined an FET {\it not} for the purpose of external physics coupling, then the {\tt received\_coeffs} array will be allocated, but never used.
+\item {\bf If more than one FET tally is defined for a cell, some capability must be introduced to inform the external physics code which FET tally to populate the {\tt received\_coeffs} array (i.e. which tallies are used for coupling, and which are used for calculating coefficients for other purposes).}
+\item The use of a single array to hold the expansion coefficients implies that coefficients for only one physical quantity will be received by OpenMC (one physical field that is tied to {\it that particular volume} that is associated with the FET). OpenMC will use volume coupling to an external code that performs a simulation to compute an updated temperature field, so this may require modification if more than temperatures are to be exchanged between the codes, such as densities as well. There are three ways that changes in density could be realized in a coupled simulation with OpenMC:
+	\begin{enumerate}
+	\item An external code computes densities, and sends this information via expansion coefficients to OpenMC. This will require additional arrays to hold the received coefficients beyond the {\tt received\_coeffs} array.
+	\item An external code computes densities, and sends information via quantities other than expansion tallies to OpenMC. If the density has a weak effect on the fission power distribution, it may be sufficient to send an average density, or a density that is gridded along one dimension (such as to model coolant density decreases along a fuel channel).
+	\item OpenMC internally computes an updated density using other quantities received from external physics codes. For example, to compute the fuel density, correlations for fuel density could be contained within the OpenMC source, and the temperature received from an external code used to compute those quantities. This is an inferior method to the above two options because it reduces modularity and requires adding significant physical models. However, this does not require any additional transfers of data (assuming that all of the other needed information such as temperatures and pressure) to compute densities.
+	\end{enumerate}
+\end{itemize}
+
+{\bf The implementation discussed in this report assumes that no more than one FET is defined for a given cell, as many of the subroutines developed simply ``match'' with the first matching tally, which will obviously give errors if there are multiple tallies for a cell.}
+
+The expansion order for the fission power distribution produced by OpenMC does {\it not} need to match the expansion order used for transferring data into OpenMC. Hence, the second dimension of the {\tt coeffs} and {\tt received\_coeffs} arrays do not need to match. While the dimensions of the {\tt coeffs} array can be determined from the OpenMC input files, the dimensions of the {\tt received\_coeffs} array depends on information from the external physics code that must be passed to OpenMC.
+
+\subsubsubsection{{\tt read\_tallies\_xml()}}
+Currently, all FETs must be defined in the tallies XML file. This file is read and the information stored in OpenMC data structures during the initialization phase. The following high-level summary of this routine indicates changes made to implement FETs. {\bf Future improvements may include automatically specifying which cells should have FETs defined for them given information from an external coupled code, so that the user does not need to redundantly specify the tallies (for instance, in the MOOSE input file we specify which cells in OpenMC we want to transfer information {\it to} - we could imply that these same cells will also transfer information {\it out}, and hence FETs should be defined for them).}FETs are currently implemented as a custom score type, but work by INL will extend this and improve generality by instead defining a FET filter. The discussion here is based on FET scores. 
 
 \begin{enumerate}
-\item {\bf Read any meshes specified}. A mesh can be used to specify the grid over which tallies are to be scored, instead of using other geometrical filters such as cells or universes. Allocate the global {\tt meshes(n\_meshes)} array to hold this mesh information. If the run does not use CMFD acceleration, then the number of meshes is simply equal to the number of meshes specified in the input file. Otherwise, the number of meshes is the sum of the CMFD meshes plus any user-specified meshes.  
-\item {\bf Read the number of user filters and assign to the {\tt filters} array}. The filters are allocated by calling {\tt add\_filters(n\_user\_filters)}, which allocates the global {\tt filters} array if it does not exist, or else extends the {\tt filters} array.
-\item {\bf Add user tallies to the global {\tt tallies} array} by calling the {\tt add\_tallies("user", n\_user\_tallies)} subroutine. If the global variable {\tt n\_tallies} is zero, then allocate {\tt tallies(n)}, otherwise extend the {\tt tallies} array with the additional tallies.
-\item Loop through the number of user meshes and read in XML data to the {\tt meshes(i)} structure. 
-\item Read data for derivatives. 
-\item {\bf Read data for user filters}. Loop through the {\tt n\_user\_filters}.
-
+%\item {\bf Read any meshes specified}. %A mesh can be used to specify the grid over which tallies are to be scored, instead of using other geometrical filters such as cells. Allocate the global {\tt meshes(n\_meshes)} array to hold this mesh information. If the run does not use CMFD acceleration, then the number of meshes is simply equal to the number of meshes specified in the input file. Otherwise, the number of meshes is the sum of the CMFD meshes plus any user-specified meshes.  
+\item Read the number of user filters and assign to the {\tt filters} array. %The filters are allocated by calling {\tt add\_filters(n\_user\_filters)}, which allocates the global {\tt filters} array if it does not exist, or else extends the {\tt filters} array.
+\item Add user tallies to the {\tt tallies} array.% by calling the {\tt add\_tallies("user", n\_user\_tallies)} subroutine.%If the global variable {\tt n\_tallies} is zero, then allocate {\tt tallies(n)}, otherwise extend the {\tt tallies} array with the additional tallies.
+%\item Loop through the number of user meshes and read in XML data to the {\tt meshes(i)} structure. 
+\item Read data for user filters. Loop through the {\tt n\_user\_filters}.
 	\begin{enumerate}
-	\item In a select-case statement for the filter type, determine the number of bins, and save it in the local variable {\tt n\_words}. The number of bins here is simply the number specified in the input file.
 	\item Allocate and declare the filter type by instantiating from the abstract class {\tt TallyFilter} with the extended type (for each type of filter, there is a corresponding type similar to {\tt CellFilter} for cell-type filters that defines additional filter-specific parameters).
-	\item Store the number of bins that appear in the input file to the {\tt filters(i) \% obj \% n\_bins} member. 
-	\item Perform any other specific initialization of {\tt filters(i)} based on data from the input file. 
+	\item Determine the number of bins in a select-case statement for the filter type. The number of bins here is simply the number specified in the input file. For instance, a cell filter defined over three cells has three bins. Store the number of bins that appear in the input file to the {\tt filters(i) \% obj \% n\_bins} member.
+	\item Perform any other specific initialization of {\tt filters(i)} based on data from the input file and the type of filter.
 	\end{enumerate}
-	
-\item {\bf Read data for tallies}. Loop through the {\tt n\_user\_tallies}.
-	
+\item Read data for tallies. Loop through the {\tt n\_user\_tallies}.
 	\begin{enumerate}
-	\item Set the tally type {\tt tallies(i) \% type = TALLY\_VOLUME} to volume by default default. 
-	\item It's better to use track length estimators for tallies, since more events will contribute (though we can't use this for tallies that require post-collision information). Set {\tt tallies(i) \% estimator = ESTIMATOR\_TRACKLENGTH} as the default in case the user doesn't specify anything in the input file. 
-	\item Read any filters specified within this particular tally (instead of as their own XML object). Store the filter IDs in the temporary array {\tt temp\_filter(n\_filter)}, where {\tt n\_filter} is the number of filter specified for this tally. Loop over the filters.
-		
+	\item Set the tally type to volume by default. 
+	\item Set the estimator to tracklength by default in case the user doesn't specify anything in the input file. More events will contribute to tracklength tallies than with other estimators (though we can't use this for tallies that require post-collision information).
+	\item Loop over the filters specified for this tally.	
 		\begin{enumerate}
-		\item Set the filter index in the {\tt tallies(i) \% find\_filter} array. For each filter, populate the numeric entry of {\tt find\_filter} corresponding to the filter type of this filter (i.e. set the {\tt FILTER\_CELL} entry to the filter number if the filter is a cell filter). Hence, the {\tt find\_filter} array holds all zeros except for entries that correspond to the number of filters for this tally. The location of these non-zeros directly translates to the {\it type} of filter, as defined in the constants module.
+		\item For each filter on the tally, populate the numeric entry of the {\tt find\_filter} array corresponding to the filter type of this filter (i.e. set the {\tt FILTER\_CELL} entry to the filter number in the {\tt filters(:)} array if the filter is a cell filter). Hence, the {\tt find\_filter} array holds all zeros except for entries that correspond to the number of filters for this tally.
 		\item Any filters that cannot use a tracklength estimator (those that require you to have sampled the outgoing phase space following a collision) are set to analog.
 		\end{enumerate}
-	\item {\bf Read data for nuclides that you'd like to tally} for the current tally. 
+	\item Read data for nuclides (filters for this tally). The {\tt tallies(i) \% nuclide\_bins} array holds the integer equivalents of all the nuclides for tally. If you specify {\tt all}, then the number of nuclide bins is equal to the total number of nuclides plus one (the last entry, with value {\tt -1}, is the sum over all nuclides). If you specify {\tt total}, then you tally irrespective of material. Finally, if you specify a list of nuclides, then only those nuclides are tallied.
+	\item Loop through the scores for this tally.
 		
 		\begin{enumerate}
-		\item If you specify all nuclides, then {\tt tallies(i)\%nuclide\_bins} is allocated with a size equal to the total number of nuclides in the simulation. The entries in the {\tt nuclide\_bins} array hold the integer-equivalents of all of the nuclides in the simulation.
-		\item Otherwise, {\tt nuclide\_bins} is allocated with a length equal to the number of nuclides you specified for this tally. 
-		\item If no nuclides were specified, then set the length of {\tt nuclide\_bins} to 1, and set the numeric entry equal to \(-1\), which indicates that you'll be using the {\tt 'total'} material (i.e. everything scores regardless of the material bin).
-		\end{enumerate}
-	
-	\item {\bf Read data for scores}. Loop through the number of scores specified in the input file, stored locally as {\tt n\_words}.
-		
-		\begin{enumerate}
-		\item {\bf Determine number of additional scores required due to moment scores} before you allocate storage for the scores. This is only required for score types present in the {\tt MOMENT\_STRS} array, which holds the names of moment tallies. These tallies are invoked in the input file by following their name directly by a number indicating an order. If this trailing number is greater than {\tt MAX\_ANG\_ORDER}, a warning is thrown, and instead the order is gracefully set to the maximum angular order allowed, and stored in the local variable {\tt n\_order}.
+		\item Determine the number of additional scores required due to moment scores before you allocate storage for the scores. This is only required for score types present in the {\tt MOMENT\_STRS} array, which holds the names of moment tallies. These tallies are invoked in the input file by following their name directly by a number indicating an order. A new constant, {\tt MAX\_Z\_ANG\_ORDER}, was included to indicate the maximum Zernike order of 18, which was higher than the {\tt MAX\_ANG\_ORDER} used for the Legendre and spherical harmonics expansions. If the order is greater than the maximum order, a warning is thrown, and instead the order is gracefully set to the maximum angular order allowed. To implement FETs, a new tally score, {\tt kappa-fission-z} was added.
 
 \begin{lstlisting}[language=Fortran]
 		character(*), parameter :: &
@@ -698,167 +748,101 @@ Before discussing how the tallies XML file is used to populate OpenMC tally data
                                "nu-scatter- "/)
 \end{lstlisting}
 
-		\item The number of bins is determined according to the order of the expansion requested. For Legendre expansions, the number of bins needed is \(n+1\), since the \(l\) summation has a lower bound of zero. For an order \(n\), \((n+1)^2\) tallies are required for spherical harmonics tallies and \(0.5(n+1)(n+2)\) for Zernike tallies. Hence, {\tt tallies(i) \% n\_scores} contains the actual number of scores (including {\it all} expansion orders for moment expansions, while {\tt tallies(i) \% n\_words} contains the number of scores specified in the XML file.  
-		\item Allocate {\tt tallies(i) \% score\_bins(n\_scores)} and {\tt tallies(i) \% moment\_order(n\_scores)}. Initialize the {\tt moment\_order} array to all zeros. 
-		\item {\bf Loop over the number of scores specified in the input file} ({\it not} the total number I actually allocated to account for moment scores). Ask Paul about duplication here...
+The number of score bins is determined according to the order of the expansion requested. For an order \(n\), \(n+1\) bins are required for Legendre, \((n+1)^2\) for spherical harmonics, and \(0.5(n+1)(n+2)\) for Zernike tallies. Hence, {\tt tallies(i) \% n\_scores} contains the actual number of scores (including {\it all} expansion orders for moment expansions), while {\tt tallies(i) \% n\_words} contains the number of scores specified in the XML file.
+		\item Allocate {\tt tallies(i) \% score\_bins(:)} and {\tt tallies(i) \% moment\_order(:)} of length {\tt n\_scores}. Initialize the {\tt moment\_order} array to all zeros. 
+		\item Loop over the number of scores specified in the input file.
 			
 			\begin{enumerate}
 			\item Enter a select-case statement that loops over all of the possible score types. Additional checks are made here to ensure compatibility between the types of filters you specified above, and the types of scores. 
-			\item For each type of score, set {\tt tallies(i) \% score\_bins(j) = SCORE\_FLUX}, or the appropriate type of scoring. For scores that inherently contain more than one score bins (the moment scores), simultaneously apply values for all of the {\tt score\_bins} and {\tt moment\_order} (where the order of the total Zernike expansion is held).
+			\item For each type of score, set {\tt tallies(i) \% score\_bins(j) = SCORE\_FLUX}, or the appropriate type of scoring. For scores that inherently contain more than one score bin (the moment scores), simultaneously apply values for all of the {\tt score\_bins} and {\tt moment\_order} (where the order of the {\it total} expansion is held). The following shows the initialization of the new {\tt kappa-fission-zn} tally. Currently, this FET is implemented as an analog tally, and a check was added to ensure that a cell filter is used (a user cannot specify more than one filter of the same type, so no checks need to be made to ensure that more than one cell filter are specified). As discussed, because the order of the expansion to be received from an external physics code isn't know by OpenMC, the {\tt received\_coeffs} array cannot be allocated during the XML input file reading phase.
+					
+A modification was made to Matt's work to automatically retrieve the radius from the cell geometrical information, so the geometric normalization information that was originally required in the tallies XML input is no longer needed.
 		
-		To implement FETs, a new score is introduced called {\tt kappa-fission-zn}. The type of score for each bin is set to a new constant, {\tt SCORE\_KAPPA\_FISSION\_ZN}. The moment order for each of these bins is set to {\tt n\_order}, the requested order. The user may specify one value of {\tt geom\_norms} in the input file - then, {\tt tallies(i) \% fet\_geom\_norm(n\_fet\_norms)} is allocated, and set equal to the value from the input file. 
-		
-\begin{lstlisting}[language=Fortran]
-case ('kappa-fission-zn')
-  t % estimator = ESTIMATOR_ANALOG
-  t % score_bins(j : j + n_bins - 1) = SCORE_KAPPA_FISSION_ZN
-  t % moment_order(j : j + n_bins - 1) = n_order
-  j = j + n_bins - 1
-  n_fet_norms = node_word_count(node_tal, "geom_norms")
-  if (n_fet_norms /= 1) then
-    call fatal_error('Expecting one value for geometric& 
-      & norm of Zernike kappa-fission tally.')
-  end if
-
-  allocate(t % fet_geom_norm(n_fet_norms))
-  call get_node_array(node_tal, "geom_norms", t % fet_geom_norm)
-\end{lstlisting}
-		
-			\item Check to make sure that the tallies are compatible with MG mode.  
 			\item Check that no duplicate scores exist by looping through the number of scores.
 			\end{enumerate}
 		\end{enumerate}
-	\item Check for tally derivatives. 
-	\item If {\tt trigger\_on} is true based on the settings XML file, then create tally triggers.
+	%\item Check for tally derivatives. 
+	%\item If {\tt trigger\_on} is true based on the settings XML file, then create tally triggers.
 	\item {\bf Set tally estimator {\it if} specified in XML file} - this checks if the user specified an estimator in the input file (previously it was set according to the type of tally as either was strictly required to be an analog estimator, or by default as a track-length estimator).  If you don't need post-collision information, then the type specified by the user in the tallies XML file will supersede any defaults set earlier. 
 	\end{enumerate}
 \end{enumerate}
 
-After the desired tallies are read from the input file, all scoring to the tallies occurs within the {\tt transport} subroutine. Within this main transport loop, after cross sections are calculated, the actions taken by a particle are determined. The particle is moved the minimum of the distance to the nearest boundary and the sampled distance to a collision. Before sampling any information about the type of collision, tracklength tallies are scored. If a particle has a collision, then first score to the collision estimate of \(k\), and score to surface current tallies that require us to not have yet sampled outgoing information. Then, perform the collision, and score to the collision and analog tallies. Perform some resetting, and then determine if any secondary particles were born. If so, then initialize them from the fission source. Otherwise, continue transporting the present particle until it suffers an absorption and produces no secondary particles.
+\subsubsubsection{{\tt score\_general\_ce(...)}}
+
+After the tallies are read from the input file, all scoring to the tallies occurs within the {\tt transport} subroutine. Within this main transport loop, after cross sections are calculated, the following sequence of events occurs.
 
 \begin{enumerate}
-\item {\bf Find distance to nearest boundary} by calling {\tt distance\_to\_boundary}.
-\item {\bf Sample a distance to collision} and store in {\tt d\_collision}. 
-\item {\bf Advance the particle}. Select the smaller of the two distances as the distance to move the particle, and then update the {\tt p \% coord(j) \% xyz} particle coordinates by looping through the number of particle coordinates and adjusting each accordingly.
-\item {\bf Score track-length tallies} by calling {\tt score\_tracklength\_tally(p, distance)}. This is only performed if {\tt active\_tracklength\_tallies} is greater than zero. If running in eigenvalue mode, then also score the tracklength estimate of \(k\).
-\item Score flux derivative accumulators for differential tallies.
-\item If the particle crosses a surface, then determine if it crossed either a lattice boundary or a surface boundary, and update the {\tt p \% event} field (to either {\tt EVENT\_LATTICE} or {\tt EVENT\_SURFACE}). Otherwise, the particle has a collision.
+\item Find distance to nearest boundary.
+\item Sample a distance to collision. 
+\item Advance the particle the smaller of the distance to the nearest boundary and to a collision. %Update the {\tt p \% coord(j) \% xyz} particle coordinates by looping through the number of particle coordinates and adjusting each accordingly.
+\item Score track-length tallies.% by calling {\tt score\_tracklength\_tally(p, distance)}.
+%\item Score flux derivative accumulators for differential tallies.
+\item If the particle crosses a surface, then determine if it crossed either a lattice boundary or a surface boundary, and update the {\tt p \% event} field. Otherwise, the particle has a collision. %(to either {\tt EVENT\_LATTICE} or {\tt EVENT\_SURFACE})
 	\begin{enumerate}
-	\item Score to the collision estimate of \(k\).
-	\item Score to surface current tallies by calling {\tt score\_surface\_current(p)} before the particle direction changes, since we want to use the incident neutron direction for this tally.
-	\item Perform a collision by calling {\tt collision(p)}. 
-	\item {\bf Score collision estimator tallies} by calling {\tt score\_collision\_tally(p)} if there are collision tallies (size of {\tt active\_collision\_tallies} is greater than zero). 
-	\item {\bf Score analog tallies} by calling {\tt score\_analog\_tally(p)} if there are analog tallies (size of {\tt active\_analog\_tallies} is greater than zero).
-	\item Reset banked weight during collision by setting {\tt p \% n\_bank = 0, p \% wgt\_bank = ZERO, p \% n\_delayed\_bank(:) = 0}. 
-	\item Save coordinates for tallying purposes by writing to {\tt p \% last\_xyz\_current}. 
-	\item Set {\tt p \% last\_material = NONE} because cross sections will need to be re-evaluated. 
+	\item Score to surface current tallies before the particle direction changes, since we want to use the incoming neutron direction for this tally.
+	\item Perform a collision. %by calling {\tt collision(p)}. 
+	\item Score collision and analog estimator tallies. %by calling {\tt score\_collision\_tally(p)}. 
+	%\item Score analog tallies by calling {\tt score\_analog\_tally(p)}.
+	%\item Reset banked weight during collision by setting {\tt p \% n\_bank = 0, p \% wgt\_bank = ZERO, p \% n\_delayed\_bank(:) = 0}. 
+	%\item Save coordinates for tallying purposes by writing to {\tt p \% last\_xyz\_current}. 
+	\item Set {\tt p \% last\_material = NONE} so that cross sections will be re-evaluated. 
 	\item Check for secondary particles if this particle is dead. If any secondary particles exist, then initialize them by calling {\tt initialize\_from\_source}. 
 	\end{enumerate}
 	\item Repeat until particle is dead (no secondary particles and an absorption).
 \end{enumerate}
 
-All volume tallies call the {\tt score\_general\_ce(p, t, start\_index, filter\_index, i\_nuclide, atom\_density, flux)} subroutine. This subroutine adds scores to the tally array for a given filter and nuclide. This routine performs the following logic. Loop over all of the score bins, and then a select-case statement contains the actual ``formulas'' for tallying different scores are held. The end result of this select-case statement is to determine a value for the {\tt score}. The only change made in this section to accommodate the new {\tt SCORE\_KAPPA\_FISSION\_ZN} tally was to include its type in the same case statement as the {\tt SCORE\_KAPPA\_FISSION} tally. 
+All volume tallies call the {\tt score\_general\_ce} subroutine. This subroutine adds scores to the tally array for a given filter and nuclide. In a select-case statement, the actual ``formulas'' for tallying different scores are held - the end result is to determine a value for the score. Because the FETs will be volume tallies, modifications must be made to this routine. The only change made in this section to accommodate the new {\tt kappa-fission-zn} tally was to include its type in the same case statement as the {\tt kappa-fission} tally. 
 
-This tally is chosen because it tallies the recoverable energy production rate due to fission, and includes the fission product kinetic energy, prompt and delayed neutron kinetic energies, prompt and delayed gamma ray energies, and the total energy released from \(\beta\) particles. Neutrino energies are assumed to not deposit in the system, and hence are not included. The prompt and delayed gamma ray energy is assumed to deposit locally, so this tally would not provide very accurate results for estimating fission energy deposition directly in the coolant, since no fission will occur directly in the coolant. The units for this tally are eV per source particle. We only score to this tally if the nuclide with which the neutron is interacting is fissionable. This tally differs from the {\tt FISSION\_Q\_RECOVERABLE} tally because it does not use \(Q\)-values that are a function of the neutron energy (though they are functions of the particular fissioning nuclide). The {\tt KAPPA\_FISSION} tally computes the score in the following manner. For analog tallies:
-
-\beq
-X=\sum_{i}w_iQ\frac{\sigma_f}{\sigma_a}\phi
-\eeq
-
-where if there is no survival biasing, then we need to skip scoring to this tally for all absorption events (no absorption events occur with survival biasing, so we don't have to worry about this check for those cases). Note that the Q-value of the reaction is not dependent on the incident neutron energy (the {\tt FISSION\_Q\_RECOVERABLE} tally would be used for this purpose). For non-analog tallies, we no longer use the particle weight in the tally, and we score according to the material in which we are in:
-
-\beq
-X=\sum_{i}Q\sigma_{f,i}N_i\phi
-\eeq
-
-After determining the correct value of the score, expand the score if necessary and add it to the tally results by calling {\tt expand\_and\_score(p, t, score\_index, filter\_index, score\_bin, score, i)} subroutine. This routine takes a previously determined score value and adjusts it if needed, such as for functional expansion weighting, and then adds the resultant value to the tally results array. Enter a case-select statement based on the type of score. For FETs, this is where the heart of the expansion itself occurs. 
-
-In order to compute the Zernike expansion, we must use coordinates that have been normalized to the unit circle. Matt Ellis developed a function to perform this capability. While he developed this routine for 2-D Zernike expansions, it can be extended to allow calculation of normalized positions for other expansions, such as Legendre expansions, by changing the score type pass in. For Zernike polynomials, the {\tt norm\_pos1} represents the normalized radial coordinate, and {\tt norm\_pos2} the normalized angular coordinate. Based on the formula for {\tt norm\_pos2}, this subroutine assumes that the Zernike expansion is occurring in the \(xy\) plane, since we use the first and second coordinates to compute the angle. This subroutine also assumes that the circle is centered on \(0,0\), since no information is passed in about a center about which to normalize the particle's coordinates, and based on the logic for changing {\tt norm\_pos2} (such as looking at whether or not the \(x\)-coordinate is negative). 
-
-The {\tt geom\_norms} array provided from the input file is of length 2, and contains the actual radius of the circle as its first element. A particle is associated with {\tt n\_coord}, the integer number of current coordinates, and an array of type {\tt LocalCoord} or length {\tt MAX\_COORD} named {\tt coord} that stores the coordinates for all levels. So, {\tt p \% coord(p \% n\_coord)} represents the coordinates in the present cell? 
-
-\begin{lstlisting}[language=Fortran]
-  subroutine get_polynomial_norm_positions(coord, geom_norms, norm_pos1, &
-       norm_pos2, score_type)
-
-    type(LocalCoord), intent(in) :: coord    ! mphysics coord level
-    real(8), dimension(:), intent(in) :: geom_norms    ! Geometric norms for calculation
-    real(8), intent(inout) :: norm_pos1 ! Normalized positions for tally
-    real(8), intent(inout) :: norm_pos2 ! Normalized positions for tally
-    integer, intent(in) :: score_type   ! Constant for the tally score type
-
-    select case (score_type)
-    case (SCORE_KAPPA_FISSION_ZN)
-      norm_pos1 = sqrt(coord % xyz(1) * coord % xyz(1) + &
-           coord % xyz(2) * coord % xyz(2)) / geom_norms(1)
-           
-      norm_pos2 = atan(coord % xyz(2) / coord % xyz(1))
-      
-      if (norm_pos2 < ZERO .and. coord % xyz(1) < ZERO) then
-        ! Need to shift to second quadrant
-        norm_pos2 = norm_pos2 - PI
-        
-      else if (norm_pos2 > ZERO .and. coord % xyz(1) < ZERO) then
-        ! Need to shift to third quadrant
-        norm_pos2 = norm_pos2 + PI
-      end if
-    end select
-
-  end subroutine get_polynomial_norm_positions
-\end{lstlisting}
-
-Then, after computing the normalized coordinates, the score is expanded in Zernike polynomials and added to the tally results array.
+\subsubsubsection{{\tt expand\_and\_score(...)}}
+After determining the correct value of the score from the {\tt score\_general\_ce} routine, expand the score if necessary and add it to the tally results by calling the {\tt expand\_and\_score} subroutine. This routine takes a previously-determined score value and adjusts it if needed, such as for functional expansion weighting, and then adds the resultant value to the tally results array. For FETs, this is where the expansion itself occurs. After computing normalized coordinates by calling the {\tt get\_polynomial\_norm\_positions} subroutine, the score is expanded in Zernike polynomials and added to the tally results array. The formula for the {\tt SCORE\_KAPPA\_FISSION\_ZN} tally is implemented here, and is essentially the same as other moment scores, except that the score is weighted by {\tt calc\_zn\_scaled}. 
 			
-\begin{lstlisting}[language=Fortran]
-case (SCORE_KAPPA_FISSION_ZN)
-  score_index = score_index - 1
-  num_nm = 1
+\subsubsubsection{{\tt fet\_deconstruction()}}
+Normally, the computation of the means and standard deviations of tallies is performed in the {\tt write\_tallies} subroutine. But, this routine is only called from {\tt openmc\_finalize}, which in the context of a coupled simulation, would only be called at the very end of the coupled run, which would not permit transferring the expansion coefficient information from OpenMC to an external code at each Picard step. So, the {\tt fet\_deconstruction} subroutine was added to statistically sum the FET coefficients and assemble them into the {\tt tallies(i) \% coeffs} array for easy access. 
 
-  ! Calculate normalized positions
-  call get_polynomial_norm_positions(p % coord(p % n_coord), t % fet_geom_norm, norm_pos1, norm_pos2, SCORE_KAPPA_FISSION_ZN)
-      
-  ! Loop over each moment and score the contribution of each moment in the appropriate bin
-  z = 0
-  do n = 0, t % moment_order(i)
-    ! Determine scoring bin index
-    score_index = score_index + num_nm
-    ! Update number of total n,m bins for this n
-    num_nm =  n + 1
-    z = z + num_nm
-    
-    ! multiply score by the zernike moments and store
-!$omp critical
-        t % results(RESULT_VALUE, score_index: score_index + num_nm - 1, filter_index) = &
-             t % results(RESULT_VALUE, score_index: score_index + num_nm - 1, filter_index) + &
-             score * calc_zn(n, norm_pos1, norm_pos2)
-!$omp end critical
-      end do
-      ! Advance bin counter by the number of coefficients minus one for later update
-      i = i + z - 1
-\end{lstlisting}
+ Then, loop over the filters for the tally until the cell filter is found (which must be present based on checks placed in the {\tt read\_tallies\_xml} subroutine). Then, looping over all of the score bins, the cell index is determined given the specific bin combination (of all of the filters). Then, the tally results are written according to the cell index. 
 
-To actually use Matt's FET in an input file requires the following syntax, where the {\tt geom\_norms} is forced to only have a length of 1, and represents the actual radius of the circle over which the Zernike polynomials are applied.
+Consider a tally defined with two filters, a cell filter and a material filter, which will be used to illustrate how the {\tt fet\_deconstruction} subroutine stores the expansion coefficients. This subroutine loops over all tallies, and skips any tallies that don't have the {\tt coeffs} array allocated (i.e. all non-FET tallies). More than one filter may be specified for a tally. Of these potentially multiple filters, we need to determine which one is the cell filter in order to then look up that filter in the {\tt filters} array. {\tt cell\_filt\_i} is the index in the {\tt <filters> </filters>} section that is the cell filter. Below, the cell filter is listed second of the filters, so {\tt cell\_filt\_i = 2}. Then, for each score bin combination, the coefficients are stored in the {\tt coeffs} array according to the index of the cell listed in the {\tt <bins> </bins>} section of the cell filter. For instance, below, coefficient results will be stored first for cell 20, and then for cell 10.
 
 \begin{lstlisting}
-<tally id="1">
-  <filter type="cell" bins="1" />
-  <geom_norms> 0.5</geom_norms>
-  <scores>kappa-fission-z4</scores>
-</tally>
+<tallies>
+
+  <filter id="25">
+    <type> cell</type>
+    <bins> 20 10</bins>
+  </filter>
+
+  <filter id="35">
+    <type> material</type>
+    <bins> 12 4 3</bins>
+  </filter>
+
+  <tally id="1">
+    <filters> 35 25</filters>
+    <scores>kappa-fission-z1</scores>
+  </tally>
+
+</tallies>
 \end{lstlisting}
 
-Finally, before passing the expansion coefficients to an external code, the FETs must be statistically summed in order to compute the mean (since it is the mean value that is of interest to the external code, not each individual score). Normally, this computation of the means and standard deviations is performed in the {\tt write\_tallies} subroutine. But, this routine is only called from {\tt openmc\_finalize}, which in the context of a coupled MOOSE-OpenMC simulation, would only be called at the very end of the coupled run, which would not permit transferring the expansion coefficient information from OpenMC to MOOSE at each Picard step. So, a new subroutine is needed to calculate statistical quantities associated with FETs and accumulate them into an array for transfer to an external code.
+\subsubsubsection{{\tt get\_coeffs\_from\_cell(cell\_id, cell\_coeffs, n)}}
+This subroutine is used to write coefficients from OpenMC into an array passed in by an external physics code given a cell, which is represented by passing in the cell ID given in the geometry XML file. Note that the coefficients are stored in {\tt tallies(i) \% coeffs} by the index of the cell in the bins for the cell filter, and {\it not} the cell index in the {\tt cells} array. Given a cell index in the {\tt cells} array, loop over all of the tallies. Skip any tallies that {\tt tallies(i) \% coeffs} is not allocated for (i.e. non-FET tallies). Then, loop over all of the filters defined for the tally until you find the filter that is the cell filter (which must be specified given constraints in the tallies XML reading stage). Then, loop over all of the cells for the cell filter. If the cell index passed in matches one of the cell indices that are covered by that cell filter, then pass the coefficient values to the array. A check is made here to ensure that the array passed in is the appropriate size. This routine also checks to make sure that an FET tally is defined for the requested cell.
 
-
-
-
-
-
+{\bf Note that this routine only matches with the first FET tally that exists for the specified cell, so this hinges on the assumption that at most one FET tally is defined for a cell.}
 
 \subsubsection{Field Reconstruction}
+This section discusses the changes made in the OpenMC source code to receive a set of expansion coefficients from an external code and expand them into a continuous field.
+
+\subsubsubsection{{\tt receive\_coeffs\_for\_cell(cell\_id, cell\_coeffs, n)}}
+This subroutine was added in order to receive expansion coefficients from an external code and store them in the {\tt received\_coeffs} array. A cell ID is passed in, which is converted to the index in the {\tt cells} array. Then, in a loop over all the tallies, all non-FET tallies will be skipped over (those that do not have {\tt coeffs} allocated). Then, if {\tt tallies(i) \% received\_coeffs} has not already been allocated, such as will be the case for the very first receipt of information from an external physics code, it will be allocated. The number of cells is assumed to match the number of cells tallied for the expansion coefficient sent {\it out} from OpenMC, while the number of coefficients is assumed to be equal to the length of the array passed into this subroutine. Hence, the order of the expansion produced by OpenMC does not need to match that received from an external code. An implicit assumption exists here that each of the cells for receiving coefficients will have the same number of coefficients, similar for the reverse case of coefficients generated by OpenMC. 
+
+For all other cases except the first receipt of coefficients from an external code, the {\tt received\_coeffs} array will have already been allocated, so the number of coefficients for the first cell is checked against the length of the array passed into this subroutine, and an error is thrown if the sizes do not match. This implicitly assumes that the order of the expansion for each tally does not change during the simulation and that the expansion order is the same for all cells belonging to the matching OpenMC {\tt kappa-fission-zn} tally. {\bf This tally only matches with the first matching FET tally in OpenMC, which will cause problems if more than one FET is defined for the same cell in OpenMC.} An error will be thrown if no matching tallies in OpenMC exist over the cell ID passed in, but this is logical because domains are to be linked between OpenMC and an external physics code by volume coupling.
 
 \subsubsection{Using the Constructed Field}
-The data transferred to OpenMC are temperatures in the fuel (from BISON - it is assumed that the fuel density is negligible) and densities and temperatures of the fluid coolant (from Nek). In order to understand how to use these reconstructed fields, it is necessary to understand how temperatures and densities are treated in OpenMC.
+The data transferred to OpenMC are temperatures and densities in the fuel and fluid coolant. In order to understand how to use these reconstructed fields to set temperatures and densities, it is necessary to understand how temperatures and densities are treated in OpenMC.
+
+
+
+
 
 The expansion coefficients received from MOOSE are stored each Picard iteration in the global {\tt expansion\_coeffs} array by calling the {\tt receive\_coeffs} subroutine from the {\tt coupling} module. It is assumed that the SCALAR variables used as the {\tt source\_variable} in the transfer lists the expansion coefficients, where they have been grouped by all the Zernike coefficients (organized by increasing \(n\), with increasing \(m\) for each \(n\)) in increasing Legendre order. For instance, the following would be the correct syntax in the input file for a transfer to OpenMC of coefficients associated with a Legendre order of 2 and a Zernike order of 1.
 
@@ -881,25 +865,18 @@ where {\tt l\_0\_coeffs} then holds the following coefficients in the following 
 
 It is critical that the order of the source variables in the transfer be in order of increasing Legendre order (the Zernike order is implemented correctly automatically by nature of the {\tt ZLDeconstruction} user object). 
 
+
+
 \subsubsubsection{Changing Temperatures}
-This section describes how temperatures are set in OpenMC for a normal, non-coupled simulation in order to elicit what changes are needed to modify a temperature in OpenMC and obtain the correct result of changing the temperature at which cross sections are evaluated.
+This section describes how temperatures are set in OpenMC for a normal, non-coupled simulation in order to elicit what changes are needed to modify a temperature in OpenMC and obtain the correct end result of changing the temperature at which cross sections are evaluated.
 
 \begin{enumerate}
-\item {\bf Read input data from geometry XML file}. In the {\tt read\_geometry\_xml()} subroutine, the global array {\tt cells(n\_cells)} is allocated, where {\tt n\_cells} is the number of cells that are specified in the input file ({\it not} each distributed cell). This is the subroutine in which the cell temperatures are read in, {\it if} they have been specified in the geometry XML file. If the temperature has not been specified, then set the temperature to {\tt ERROR\_REAL} to be changed later. 
+\item {\bf Read input data from the geometry XML file}. In the {\tt read\_geometry\_xml()} subroutine, the global array {\tt cells(n\_cells)} is allocated, where {\tt n\_cells} is the number of cells that are specified in the input file ({\it not} each distributed cell). This is the subroutine in which the cell temperatures are read in, {\it if} they have been specified in the geometry XML file. If the temperature has not been specified, then set the temperature to {\tt ERROR\_REAL} to be changed later. 
 
 \begin{algorithm}[H]
  \While{i $<$ n\_cells}{
   cells(i) \% instances = 0\;
   cells(i) \% distribcell\_index = NONE\;
-  \;
-  read in cell name and ID\;
-  read in universe (0 default) and fill (NONE if simple cell)\;
-  \;
-  \eIf{n\_mats $>$ 0}{
-   cells(i) \% material(j) = "material name"\;
-   }{
-   cells(i) \% material(j) = NONE\;
-  }
   \;
    \eIf{number of temps specified $>$ 0}{
    allocate(cells(i) \% sqrtkT(n))\;
@@ -910,67 +887,19 @@ This section describes how temperatures are set in OpenMC for a normal, non-coup
  }
 \end{algorithm}
 
-\item {\bf Assign temperatures to cells that did not have temperatures specified in the geometry XML file}. The {\tt assign\_temperatures(material\_temps)} subroutine deallocates and reallocates {\tt cells(i) \% sqrtkT(:)}, where the length of the temperature vector no longer refers to the number of materials in the cell (each material may have a temperature specified in the materials XML file). If any of the materials in the cell don't have temperatures defined, then use the global {\tt temperature\_default} of 293 K.
+\item {\bf Assign temperatures to cells that did not have temperatures specified in the geometry XML file}. The {\tt assign\_temperatures(material\_temps)} subroutine deallocates and reallocates {\tt cells(i) \% sqrtkT(:)}. If any of the materials in the cell don't have temperatures defined, then use the global {\tt temperature\_default} of 293 K.
 
-\item {\bf Determine temperatures at which to read cross sections and \(S(a,b)\) tables}. This is done in the reading of the materials XML file stage, since this must follow the geometry XML reading in case the user specifies temperatures in the geometry XML file. The {\tt read\_materials} subroutine declares, but does not initialize, an array {\tt nuc\_temps(:)}, which is to hold the temperatures to read for each nuclide. From within the {\tt read\_materials} subroutine, a call to the {\tt get\_temperatures} subroutine then allocates memory for and returns a list {\tt nuc\_temps(:)} of temperatures that each nuclide appears at in the model. Each entry in {\tt nuc\_temps(:)} corresponds to one nuclide in the model. 
+\item {\bf Determine temperatures at which to read cross sections and \(S(a,b)\) tables}. This is done in the reading of the materials XML file. From within the {\tt read\_materials} subroutine, a call to the {\tt get\_temperatures} subroutine then allocates memory for and returns a list {\tt nuc\_temps(:)} of temperatures that each nuclide appears at in the model. 
 
-\begin{algorithm}[H]
-\While{i $<$ size of cells}{
-  \While{j $<$ size of cells(i) \% material}{
-    \While{k $<$ size of materials(i\_material) \% names}{
-      \If{cells(i) \% sqrtkT(j) not in nuc\_temps(i\_nuclide)}{
-        add temperature to nuc\_temps;
-      }
-    }
-  }
-}
-\end{algorithm}
+\item {\bf Read cross sections from HDF5 files}. The {\tt nuc\_temps(:)} array is passed into the {\tt read\_ce\_cross\_sections} subroutine. Hence, the {\tt nuc\_temps(:)} array contains all of the temperatures that each nuclide appears at in the input files, while the {\tt Type(Nuclide) :: nuclides(:)} type contains much more aggregate information for the nuclides in the model. The {\tt nuc\_temps} array is passed into the {\tt nuclide\_from\_hdf5} subroutine, which finds all of the nuclear data that bounds each of the specified temperatures. Finally, the {\tt kTs(:)} array of the global {\tt nuclides} data structure is populated with all of the temperatures at which the data will be read. For a coupled simulation, you likely will not know a-priori all of the temperatures that you will need to load in, so a new settings XML parameter, {\tt temperature\_range}, allows the user to specify an expected range in temperatures for which to load nuclear data to avoid loading all the data.
+\end{enumerate}
 
-The {\tt get\_temperatures} subroutine is called with the global variables {\tt cells}, {\tt materials}, and {\tt n\_nuclides\_total} (so the parameter list could have been made smaller, since this subroutine acts on {\it all} of the nuclides in the problem). Each nuclide pertains to an index in the {\tt nuc\_temps} array (do distributed materials correspond to unique entries in the nuc\_temps array even though they are technically the same?). 
+This completes the loading of temperature-dependent cross sections. The use of this temperature-dependent data occurs within the {\tt transport} subroutine. At the start of the transport routine, the calculation of cross sections for the particle is performed by initializing {\tt micro\_xs \% last\_E = ZERO}. Then, from within the event loop, the following actions occur.
 
-\item {\bf Read cross sections}. The {\tt nuc\_temps(:)} array is passed into the {\tt read\_ce\_cross\_sections} subroutine. Memory is allocated for the global {\tt nuclides} (holds nuclide cross sections), {\tt sab\_tables}, and {\tt micro\_xs} (allocated in parallel using OpenMP) arrays. By looping over all of the materials, and then through all of the names in a material (are names equivalent to nuclides here?), then populate the fields in the {\tt nuclides} global array by reading nuclear data from the HDF5 files by passing in the component of the {\tt nuc\_temps} array for the current nuclide. 
+\begin{enumerate}
+\item {\bf Determine the particle's cell if it is not known} ({\tt NONE}) by calling the {\tt find\_cell} subroutine. This subroutine is called recursively, and will only break out once reaching the lowest universe. Once reaching the lowest universe (where the cell is filled by a homogeneous material (cell type is {\tt FILL\_MATERIAL}), this is where the {\tt p \% last\_material} and {\tt p \% last\_sqrtkT} entries are saved. A distributed cell exists if {\it either} the material or temperature lists have more than one value. Then, the particle's new temperature and material are saved according to the cell the particle is in.
 
-\begin{algorithm}[H]
-\While{i $<$ size(materials)}{
-  \While{j $<$ materials(i) \% names}{
-    i\_nuclide = key representation of nuclide\;
-    call nuclides(i\_nuclide) \% from\_hdf5(..., nuc\_temps(i\_nuclide), ...)\;
-  }
-}
-\end{algorithm}
-
-Hence, the {\tt nuc\_temps(:)} array contains all of the temperatures that each nuclide appears at in the input files, while the {\tt Type(Nuclide) :: nuclides(:)} type contains much more aggregate information for the nuclides in the model. In the call to {\tt nuclide\_from\_hdf5}, an array of desired temperatures to read is passed in (referenced locally as {\tt temperature}, but {\tt nuc\_temps(i\_nuclide)} is actually passed in, so this subroutine looks up all of the cross sections for a nuclide given a list of temperatures). Loop over the number of temperatures available in the HDF5 file (11 for JEFF-3.2), and store these temperatures in the local {\tt temps\_available(:)} array. Then, loop over the list of input temperatures that you would like to read data for. For each desired temperature, loop through the available temperatures until you find the two available temperatures that bound the current temperature. If the local array {\tt temps\_to\_read} does not yet have these bounding temperatures, then add them to this array. Finally, the {\tt kTs(:)} array of the global {\tt nuclides} data structure is populated with all of the temperatures at which the data will be read. So, {\tt nuc\_temps} gets directly converted into the {\tt kTs(:)} field of the {\tt nuclides} data structure, except that additional fields may be present in the {\tt nuclides}' {\tt kTs(:)} array to extract the temperatures in the HDF5 nuclear data files that most closely bound the desired temperature.
-
-\begin{algorithm}[H]
-\While{i $<$ number of temps available in HDF5}{
-  temps\_available(i) = read from HDF5\;
-}
-\;
-\eIf{TEMPERATURE\_NEAREST}{
-}{
-  \While{i $<$ nuc\_temps(i\_nuclide) \% size()}{
-     temp\_desired = nuc\_temps(i\_nuclide) \% data(i)\;
-     \While{j $<$ size(temps\_available) - 1}{
-       \If{temp\_desired bounded by values in temps\_available}{
-         \If{temps\_to\_read does not have these 2 bounding temps}{
-           Add bounding temperatures to temps\_to\_read\;
-         }
-       }
-     }
-  }
-}
-\;
-allocate(this \% kTs(temps\_to\_read \% size()))\;
-read entries into this \% kTs\;
-\end{algorithm}
-
-\item {\bf Transport the particles one-by-one}. A {\tt Particle} is passed into the {\tt transport} subroutine to transport one particle.
-
-	\begin{enumerate}
-	\item Perform initialization actions outside of the event loop. Initialize the number of events to zero, add the particle's starting weight to the {\tt total\_weight}, force calculation of cross sections by setting {\tt micro\_xs \% last\_E = ZERO}, and zero out any accumulated flux derivative on the particle. 
-	\item {\bf Enter the event loop}, which is exited when the particle dies and there are no secondary particles to track.
-		\begin{enumerate}
-		\item {\bf Determine the particle's cell if it is not known} ({\tt NONE}) by calling the {\tt find\_cell} subroutine. An optional list of cells is passed into the {\tt find\_cell} routine, and those cells are looped over to determine which cell a particle is in (if this list is not present, then all of the cells in the universe are searched). This subroutine is called recursively, and will only break out once reaching the lowest universe. Once reaching the lowest universe (where the cell is filled by a homogeneous material (cell type is {\tt FILL\_MATERIAL}), then this is where the {\tt p \% last\_material} and {\tt p \% last\_sqrtkT} entries are saved. A distributed cell exists if {\it either} the material or temperature lists have more than one value. Then, the particle's new temperature and material are saved.
+% An optional list of cells is passed into the {\tt find\_cell} routine, and those cells are looped over to determine which cell a particle is in (if this list is not present, then all of the cells in the universe are searched).
 				
 		\begin{algorithm}[H]
 		\While{i $<$ size of search\_cells}{
@@ -995,36 +924,16 @@ read entries into this \% kTs\;
 				}
 				\end{algorithm}
 				
-		\item {\bf Calculate cross sections} by calling {\tt calculate\_xs(particle)}, but only if the {\tt p \% material} differs from {\tt p \% last\_material} (new nuclide cross section) or if {\tt p \% sqrtkT} differs from {\tt p \% last\_sqrtkT} (new energy). All of the material macroscopic cross sections {\tt material\_xs} are set to zero. {\tt material\_xs} is a cache of type {\tt MaterialMacroXS} that holds cross section values for the current material. The current material is indicated by the integer value of {\tt p \% material}. Loop through all of the nuclides in the material, and calculate microscopic cross sections for each nuclide (this is forced by setting {\tt micro\_xs \% last\_E = ZERO}, so microscopic cross sections are re-calculated {\it every} event. {\tt micro\_xs} is a cache to hold microscopic cross section data for each nuclide in a material. Call {\tt calculate\_nuclide\_xs} subroutine if the last energy or last temperature at which microscopic cross sections were looked up has changed. The {\tt calculate\_nuclide\_xs} subroutine populates {\tt micro\_xs(i\_nuclide)} for the specified particle energy. It is in this routine that the temperature method is actually implemented. 
+\item {\bf Calculate cross sections} by calling {\tt calculate\_xs(particle)}, but only if the {\tt p \% material} differs from {\tt p \% last\_material} (new nuclides) or if {\tt p \% sqrtkT} differs from {\tt p \% last\_sqrtkT} (new temperature). Loop through all of the nuclides in the material, and calculate microscopic cross sections for each nuclide. Call the {\tt calculate\_nuclide\_xs} subroutine if the last energy or last temperature at which microscopic cross sections were looked up has changed (since these cross sections are cached). It is in this routine that the temperature method is actually implemented. 
 		
-				\begin{algorithm}[H]
-				\;
-				mat = materials(p \% material)\;
-				\;
-				\While{i $<$ mat \% n\_nuclides}{
-				  \If{p \% E /= micro\_x(mat \% nuclide(i)) \% last\_E or p \% sqrtkT /= micro\_x(mat \% nuclide(i)) \% last\_sqrtkT}{
-				    calculate\_nuclide\_xs(...)\;
-				  }
-				  \;
-				  read atom density of nuclide\;
-				  add contribution to macroscopic cross section\;
-				}
-				\end{algorithm}
-		
-		\item Transport the particle and score tallies... (no relation to temperatures, so this is not shown here). 
-		\end{enumerate}
-	\end{enumerate}
+% All of the material macroscopic cross sections {\tt material\_xs} are set to zero. {\tt material\_xs} is a cache of type {\tt MaterialMacroXS} that holds cross section values for the current material. The current material is indicated by the integer value of {\tt p \% material}. {\tt micro\_xs} is a cache to hold microscopic cross section data for each nuclide in a material.
+
+\item Then, transport the particle, score tallies, and repeat until the particle is dead and there are no more secondary particles.
 \end{enumerate}
 
-The temperature at which a cross section is evaluated can be performed in one of two ways - {\tt TEMPERATURE\_NEAREST} simply finds the nearest temperature value in the cross section data, and uses that value, while {\tt TEMPERATURE\_INTERPOLATION} will randomly sample (linearly) between the two temperatures that bound the current temperature. The default method is to use the nearest cross section. To use the interpolation method, note that the default temperature of 293 K cannot be used, since no cross sections exist below this temperature (so there is nothing to bound on the lower end).
+%The temperature at which a cross section is evaluated can be performed in one of two ways - {\tt TEMPERATURE\_NEAREST} simply finds the nearest temperature value in the cross section data, and uses that value, while {\tt TEMPERATURE\_INTERPOLATION} will randomly sample (linearly) between the two temperatures that bound the current temperature. The default method is to use the nearest cross section. To use the interpolation method, note that the default temperature of 293 K cannot be used, since no cross sections exist below this temperature (so there is nothing to bound on the lower end).
 
-The following changes were made to the temperature treatment in OpenMC:
-
-\begin{itemize}
-\item The {\tt get\_temperatures} subroutine will cause cross sections to be read from HDF5 files for all temperatures that appear in the geometry and materials XML files. For coupling, these XML files will be read only once to establish an approximate initial condition on temperatures. Then, for each subsequent Picard step, updated temperatures will be passed from MOOSE into OpenMC. If these updated temperatures were not also used in the XML input files, then no nuclear data will have been read in. A change is needed in order to read in all of the necessary nuclear data during the initialization stage. For now, this is alleviated by defining small regions of the domain that contain the temperatures needed (a material must actually be used in the geometry in order for {\tt get\_temperatures} to read in the data).
-\end{itemize}
-
-In order to use expansion coefficients from MOOSE within OpenMC to change temperatures, several changes were made to OpenMC to permit storage of these coefficients. 
+So, in order to use a reconstructed temperature field in OpenMC simply requires changed the temperatures of the appropriate cell, since the cell temperatures are used to determine which cross section values to use. Because the cross sections are forced to be calculated for every particle at the {\it start} of the transport subroutine, there is no need to reset or clear cross sections between Picard steps. 
 
 \subsubsubsection{Changing Densities}
 This section discusses the changes made in OpenMC to allow fluid densities to be changed given information from Nek. 
@@ -1045,9 +954,7 @@ MOOSE transfer a heat flux to Nek to apply on the boundary between the fuel and 
  
 
 \section{Executioners and Timesteppers}
-This section describes how an external code can be run from within the MOOSE framework by developing custom MOOSE {\tt Executioner} and {\tt TimeStepper} classes that run the external code. For this three-way coupling, both OpenMC and Nek are run by MOOSE by wrapping calls to their routines that run a simulation from within MOOSE class structures. In order to understand how to run an external code from within the MOOSE framework, a discussion of the MOOSE executioner and time stepper classes is given. 
-
-When MOOSE performs a simulation, the following major steps are performed:
+This section describes how an external code can be run from within the MOOSE framework by developing custom MOOSE {\tt Executioner} and {\tt TimeStepper} classes that run subroutines of the external code. In order to wrap an external code as Moose App, an understanding of the Moose executioner and timestepper methods is needed to show the types of execution ``chunks'' that a once-continuous code such as OpenMC must be decomposed into. When MOOSE performs a simulation, the following major steps are performed:
 
 \begin{enumerate}
 \item Call {\tt MooseInit} to initialize MPI, the solvers, and MOOSE.
@@ -1056,30 +963,30 @@ When MOOSE performs a simulation, the following major steps are performed:
 \item Execute the application by calling the {\tt run()} method of the App. This will perform setup, read the input file, and then call the {\tt executeExecutioner()} method. This method calls the {\tt init()} method, followed by the {\tt execute()} method of the executioner specified in the input file.
 \end{enumerate}
 
-Hence, the brunt work of the solve is contained in the executioner, so in order to couple an external code, most of the required calls to external code routines can be placed in the executioner in the appropriate methods for routines that should be called once per coupled solve, for every Picard step, and at the end of the simulation to perform cleanup. So, in order to call an external code from within the MOOSE framework, the structure of the executioner class must be understood. Because all of the coupled simulations of interest to this project will be transient, emphasis will be placed on the {\tt Transient} executioner. In a MOOSE simulation, the methods of the transient executioner and called in the following order:
+Hence, the brunt work of the solve is contained in the executioner, so in order to couple an external code, most of the required calls to external code routines can be placed in the executioner in the appropriate methods that are called once per coupled solve, for every Picard step, and at the end of the simulation to perform cleanup. So, in order to call an external code from within the MOOSE framework, the structure of the executioner and timestepper classes must be understood. Because all of the coupled simulations of interest to this project will be transient, emphasis will be placed on the {\tt Transient} executioner. In a MOOSE simulation, the methods of the transient executioner are called in the following order. 
 
 \begin{enumerate}
-\item At the very start of the simulation (before any time stepping has occurred), call {\bf {\tt init()}}. This method selects a default timestepper ({\tt constantDT}) if none is specified.
-	\begin{enumerate}
-	\item Call the {\tt init()} method of the timestepper - defined by custom time stepper
-	\end{enumerate}
+\item {\bf Perform initializations} at the very start of the simulation (before any time stepping has occurred), by calling {\tt init()}, which calls the {\tt init()} method of the timestepper - defined by custom time stepper. 
 \item Perform the time stepping within the {\tt execute()} method.
 	\begin{enumerate}
-	\item {\tt preExecute} - call the corresponding method of the time stepper, which deletes all previous sync times
+	\item {\tt preExecute} - call the {\tt preExecute()} method of the time stepper%, which deletes all previous sync times
 	\item {\bf Main time stepping loop}. For each time step, perform the following:
 		\begin{enumerate}
 		\item For all but the first time step, the problem state and MultiApps are advanced by calling the {\tt incrementStepOrReject()} method, which checks to make sure that the last solve converged (MasterApp + any MultiApps) before advancing the state.
-		\item Then, the {\tt keepGoing()} method is called to determine whether or not to break from the main time stepping loop. This method will break out of the main time stepping loop if the last solve converged (MasterApp + any MultiApps) and a) you've reached the desired number of time steps or the end simulation time or b) you've reached the steady state check, and no longer need to run a transient simulation. This method will break out of the main time stepping loop if last solve did not converge, and you can no longer halve the time step.
+		\item {\tt keepGoing()} - determines whether or not to break from the main time stepping loop; a break will occur if the last solve converged (MasterApp + any MultiApps) and a) you've reached the desired number of time steps or the end simulation time or b) you've reached the steady state check, and no longer need to run a transient simulation. This method will also break out of the main time stepping loop if last solve did not converge, and you can no longer halve the time step due to minimum time step constraints.
 		\item {\tt preStep()}  - defined by custom time stepper
-		\item {\tt computeDT()} - compute \(\Delta t\), which calls {\tt computeStep} by the time stepper (where the current \(\Delta t\) is actually selected). If the solve has not converged, then the {\tt computeFailedDT()}  method of the time stepper simply cuts the time step in half, provided you're not  already at the minimum time step size. If you're at the first time step, then call the {\tt computeInitialDT()} method of the time stepper. This sets the value of {\tt \_current\_dt}.
-		\item {\tt takeStep()} - {\bf Perform a single complete time step}. Initialize the number of Picard iterations to zero and back up the MultiApps. The Picard loop is then controlled as a while loop. For each Picard iteration:
+		\item {\tt computeDT()} - compute \(\Delta t\), which calls {\tt computeStep} by the time stepper (where the current \(\Delta t\) is actually selected). If you're at the first time step, then call the {\tt computeInitialDT()} method of the time stepper. Otherwise, if the solve has not converged, then the {\tt computeFailedDT()}  method of the time stepper simply cuts the time step in half, provided you're not  already at the minimum time step size.
+		\item {\tt takeStep()} - {\bf Perform a single complete time step}. Initialize the number of Picard iterations to zero. The Picard loop is then controlled as a while loop. For each Picard iteration:
 			\begin{enumerate}
-			\item {\tt solveStep()}  - {\bf solve a single Picard step}. 
+			\item {\tt solveStep()}  - {\bf solve a single Picard step}
 				\begin{itemize}
-				\item First, transfers to MultiApps are performed, and those MultiApps that execute on {\tt timestep\_begin} are solved. If those MultiApps don't converge, then return.
-				\item {\tt preSolve()} - call Executioner and time stepper methods of the same name, both undefined.
-				\item {\tt \_time\_stepper->step()} solves the FEM solution of the Master App. 
-				\item After this has been called, we need to check that both the MasterApp and all of the timestep\_begin MultiApps have converged. If all converged, then perform transfers to and execute MultiApps on timestep\_end. Check that those MultiApps also converged.
+				\item Perform transfers to MultiApps on {\tt timestep\_begin}.
+				\item Execute (solve) MultiApps on {\tt timestep\_begin}. If those MultiApps don't converge, then return.
+				\item {\tt preSolve()} - call executioner and time stepper methods of the same name, both undefined.
+				\item {\tt \_time\_stepper->step()} solves the finite element problem of the Master App. 
+				\item Check that both the MasterApp and all of the {\tt timestep\_begin} MultiApps have converged.
+				\item Perform transfers to MultiApps on {\tt timestep\_end}.
+				\item Execute (solve) MultiApps on {\tt timestep\_end}. If those MultiApps don't converge, then return.
 				\item {\tt postSolve()} - call Executioner and time stepper methods of the same name, both undefined.
 				\end{itemize}
 			\end{enumerate}
@@ -1090,7 +997,14 @@ Hence, the brunt work of the solve is contained in the executioner, so in order 
 	\end{enumerate}
 \end{enumerate}
 
-So, as long as the routines needed from an external code can be cast into one or several of these executioner and time stepper methods shown above, then a custom executioner class, such as {\tt OpenMCExecutioner} can be created to override the needed methods. This executioner would then be used in a MOOSE input file to run an external code from within the MOOSE framework.
+So, as long as the routines needed from an external code can be cast into one or several of these executioner and time stepper methods shown above, then a custom executioner class can be created and override the needed methods. This executioner would then be used in a MOOSE input file to run an external code from within the MOOSE framework. To wrap an external code as a MOOSE executioner requires that we decompose the code project into the following basic actions:
+
+\begin{itemize}
+\item Initialization and problem setup before {\it all} solves.
+\item A manner for assessing convergence to communicate to the Master App whether or not the MOOSE-wrapped App has converged for a single set of inputs. Most external codes will already have this capability built in, and can simply always ``tell'' MOOSE that they have converged once they have finished executing.
+\item Initialization and problem setup to be performed before each individual solve. This might include resetting variables to zero that would otherwise stay alive in memory with repeated runs, for instance.
+\item Perform a single solve.
+\end{itemize}
 
 \subsection{OpenMC Execution}
 This section describes the OpenMC executioner and time stepper created that will call the OpenMC routines that are needed to perform a Monte Carlo simulation within the MOOSE framework.
