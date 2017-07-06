@@ -56,7 +56,7 @@
 
 [Executioner]
   type = Transient
-  num_steps = 50
+  num_steps = 3
 []
 
 [MultiApps]
@@ -104,6 +104,7 @@
     source_variable = 'l_0_coeffs_temp'
     to_aux_scalar = 'dummy_openmc'
     execute_on = timestep_begin
+    dbg = true
   [../]
   [./from_openmc]
     type = PolynomialOpenMC
@@ -113,6 +114,7 @@
     source_variable = 'dummy_openmc'
     to_aux_scalar = 'l_0_coeffs_power'
     execute_on = timestep_begin
+    dbg = true
   [../]
 []
 
