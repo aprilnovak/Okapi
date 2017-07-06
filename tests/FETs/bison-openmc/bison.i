@@ -38,7 +38,7 @@
     type = KappaFissionToHeatSource
     variable = bison_heat
     kappa_fission_source = bison_kappa_fission
-    power = 10.0
+    power = 20
     volume_pp = 'volume'
   [../]
 []
@@ -85,6 +85,15 @@
   [../]
 []
 
+[BCs]
+  [./constant_temp]
+    type = DirichletBC
+    variable = bison_temp
+    boundary = 'wall'
+    value = 673 # Kelvin
+  [../]
+[]
+
 [UserObjects]
   [./l0]
     type = ZLDeconstruction
@@ -109,5 +118,9 @@
     block_id = '1'
     execute_on = timestep_begin
   [../]
+[]
+
+[Outputs]
+  exodus = true
 []
 

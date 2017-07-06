@@ -50,13 +50,13 @@
   [./ic]
     type = ScalarComponentIC
     variable = 'l_0_coeffs_temp'
-    values = '500.0 0.0 0.0'
+    values = '900.0 0.0 0.0'
   [../]
 []
 
 [Executioner]
   type = Transient
-  num_steps = 3
+  num_steps = 50
 []
 
 [MultiApps]
