@@ -22,6 +22,7 @@ protected:
   std::vector<VariableName> _source_var_names;
   std::vector<VariableName> _to_aux_names;
   int _cell;
+  bool _dbg;
 };
 
 #endif /* POLYNOMIALOPENMC_H */

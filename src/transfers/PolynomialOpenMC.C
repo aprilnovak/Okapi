@@ -38,6 +38,7 @@ InputParameters validParams<PolynomialOpenMC>()
     value to.");
   params.addRequiredParam<int>("openmc_cell", "OpenMC cell ID (defined in\
     input file) for this transfer to be associated with.");
+  params.addParam<bool>("dbg", false, "Whether to turn on debugging information");
   return params;
 }
 
@@ -45,7 +46,8 @@ PolynomialOpenMC::PolynomialOpenMC(const InputParameters & parameters) :
     MultiAppTransfer(parameters),
     _source_var_names(getParam<std::vector<VariableName>>("source_variable")),
     _to_aux_names(getParam<std::vector<VariableName>>("to_aux_scalar")),
-    _cell(parameters.get<int>("openmc_cell"))
+    _cell(parameters.get<int>("openmc_cell")),
+    _dbg(parameters.get<bool>("dbg"))
 {
 }
 
@@ -98,6 +100,18 @@ PolynomialOpenMC::execute()
       for (unsigned int i = 0; i < num_apps; i++)
         if (_multi_app->hasLocalApp(i))
         {
+          /* first, we need to determine how many coefficients will be passed from
+             MOOSE to OpenMC. A check is made after computing these quantities to
+             ensure that all of the source auxvariables are of the same order, but
+             so that we don't need to duplicate the loop structure below, we assume
+             that the number of variables to transfer equals the number of variables
+             to read multiplied by the order of the first of these variables. If
+             the source variables are actually the same size, an error will be thrown
+             before this would become a problem. */
+          int num_coeffs_from_moose = num_vars_to_read *
+            source_variables[beginIndex(_source_var_names)]->sln().size();
+          double moose_coeffs[num_coeffs_from_moose];
+
           /* Loop through each SCALAR variable. The order of the Legendre
              expansion equals the number of source variables - 1, since the
              Legendre order can be zero. */
@@ -119,13 +133,26 @@ PolynomialOpenMC::execute()
               zernike_order_from_coeffs(soln_values.size());
 
             for (auto j = beginIndex(soln_values); j < soln_values.size(); ++j)
-            {
-              //TODO:  store the coefficients in OpenMC data structures
-              //OpenMC::receive_coeffs(soln_values[j]);
-            }
+              moose_coeffs[i * num_vars_to_read + j] = soln_values[j];
+
             _console << '\n';
           }
+
+        if (_dbg)
+        {
+          _console << "Transferring " << num_coeffs_from_moose << " coefficients"
+            " from MOOSE to OpenMC..." << std::endl;
+          _console << "For cell " << _cell << ":" << std::endl;
+
+          for (int i = 0; i < num_coeffs_from_moose; ++i)
+            _console << moose_coeffs[i] << " ";
+
+          _console << std::endl;
         }
+
+        // send all expansion coefficients for a cell to OpenMC at one time
+        OpenMC::receive_coeffs_for_cell(&_cell, moose_coeffs, &num_coeffs_from_moose);
+      }
 
       /* Change a temperature in OpenMC. For now, only use a single coefficient,
          since there's no continuous material tracking yet. Note that changing
@@ -167,16 +194,16 @@ PolynomialOpenMC::execute()
          t % coeffs array) matches what is allocated in C++ to receive it.*/
 
       // Check that all of the coupled variables are of the same length
-     int zernike_order_from_OpenMC = zernike_order_from_coeffs(
-       to_variables[beginIndex(_to_aux_names)]->sln().size());
-     for (int i = 0; i < num_vars_to_write; ++i)
-     {
-       if (i > 0)
-         if (old_zernike_order_OpenMC != zernike_order_from_OpenMC)
-           mooseError("The order of the Zernike expansion does not "
-             "match each coupling Legendre coefficient aux variable.");
-       old_zernike_order_OpenMC = (to_variables[i]->sln()).size();
-     }
+      int zernike_order_from_OpenMC = zernike_order_from_coeffs(
+        to_variables[beginIndex(_to_aux_names)]->sln().size());
+      for (int i = 0; i < num_vars_to_write; ++i)
+      {
+        if (i > 0)
+          if (old_zernike_order_OpenMC != zernike_order_from_OpenMC)
+            mooseError("The order of the Zernike expansion does not "
+              "match each coupling Legendre coefficient aux variable.");
+        old_zernike_order_OpenMC = (to_variables[i]->sln()).size();
+      }
 
       // Determine size of array to allocate based on size of MOOSE variables
       int num_zernike_coeffs_per_var =
