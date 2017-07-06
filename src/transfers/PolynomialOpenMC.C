@@ -36,8 +36,8 @@ InputParameters validParams<PolynomialOpenMC>()
   params.addRequiredParam<std::vector<VariableName> >("to_aux_scalar", \
     "The name of the SCALAR auxvariable in the MultiApp to transfer the \
     value to.");
-  params.addRequiredParam<int>("openmc_cell", "index in the OpenMC cells(:)\
-    array that this transfer is associated with.");
+  params.addRequiredParam<int>("openmc_cell", "OpenMC cell ID (defined in\
+    input file) for this transfer to be associated with.");
   return params;
 }
 
