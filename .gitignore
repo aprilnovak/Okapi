@@ -1,4 +1,5 @@
 .libs
+*.exo
 *.la
 *.lo
 *.d
