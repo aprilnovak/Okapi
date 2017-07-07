@@ -6,29 +6,31 @@
 template<>
 InputParameters validParams<ZernikeLegendreDeconstruction>()
 {
-  /* This class inherits from a class that uses the BlockRestrictable parameters, which means
-     that the variable and/or domain blocks to which this integral is to be applied can be
-     specified in the input file using the variable = `` and blocks = `` syntax. 
-     
-     IMPORTANT: This user object should only be used over cylindrical domains! Because a 
-     postprocessor is used to compute volume, no error will be given if this is used over
-     a non-cylindrical region. */
+  /* This class inherits from a class that uses the BlockRestrictable parameters,
+     which means that the variable and/or domain blocks to which this integral is
+     to be applied can be specified in the input file using the variable = `` and
+     blocks = `` syntax. IMPORTANT: This user object should only be used over
+     cylindrical domains! Because a postprocessor is used to compute volume, no
+     error will be given if this is used over a non-cylindrical region. */
+
+  // TODO: check that the volume from the postprocessor matches the volume as
+  // calculated by the coupled Legendre and Zernike functions.
 
   InputParameters params = validParams<ElementIntegralUserObject>();
   params.addRequiredCoupledVar("variable", "The variable that will be integrated");
-  params.addRequiredParam<std::string>("legendre_function", \
+  params.addRequiredParam<std::string>("legendre_function",
     "Name of function to compute Legendre polynomial value at a point.");
-  params.addRequiredParam<std::string>("zernike_function", \
+  params.addRequiredParam<std::string>("zernike_function",
     "Name of function to compute Zernike polynomial value at a point");
-  params.addRequiredParam<int>("l_direction", \
+  params.addRequiredParam<int>("l_direction",
     "Direction of integration for Legendre polynomial");
   params.addRequiredParam<int>("l_order", "The order of the Legendre expansion");
   params.addRequiredParam<int>("n_order", "The order of the Zernike expansion");
   params.addRequiredParam<int>("m_order", "The order of the Zernike expansion");
-  params.addRequiredParam<std::string>("aux_scalar_name", \
+  params.addRequiredParam<std::string>("aux_scalar_name",
     "Aux scalar to store the Legendre expansion coefficient");
-  params.addRequiredParam<std::string>("volume_pp", "The name of the post processor that\
-     calculates volume.");
+  params.addRequiredParam<std::string>("volume_pp",
+    "The name of the post processor that calculates volume.");
   return params;
 }
 
@@ -48,7 +50,7 @@ ZernikeLegendreDeconstruction::ZernikeLegendreDeconstruction(const InputParamete
     _volume_pp(getPostprocessorValueByName(parameters.get<std::string>("volume_pp")))
 {
   addMooseVariableDependency(mooseVariable());
- 
+
   if (_l_direction == 0) // Legendre in x-direction, Zernike in y-z
   {
     _fdir1 = 1;
@@ -73,20 +75,17 @@ ZernikeLegendreDeconstruction::computeQpIntegral()
   Real z_func = _zernike_function.getPolynomialValue(_t, _q_point[_qp](_fdir1), _q_point[_qp](_fdir2),\
     _m_order, _n_order);
 
-  /*std::cout << "l_func: " << l_func << std::endl;
-  std::cout << "z_func: " << z_func << std::endl;
-  std::cout << "volume: " << _volume_pp << std::endl;
-  std::cout << "pi: " << M_PI << std::endl;*/
   return _u[_qp] * l_func * z_func * 2.0 * M_PI / _volume_pp;
 }
 
 void
 ZernikeLegendreDeconstruction::finalize()
 {
-  /* In the finalize step, we store the result of the user object in a SCALAR variable. 
-     For now, this user object can only set one C_l^{nm} coefficient at a time. The entry
-     in the SCALAR variable that is to be filled depends on the values of n and m. */
-  MooseVariableScalar & scalar =  _fe_problem.getScalarVariable(_tid, _aux_scalar_name);
+  /* In the finalize step, store the result in a SCALAR variable. This user object
+     can only set one C_l^{nm} coefficient at a time. The entry in the SCALAR
+     variable that is to be filled depends on the values of n and m. */
+  MooseVariableScalar & scalar = _fe_problem.getScalarVariable(
+    _tid, _aux_scalar_name);
   scalar.reinit();
 
   std::vector<dof_id_type> & dof = scalar.dofIndices();
@@ -107,8 +106,6 @@ ZernikeLegendreDeconstruction::finalize()
     else
       m_begin += 1;
   }
-
-  std::cout << "Storing value " << getValue() << "in entry " << n_begin + m_begin << std::endl;
 
   scalar.sys().solution().set(dof[n_begin + m_begin], getValue());
   scalar.sys().solution().close();
