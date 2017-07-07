@@ -1,11 +1,15 @@
 # This input file performs a BISON solve over the fuel pin.
 
 [Mesh]
-  file = 3D_sideset.exo
-  block_id = '1'
-  block_name = 'interior'
-  boundary_id = '100 200 300'
-  boundary_name = 'top bottom wall'
+#  file = 3D_sideset.exo
+#  block_id = '1'
+#  block_name = 'interior'
+#  boundary_id = '100 200 300'
+#  boundary_name = 'top bottom wall'
+   type = GeneratedMesh
+   dim = 2
+   nx = 10
+   ny = 10
 []
 
 [Variables]
@@ -29,6 +33,7 @@
 []
 
 [AuxKernels]
+active = ''
   [./bison_kappa_fisson]
     type = FunctionAux
     variable = bison_kappa_fission
@@ -50,6 +55,7 @@
 # The only disadvantage here is that we would need to duplicate these
 # functions for every pin...
 [Functions]
+active = ''
   [./legendre]
     type = LegendrePolynomial
     l_geom_norm = '0.0 1.0'
@@ -87,6 +93,7 @@
 []
 
 [BCs]
+active = ''
   [./constant_temp]
     type = DirichletBC
     variable = bison_temp
@@ -96,6 +103,7 @@
 []
 
 [UserObjects]
+active=  ''
   [./l0]
     type = ZLDeconstruction
     variable = bison_temp
