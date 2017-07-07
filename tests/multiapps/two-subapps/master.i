@@ -63,7 +63,7 @@
     type = TransientMultiApp
     app_type = OkapiMCSApp
     positions = '0 0 0'
-    input_files = 'picard.i'
+    input_files = 'openmc.i'
     execute_on = timestep_begin
   [../]
   [./bison]
