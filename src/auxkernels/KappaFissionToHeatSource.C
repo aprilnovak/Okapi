@@ -4,13 +4,13 @@ template<>
 InputParameters validParams<KappaFissionToHeatSource>()
 {
   InputParameters params = validParams<AuxKernel>();
-  params.addRequiredCoupledVar("kappa_fission_source", "Continuous field\
-  representing the kappa-fisison source (eV/source particle)");
+  params.addRequiredCoupledVar("kappa_fission_source",
+    "Continuous field representing the kappa-fisison source (eV/source particle)");
   params.addRequiredParam<Real>("power", "pin power (W)");
-  params.addRequiredParam<std::string>("kappa_fission_pp", "The name\
-    of the postprocessor that integrates the kappa-fission distribution.");
-  params.addRequiredParam<std::string>("volume_pp", "The name of the\
-  postprocessor that calculates volume.");
+  params.addRequiredParam<std::string>("kappa_fission_pp",
+    "The name of the postprocessor that integrates the kappa-fission distribution.");
+  params.addRequiredParam<std::string>("volume_pp",
+    "The name of the postprocessor that calculates volume.");
   return params;
 }
 
