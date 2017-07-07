@@ -13,12 +13,13 @@ template <>
 InputParameters
 validParams<ZLDeconstruction>()
 {
-  /* This user object computes the expansion coefficients into which a continuous MOOSE
-     variable is decomposed for transfer _to_ OpenMC for a _single_ value of l. */
+  /* This user object computes the expansion coefficients into which a continuous
+     MOOSE variable is decomposed for a single value of l. */
   InputParameters params = validParams<ElementUserObject>();
   params.addRequiredCoupledVar("variable", "The variable that will be integrated");
   params.addRequiredParam<int>("l_order", "Order of Legendre expansion.");
-  params.addRequiredParam<int>("n_order_to_openmc", "Order of Zernike expansion used in OpenMC");
+  params.addRequiredParam<int>("n_order",
+    "Order of Zernike expansion for current set of coefficients.");
   params.addRequiredParam<std::string>("legendre_function", \
     "Name of function to compute Legendre polynomial value at a point.");
   params.addRequiredParam<std::string>("zernike_function", \
@@ -27,8 +28,8 @@ validParams<ZLDeconstruction>()
     "Direction of integration for Legendre polynomial");
    params.addRequiredParam<std::string>("aux_scalar_name", \
      "Aux scalar to store the expansion coefficients.");
-   params.addRequiredParam<std::string>("volume_pp", "The name of the post processor that\
-      calculates volume."); 
+   params.addRequiredParam<std::string>("volume_pp",
+     "The name of the post processor that calculates volume.");
  return params;
 }
 
@@ -122,30 +123,26 @@ ZLDeconstruction::computeIntegral(int l, int m, int n)
 Real
 ZLDeconstruction::computeQpIntegral(int l, int m, int n)
 {
-  Real l_func = _legendre_function.getPolynomialValue(_t, _q_point[_qp](_l_direction), l);
-  Real z_func = _zernike_function.getPolynomialValue(_t, _q_point[_qp](_fdir1), _q_point[_qp](_fdir2), m, n);
+  Real l_func = _legendre_function.getPolynomialValue(_t,
+    _q_point[_qp](_l_direction), l);
+  Real z_func = _zernike_function.getPolynomialValue(_t,
+    _q_point[_qp](_fdir1), _q_point[_qp](_fdir2), m, n);
 
-  /*std::cout << "l_func: " << l_func << std::endl;
-  std::cout << "z_func: " << z_func << std::endl;
-  std::cout << "volume: " << _volume_pp << std::endl;
-  std::cout << "pi: " << M_PI << std::endl;*/
   return _u[_qp] * l_func * z_func * 2.0 * M_PI / _volume_pp;
 }
 
 void
 ZLDeconstruction::finalize()
 {
-  /* In the finalize step, we store the result of the user object in a SCALAR variable.
-     For now, this user object can only set one C_l^{nm} coefficient at a time. The entry
-     in the SCALAR variable that is to be filled depends on the values of n and m. */
-  MooseVariableScalar & scalar =  _fe_problem.getScalarVariable(_tid, _aux_scalar_name);
+  /* Store the result of the user object in a SCALAR variable.*/
+  MooseVariableScalar & scalar =
+    _fe_problem.getScalarVariable(_tid, _aux_scalar_name);
   scalar.reinit();
 
   std::vector<dof_id_type> & dof = scalar.dofIndices();
 
   for (int i = 0; i < _num_entries; ++i)
-  {
     scalar.sys().solution().set(dof[i], getValue(i));
-    scalar.sys().solution().close();
-  }
+
+  scalar.sys().solution().close();
 }
