@@ -215,6 +215,18 @@ PolynomialOpenMC::execute()
       // store coefficients from OpenMC into the omc_coeffs array
       OpenMC::get_coeffs_from_cell(&_cell, omc_coeffs, &num_coeffs_from_openmc);
 
+     if (_dbg)
+     {
+        _console << "Transferring " << num_coeffs_from_openmc << " coefficients"
+          " from OpenMC to MOOSE..." << std::endl;
+        _console << "For cell " << _cell << ":" << std::endl;
+
+        for (int i = 0; i < num_coeffs_from_openmc; ++i)
+          _console << omc_coeffs[i] << " ";
+
+        _console << std::endl;
+     }
+
       // Loop over the variables that we are going to write
       for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
       {
