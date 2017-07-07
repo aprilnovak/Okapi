@@ -6,14 +6,13 @@ template<>
 InputParameters validParams<LegendrePolynomial>()
 {
   InputParameters params = validParams<Function>();
-  /* This parameter is used for normalizing the Legendre polynomials,
-     which are only orthogonal on [-1, 1]. However, the Cartesian
-     domain over which we'd like to use FETs may exist over a 
-     different range. So, just scale the polynomial appropriately. 
-     Care should be taken that this value matches that given in the
-     OpenMC input XML files. */
-  params.addRequiredParam<std::vector<Real>>("l_geom_norm","Lengths needed for\
-    Legendre polynomial normalization (min, max)");
+  /* This parameter is used for normalizing the Legendre polynomials, which
+     are only orthogonal on [-1, 1]. However, the Cartesian domain over which
+     we'd like to use FETs may exist over a different range. So, just scale the
+     polynomial appropriately. Care should be taken that this value matches
+     that given in the OpenMC input XML files. */
+  params.addRequiredParam<std::vector<Real>>("l_geom_norm",
+    "Lengths needed for Legendre polynomial normalization (min, max)");
   params.addParam<bool>("dbg", false, "Print debug output");
   return params;
 }
@@ -34,8 +33,8 @@ LegendrePolynomial::~LegendrePolynomial()
 Real
 LegendrePolynomial::value(Real t, const Point & p)
 {
-  /* Because we need to pass in the order of the Legendre polynomial,
-     the parameter list for this method does not suffice. */
+  /* Because we need to pass in the order of the Legendre polynomial, the
+     parameter list for this method does not suffice. */
   mooseWarning("value() in LegendrePolynomial should not be used");
   return 0.0;
 }
@@ -43,17 +42,14 @@ LegendrePolynomial::value(Real t, const Point & p)
 Real
 LegendrePolynomial::getPolynomialValue(Real t, Real p, int n)
 {
-  /* The Legendre polynomials are computed with a recursion relation
-     that uses the P_{L-1} and P_{L-2} Legendre polynomials. This
-     method returns the Legendre polynomials normalized by 
-     \sqrt{(2*l + 1)/2} so that the calculation of the expansion
-     coefficients does not need to carry these factors around. */
+  /* The Legendre polynomials are computed with a recursion relation that uses
+     the P_{L-1} and P_{L-2} Legendre polynomials. */
 
   Real z;          // Normalized position
   Real plm2 = 0.0; // L-2 Legendre polynomial value
   Real plm1 = 0.0; // L-1 Legendre polynomial value
   Real plm = 0.0;  // L   Legendre polynomial value
-  
+
   z = 2.0 * (p - _geom_norm[0]) / _dz - 1.0;
 
   /* The recursion relation can only be used for order 2 and above. */
@@ -74,7 +70,7 @@ LegendrePolynomial::getPolynomialValue(Real t, Real p, int n)
   }
 
   if (_dbg)
-    std::cout << "Legendre value  = " << plm * sqrt((2.0 * n + 1.0) / 2.0) << std::endl;
-  
+    _console << "Legendre value  = " << plm * sqrt((2.0 * n + 1.0) / 2.0) << std::endl;
+
   return (plm * sqrt((2.0 * n + 1.0) / 2.0));
 }
