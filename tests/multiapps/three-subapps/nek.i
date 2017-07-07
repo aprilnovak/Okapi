@@ -1,7 +1,9 @@
 [Mesh]
-  type = GeneratedMesh
-  dim = 1
-  nx = 1
+  file = 3D_sideset.exo
+  block_id = '1'
+  block_name = 'interior'
+  boundary_id = '100 200 300'
+  boundary_name = 'top bottom wall'
 []
 
 [Variables]
