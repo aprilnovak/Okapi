@@ -56,7 +56,7 @@
 
 [Transfers]
   [./from_openmc]
-    type = PolynomialOpenMC
+    type = MultiAppOkapiMooseTransfer
     multi_app = openmc
     direction = from_multiapp
     source_variable = dummy
