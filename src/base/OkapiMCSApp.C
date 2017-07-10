@@ -20,7 +20,7 @@
 #include "ZernikeLegendreReconstruction.h"
 
 // transfers
-#include "PolynomialOpenMC.h"
+#include "MultiAppOkapiMooseTransfer.h"
 
 // user objects
 #include "ZernikeLegendreDeconstruction.h"
@@ -75,7 +75,7 @@ OkapiMCSApp::registerObjects(Factory & factory)
   registerFunction(LegendrePolynomial);
   registerFunction(ZernikePolynomial);
   registerFunction(ZernikeLegendreReconstruction);
-  registerTransfer(PolynomialOpenMC);
+  registerTransfer(MultiAppOkapiMooseTransfer);
   registerUserObject(ZernikeLegendreDeconstruction);
   registerUserObject(ZLDeconstruction);
 }
