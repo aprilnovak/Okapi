@@ -144,15 +144,15 @@
 
 This document is intended to describe the coupling methodology between Nek, a \gls{cfd} code developed by \gls{anl}, OpenMC, a Monte Carlo code developed by \gls{anl}, and BISON, a nuclear fuel performance code developed by \gls{inl}. Previous work by Matthew Ellis and others at MIT resulted in the coupling of OpenMC to MOOSE, and work by a joint effort of \gls{anl} and \gls{inl} resulted in the coupling of Nek to MOOSE. So, the coupling of all three codes together will attempt to utilize as much as possible regarding this previous work. The purpose of this report is to document the coupling process, justify decisions made, and illustrate how to use these codes in a coupled manner.
 
-This report is organized beginning with a description of the overall coupling methodology, followed by a discussion of the nuts-and-bolts requirements for coupling two codes in terms of the data transfer between the codes and executing non-MOOSE codes from within the MOOSE framework.
+This report is organized beginning with a description of the overall coupling methodology, followed by a discussion of the nuts-and-bolts requirements for coupling two codes in terms of the data transfer between the codes and executing non-MOOSE codes from within the MOOSE framework. Finally, the end of this document discusses the mechanics of coupling the three codes together in terms of the build configuration requirements.
+
+This document serves as my working notes, so any lingering ``dangers'' that are not fully resolved are indicated in pink font.
 
 \section{Overall Coupling Methodology}
-This section discusses the overall coupling methodology that was pursued between OpenMC-BISON, BISON-Nek, and finally OpenMC-BISON-Nek. The immediate jump to the coupling of all three codes together was not performed because taking smaller steps often helps reveal difficulties that would otherwise be compounded and confusing when performing the full three-way coupling. 
-
-When coupling two or more distinct projects (code bases), there are generally three ways to perform the coupling:
+This section discusses the overall coupling methodology that was pursued between OpenMC-BISON, BISON-Nek, and finally OpenMC-BISON-Nek. The immediate jump to the coupling of all three codes together was not performed because taking smaller steps often helps reveal difficulties that would otherwise be compounded and confusing when performing the full three-way coupling. When coupling two distinct projects, there are generally three ways to perform the coupling:
 
 \begin{enumerate}
-\item Make virtually no changes to the source code of the two projects, and instead write an external script that will:
+\item Make virtually no changes to the source code either project, but write an external script that will:
 	\begin{enumerate}
 	\item Run the first code.
 	\item Read the text output file of the first code and modify the text input file for the second code.
@@ -160,7 +160,7 @@ When coupling two or more distinct projects (code bases), there are generally th
 	\item Read the text output file of the second code and modify the text input file for the first code. 
 	\item Repeat (a)-(d) until convergence, then move to the next time step.
 	\end{enumerate}
-	This approach is necessary for proprietary codes for which you have no access to the source code, and the only interaction with the software is through text files.
+	This approach is necessary for projects that restrict access to source code, since a more internal coupling requires modifications to the source code of one or more of the projects. The only interaction with the software with this method is through text files.
 \item Write a custom driver that will call routines from each code. This may be fast to develop, but limits the reusability of the driver itself or changes made to the two codes to meld to the driver structure. For example, pseudo-code for a driver written to couple OpenMC and Nek may have the following overall structure:
 
 	\begin{algorithm}[H]
@@ -175,13 +175,14 @@ When coupling two or more distinct projects (code bases), there are generally th
 	    transfer data to OpenMC\;
 	    evaluate convergence\;
 	  }
+	  advance time state\;
 	}
 	\end{algorithm}
 	
-\item Use an existing driver with a sufficiently general structure that the codes you want to couple can be structurally modified to be callable from within the existing driver by directly calling code routines (no editing of text files). This approach, by virtue of using an existing driver, allows you to immediately take advantage of the ability to couple to any other codes that have been cast in terms of the existing driver's methods. However, this approach requires a good understanding of the existing driver, which can be much more time consuming than developing a custom driver from scratch. In addition, the downsides of using an existing coupling framework include potentially less control over parallelism and performance, since applications must be mapped to the structure of the existing driver, which may not be ideal for every application.
+\item Use an existing driver with a sufficiently general structure that the codes you want to couple can be structurally modified to be callable from within the existing driver by directly calling code routines (no editing of text files). This approach, by virtue of using an existing driver, allows you to immediately take advantage of the ability to couple to any other codes that have been cast in terms of the existing driver's methods. However, this approach requires a good understanding of the existing driver, which can be much more time consuming than developing a custom driver from scratch. In addition, using an existing coupling framework could potentially restrict control over parallelism and performance, since applications must be mapped to the structure of the existing driver, which may not be ideal for every application.
 \end{enumerate}
 
-The third approach of using an existing driver framework was selected for this work given the reasons above. More specifically, the MOOSE framework was selected for the following reasons:
+Adapting OpenMC and Nek to an existing driver framework was selected for this work for the reasons given above. The MOOSE framework was selected for the following reasons:
 
 \begin{enumerate}
 \item Many applications have been developed with the MOOSE framework, such as nuclear fuels simulations (BISON), porous media thermal-hydraulics (PRONGHORN), radiation damage and structural modeling (GRIZZLY), and many other physics. Using the MOOSE coupling framework allows OpenMC and Nek to essentially become "MOOSE" Animals in that they can not only be coupled to each other, as the scope of this project seeks, but to these other codes with relatively minor effort.
@@ -189,7 +190,7 @@ The third approach of using an existing driver framework was selected for this w
 \item The MOOSE framework is easy-to-use and has significant coupling capabilities already developed, as well as an accessible development team for assistance.
 \end{enumerate}
 
-If the parallel performance is not acceptable, then the work developed in constructing OpenMC and Nek as MOOSE applications can still be reused for a custom driver due to MOOSE's modular structure. The MOOSE coupling framework performs coupling in a tree-like structure. A Master App controls the entire coupled solver, and is the App that performs actions such as initializing MPI. For the Master App, there may be any number of sub-applications. The terminology "Sub-app" and "MultiApp" are essentially the same, where the use of sub app is used primarily to denote that a MultiApp is "down-the-tree" from another MultiApp. 
+If the parallel performance is not acceptable, then the work developed in constructing OpenMC and Nek as MOOSE applications can still be reused for a custom driver due to MOOSE's modular structure. The MOOSE coupling framework performs coupling in a tree-like structure. A Master App controls the entire coupled solve, and is the App that performs actions such as initializing MPI. For the Master App, there may be any number of sub-applications. The terminology "Sub-app" and "MultiApp" are essentially the same, where the use of sub app is used primarily to denote that a MultiApp is "down-the-tree" from another MultiApp. 
 
 \begin{figure}[H]
 \centering
@@ -197,30 +198,27 @@ If the parallel performance is not acceptable, then the work developed in constr
 \caption{MasterApp and MultiApp structure for a MOOSE simulation.}
 \end{figure}
 
-The Master App coordinates the main solve, and will call the execution methods of its immediate MultiApps when needed. Those immediate MultiApps may have their own MultiApps, and hence act somewhat locally as Master Apps. 
-
-The remainder of this section discusses the high-level coupling strategy for OpenMC-MOOSE, Nek-MOOSE, and finally OpenMC-Nek-BISON. 
+When using the MOOSE coupling framework, decisions must be made regarding the Master App-Multi App structure, such as which App acts as the Master App, and which as the Multi Apps. The remainder of this section discusses the high-level coupling strategy for OpenMC-MOOSE, Nek-MOOSE, and finally OpenMC-Nek-BISON. 
 
 \subsection{OpenMC and BISON Coupling}
-This section discusses the OpenMC-BISON coupling, illustrated through a pair of specific example input files that can be found in {\tt okapimcs/tests/FETs/bison-openmc}. For the most generic OpenMC-BISON coupling, MOOSE is the Master App, and OpenMC is wrapped as a MOOSE App so that it can be called as a MultiApp to the MOOSE Master App. BISON is already a MOOSE animal, and hence does not require any wrapping. So, for this coupling scheme, MOOSE is the Master App, and Okapi and BISON are same-level MultiApps. In a coupled solve, the following steps occur. We arbitrarily choose OpenMC to execute before BISON, so we choose to execute OpenMC on {\tt timestep\_begin}, and BISON on {\tt timestep\_end}. 
+This section discusses the OpenMC-BISON coupling, illustrated through a pair of specific example input files that can be found in {\tt okapimcs/tests/FETs/bison-openmc}. For the most generic OpenMC-BISON coupling, MOOSE is the Master App, and OpenMC is wrapped as a MOOSE App so that it can be called as a MultiApp to the MOOSE Master App. BISON is already a MOOSE animal, and hence does not require any wrapping. So, for this coupling scheme, MOOSE is the Master App, and Okapi and BISON are same-level MultiApps (As an aside, to be fully explicit, you cannot have ``MOOSE'' as the Master App, since it just the framework. A Moose App must be the Master App, so when MOOSE is referred to as the Master App, this means that one of the Moose Apps used in the simulation is also used as the Master App, but it does not perform any physics solves, but just exists to pass data. For this implementation, Okapi is both the Master App and a Multi App).
+
+In a coupled solve, the following steps occur. We arbitrarily choose OpenMC to execute before BISON, so we choose to execute OpenMC on {\tt timestep\_begin}, and BISON on {\tt timestep\_end}. 
 
 \begin{enumerate}
 \item Initialize the MasterApp. The MasterApp does not perform any solves, but only exists to transfer data between its MultiApps.
 \item Initialize OpenMC. This calls the {\tt OpenMCExecutioner::init()} method, which performs the regular initialization steps for any MOOSE App, followed by calling the {\tt openmc\_init} subroutine found in the OpenMC source. This subroutine performs basic tasks such as reading in the XML files that control OpenMC parameters (none are set in the MOOSE input files), allocating memory for data structures, etc.
-\item Initialize BISON. Because BISON is a Moose ``animal,'' this simply calls initialization method of the MOOSE executioner that we chose to use (for most cases, this will be {\tt Transient::init()}).
-\item Perform any transfers that are defined on {\tt timestep\_begin} to the MultiApps. 
-	\begin{enumerate}
-	\item This calls the {\tt PolynomialOpenMC::execute()} method to pass the {\tt l\_0\_coeffs\_temp} scalar variable to OpenMC. Because OpenMC is not a MOOSE ``animal,'' we cannot simply use the {\tt MultiAppScalarToAuxScalarTransfer}. For this step, we are transferring from MOOSE to Okapi, so we call the {\tt OpenMC::openmc\_cell\_set\_temperature} method, which takes as its arguments the OpenMC cell to change temperature and a single value. Without continuous material tracking implemented yet in OpenMC, this only selects the first expansion coefficient for temperature (so this transfer is incomplete). This is where an initial condition on temperature is applied in OpenMC.
-	\end{enumerate}
-\item Execute OpenMC by calling the {\tt OpenMCExecutioner::execute()} method, which calls the {\tt openmc\_reset} and {\tt openmc\_run} subroutines in the OpenMC source. This performs a full Monte Carlo solve.
-\item Transfer information back from OpenMC to the MOOSE Master App. This is done by calling the {\tt PolynomialOpenMC::execute} method, for a direction from OpenMC to a Master App. This method then calls the {\tt fet\_deconstruction} subroutine in the OpenMC source, which stores the expansion coefficients for the FETs (which we indicated in the tallies XML input) by cell index. Then, the {\tt get\_coeffs\_from\_cell} subroutine is called to store the expansion coefficients in OpenMC in a C++ array. Finally, those values are stored in the {\tt l\_0\_coeffs\_power} scalar variable in the MOOSE Master App.
+\item Initialize BISON. Because BISON is a Moose ``animal,'' this simply calls the initialization method of the MOOSE executioner that we chose to use (for most cases, this will be {\tt Transient::init()}).
+\item Perform any transfers that are defined on {\tt timestep\_begin} to the MultiApps. This calls the {\tt execute()} method of the {\tt MultiAppOkapiMooseTransfer} transfer to pass the {\tt l\_0\_coeffs\_temp} scalar variable to OpenMC (because OpenMC is not a MOOSE ``animal,'' we cannot simply use any of the transfers found in the MOOSE framework). For this step, we are transferring from MOOSE to Okapi, so we call the {\tt OpenMC::openmc\_cell\_set\_temperature} method, which takes as its arguments the OpenMC cell to change temperature and a single value. Without continuous material tracking implemented yet in OpenMC, this only selects the first expansion coefficient for temperature (so this transfer is incomplete), essentially performing a zeroth-order Legendre and Zernike expansion. This is where an initial condition on temperature is applied in OpenMC.
+\item Execute OpenMC by calling the {\tt OpenMCExecutioner::execute()} method, which calls the \\{\tt openmc\_reset} and {\tt openmc\_run} subroutines in the OpenMC source. This performs a full Monte Carlo solve.
+\item Transfer information back from OpenMC to the MOOSE Master App. This is done by calling the {\tt MultiAppOkapiMooseTransfer::execute()} method, which calls the {\tt fet\_deconstruction} subroutine in the OpenMC source. This subroutine stores the expansion coefficients for the FETs (which we indicated in the tallies XML input) by cell index. Then, the {\tt get\_coeffs\_from\_cell} subroutine is called to store the expansion coefficients in OpenMC in a C++ array. Finally, those values are stored in the {\tt l\_0\_coeffs\_power} scalar variable in the MOOSE Master App.
 \item ``Solve'' the Master App. This is purely a dummy solve, but is required for any auxkernels to evaluate, and for any further transfers to occur.
-\item Transfer information from the MOOSE Master App to BISON. This uses the {\tt MultiAppScalarToAuxScalarTransfer} to simply copy the coefficients for power held in {\tt l\_0\_coeffs\_power} to the {\tt l\_0\_coeffs\_power\_bison} variable in BISON.
+\item Transfer the kappa fission distribution coefficients from MOOSE to BISON. This uses the \\{\tt MultiAppScalarToAuxScalarTransfer} to simply copy the coefficients for power held in \\{\tt l\_0\_coeffs\_power} to the {\tt l\_0\_coeffs\_power\_bison} variable in BISON.
 \item BISON uses these coefficients to expand a continuous field variable {\tt bison\_kappa\_fission}, which holds the kappa fission distribution that was calculated by OpenMC. Functions for the Legendre, Zernike, and reconstruction are included in the BISON input file.
 \item BISON then applies the {\tt KappaFissionToHeatSource} auxkernel on the {\tt bison\_heat} auxvariable to convert the kappa fission source to the correct units of W/volume that is used as a heat source in the {\tt HeatSource} kernel.
 \item Solve BISON to solve for the temperature, {\tt bison\_temp}.
 \item BISON deconstructs this continuous temperature field into a set of expansion coefficients, stored in {\tt l\_0\_coeffs\_temp\_bison} by calling the {\tt ZLDeconstruction} user object.
-\item Transfer coefficients for temperature from BISON to MOOSE by calling the {\tt MultiAppScalarToAuxScalarTransfer} transfer. These coefficients are stored in the {\tt l\_0\_coeffs\_temp} variable in MOOSE. 
+\item Transfer coefficients for temperature from BISON to MOOSE by calling the \\{\tt MultiAppScalarToAuxScalarTransfer} transfer. These coefficients are stored in the {\tt l\_0\_coeffs\_temp} variable in MOOSE. 
 \item Repeat steps 4-13 for each Picard step until reaching the end of the coupled simulation.
 \end{enumerate}
 
@@ -238,12 +236,89 @@ And, in more detail, the following figure provides the names of the methods that
 \includegraphics[width=15cm]{OpenMC-BISON-complicated.png}
 \end{figure}
 
-\section{Data Transfer}
+\subsection{Nek and BISON Coupling}
+This section discusses the coupling between Nek and BISON, where Nek is wrapped as a Moose App (MOON) to facilitate this coupling. As discussed in future sections, the three-way coupling between OpenMC, Nek, and BISON will be achieved using OpenMC as the Master App, so to work towards this goal, the coupling between BISON and Nek is pursued using MOOSE as the Master App. MOON based it's coupling on using BISON as the Master App. The coupling discussed in this section is illustrated with example input files in {\tt buffalo/tests/bison-nek}. 
 
-This section discusses the requirements needed to transfer information between two physics codes. When coupling two codes, there are two general ways in which the data can be transferred:
+In a coupled solve, the following steps occur. We arbitrarily choose BISON to execute before MOON, so we choose to execute BISON on {\tt timestep\_begin}, and MOON on {\tt timestep\_end}. 
 
 \begin{enumerate}
-\item Force both codes to solve on the same mesh, in which case the data transfer can be accomplished by determining a functional form for the transfer variable (such as temperature) over a single computational element, and then passing this information to the second code. Assuming that the second code can utilize this information exactly, this is the easiest way to transfer information, because it requires little effort to map cells in one mesh to cells in another. However, this method is very restrictive, since it is often the case that the two physics do not require the same mesh, and forcing both physics to run on the finest mesh is unnecessarily expensive. For instance, boundary layers must be resolved for fluids computations with very fine elements that would be overkill for a Monte Carlo simulation.
+\item Initialize the MasterApp. The MasterApp does not perform any solves, but only exists to transfer data between its MultiApps.
+\item Initialize BISON. Because BISON is a Moose ``animal,'' this simply calls the initialization method of the MOOSE executioner that we chose to use (for most cases, this will be {\tt Transient::init()}).
+\item Initialize MOON. This calls the {\tt NekExecutioner::init()} method, which performs the regular initialization steps for any MOOSE App, followed by calling the {\tt nek\_init} subroutine found in the Nek source. This subroutine performs basic tasks such as reading Nek input files, initializing variables, generating the geometry, and applying initial conditions.
+\item Perform any transfers that are defined on {\tt timestep\_begin} to the MultiApps. 
+\end{enumerate}
+
+\subsection{OpenMC, Nek, and BISON Coupling}
+When coupling more than two applications using the MOOSE framework, there are several options for the coupling structure. In order to motivate the structure selected, an understanding of the limitations of the MOOSE coupling framework must be understood. The general coupling framework for a MOOSE simulation consists of a Master App and MultiApps. For each time step, unless sub-cycling is turned on (in which case one of the Apps may run at finer time steps than the others), all of the Apps will execute. The order in which the execution of the Apps occurs is controlled with the {\tt execute\_on} parameter, which can take several values, most commonly {\tt timestep\_begin} and {\tt timestep\_end}. The MultiApps that execute on the start of a time step and on the end of a time step bound the execution of the Master App. If there are more than two MultiApps to a Master App, then in order to ensure full exchange of information at each time step, a custom routine for transferring data {\it in time} (not a custom {\tt Transfer} class, to be discussed later) is required. This would require developing a custom {\tt MultiApp} class, which is where the execution in time is controlled.
+
+To keep the coupling as simple as possible and to avoid the need to develop custom Multi Apps (which is more intensive than developing custom transfers, executioners, and time steppers), the coupling is chosen to be limited to two MultiApps per Master App. When selecting the Master App, the Master App can either perform a solve (and hence be one of Okapi, BISON, or MOON) or simply exist to transfer data between the Multi Apps (and hence be one of Okapi, BISON, MOON, PRONGHORN, RATTLESNAKE, etc. - the animal itself doesn't matter because it's only using capabilities in the MOOSE framework, not any physics-specific capabilities). If we restrict ourselves to only using two peer MultiApps per Master App, then the Master App must perform a physical solve. For a Master App that performs a physical solve, there are three options:
+
+\begin{enumerate}
+\item BISON is the Master App.
+\item MOON is the Master App. 
+\item Okapi is the Master App.
+\end{enumerate}
+
+Because multiple fuel pins can be simulated entirely in parallel (since a boundary coupling is employed with Nek), it would be inadvisable to have BISON be the Master App. This would restrict the coupling to a single fuel pin because there can only be a single Master App. A non-trivial amount of work with MPI could allow this configuration to work correctly, but it would be much easier for either Okapi or MOON to be the Master App. However, because MOON was initially developed with BISON as the Master App, the first efforts at coupling will attempt to reuse as much as possible from MOON, and use BISON as the Master App. This is discussed in the next section.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=18.5cm]{OpenMC-BISON-Nek-complicated.png}
+\end{figure}
+
+All of the data transfer classes developed for this coupling follow the same naming convention of {\tt MultiApp<SubApp><MasterApp>Transfer}. Because MOOSE-wrapped Apps, rather than generic MOOSE ``animals,'' are being coupled, a distinction must be made on which App is the MultiApp and which is the Master App. For instance, if Okapi is the MasterApp, then {\tt MultiAppMooseOkapiTransfer} coordinates data transfer between Buffalo and Okapi when Okapi is the Master App. If Buffalo is the Master App, then the data transfer class {\tt MultiAppOkapiMooseTransfer} controls the data transfer. The reason this distinction is necessary, when the actions to be taken during the transfer are essentially the same, is that the MOOSE-wrapped Apps are not sufficiently generic to permit data transfer the same as if it were a Sub App or a Master App.
+
+With Okapi as the Master App, either BISON can be run before MOON, or MOON run before BISON. If BISON executes on {\tt timestep\_begin}, and MOON on {\tt timestep\_end}, the sequence of events following initialization of all Apps is as follows, which is repeated for each Picard step:
+
+\begin{enumerate}
+\item Transfer from Okapi to BISON a kappa-fission distribution and a temperature BC.
+\item Solve BISON.
+\item Transfer from BISON to Okapi a temperature distribution and a heat flux BC.
+\item Solve OpenMC.
+\item Transfer from Okapi to MOON a heat flux BC (not updated by OpenMC from its most recent solve).
+\item Solve Nek.
+\item Transfer from MOON to Okapi a fluid density distribution and a temperature BC.
+\end{enumerate}
+
+This approach requires setting an initial condition on the:
+
+\begin{itemize} 
+\item kappa-fission distribution; the transfer of the kappa-fission distribution from Okapi to BISON requires developing some method for setting an initial condition on this parameter internally in OpenMC, since it is not a Moose variable that can be set from one of the Moose input files.
+\item temperature BC; because this is a Moose variable, an estimate for this can simply be set in the master Moose input file.
+\item fluid density distribution; because Okapi runs before Nek in this case, an initial condition must be set on this field - this can be done from within the OpenMC XML files.
+\end{itemize}
+
+For these three initial conditions, inconsistencies can easily be introduced - if the temperature BC grossly differs from the fluid density distribution specified, convergence might be slow.
+
+If MOON executes on {\tt timestep\_begin} and BISON on {\tt timestep\_end}, the sequence of events following initialization of all Apps is as follows, which is repeated for each Picard step:
+
+\begin{enumerate}
+\item Transfer from Okapi to MOON a heat flux BC.
+\item Solve Nek.
+\item Transfer from MOON to Okapi a fluid density distribution and a temperature BC.
+\item Solve OpenMC.
+\item Transfer from Okapi to BISON a kappa-fission distribution and a temperature BC (not updated by OpenMC from its most recent solve).
+\item Solve BISON.
+\item Transfer from BISON to Okapi a temperature distribution and a heat flux BC.
+\end{enumerate}
+
+This approach requires setting an initial condition on the:
+
+\begin{itemize}
+\item heat flux BC; because this is a Moose variable, this can simply be set in the master input file.
+\item temperature distribution; because OpenMC runs before BISON, an initial condition must be set on the temperature distribution. Because this distribution is internal to OpenMC, some method must be developed to set an initial condition on the temperature distribution.
+\end{itemize}
+
+For this setup, inconsistencies can also be introduced - the initial conditions on heat flux BC and temperature distribution can be conflicting.
+
+\subsubsection{BISON Master App}
+This section discusses the three-way coupling achieved between BISON, Okapi, and MOON, where BISON is the Master App. As discussed previously, this only works for a single fuel pin (one instance of BISON) because there cannot be multiple instances of a Master App without significant MPI ``glue'' code. 
+
+\section{Data Transfer}
+This section first discusses the general requirements needed to transfer information between two physics codes. Then, subsections focusing on MOOSE, OpenMC, and Nek will individually describe the data transfer capabilities introduced in order to transfer information between all three codes. When coupling two codes, there are two general ways in which the data can be transferred:
+
+\begin{enumerate}
+\item Force both codes to solve on the same mesh, in which case the data transfer can be accomplished by determining a functional form for the transfer variable (such as temperature) over a single computational element, and then passing this information to the second code. Assuming that the second code can utilize this information exactly, this is the easiest way to transfer information, because it requires little effort to map cells in one mesh to cells in another. However, this method is very restrictive, since it is often the case that the two physics do not require the same mesh, and forcing both physics to run on the finest mesh is unnecessarily expensive. For instance, boundary layers must be resolved for fluids computations with very fine elements that would be overkill for a Monte Carlo simulation. When one of the codes is a meshless code, such as Monte Carlo codes using Constructive Solid Geometry representations, this ``easiness'' is no longer present.
 \item Run both codes on different meshes.
 
 	\begin{enumerate}
@@ -274,23 +349,23 @@ C_{000}\\C_{100}
 \end{bmatrix}
 \eeqa
 
-where \(r_0\) and \(r_1\) are the two sampled \(r\)-coordinates in the element that must be selected in order to determine the expansion coefficients for a first-order \(r\)-expansion, and \(\theta_0\) and \(z_0\) the sampling points to determine the expansion coefficients for a zeroth-order \(\theta\)- and \(z\)-expansion. This can cause problems such as oscillations in the interpolation if the choices of functions are poor, and can completely miss parts of the transfer variable solution if we happen to not select points near important features.
+where \(r_0\) and \(r_1\) are the two sampled \(r\)-coordinates in the element that must be selected in order to determine the expansion coefficients for a first-order \(r\)-expansion, and \(\theta_0\) and \(z_0\) the sampling points to determine the expansion coefficients for a zeroth-order \(\theta\)- and \(z\)-expansion. This can cause problems such as oscillations in the interpolation if the choices of functions are poor, and can completely miss parts of the transfer variable solution if we happen to not select points near important features. In addition, if we use a statistical code such as a Monte Carlo code, choosing these sampling points will make any scores to other regions of the problem completely ``useless,'' which will lead to very high numbers of particles required to reduce variance.
 
 	\item Use orthogonal functions to express a transfer variable, and then pass the expansion coefficients to the second code. Using orthogonal functions is essentially the same formulation as that shown in Eq. \eqref{eq:GenericExpansion}, except that the expansion functions are chosen to be orthogonal over the domain of transfer. Then, orthogonality conditions lead to exact formulas for \(C_{jkl}\) that are {\it integral} in nature, which means that all features of the solution are captured, and no creation and inversion of a Vandermonde matrix is required. 
 	\end{enumerate}
 	
 \end{enumerate}
 
-For the reasons discussed above, the data transfer between two physics codes can be performed in a fairly simple manner when using orthogonal polynomial expansions. This is the approach that is taken in the coupling of Nek, OpenMC, and BISON, and therefore warrants more discussion. For any code to implement data transfers using polynomials, four capabilities are required:
+For the reasons discussed above, the data transfer between OpenMC, Nek, and BISON is performed using orthogonal polynomial expansions. For any code to implement data transfers using polynomials, four capabilities are required:
 
 \begin{enumerate}
 \item Functions to compute the orthogonal polynomials given a coordinate point and expansion order.
-\item Routines to integrate a continuous variable over an orthogonal domain to compute the expansion coefficients. This process will be referred to in this document as ``deconstruction,'' since a continuous field is decomposed into a finite set of expansion coefficients that are to be passed to another physics code.
-\item Routines to multiply a set of expansion coefficients by orthogonal polynomials to form a continuous field form a set of finite coefficients. This process will be referred to in this document as ``construction,'' since a continuous field is formed by multiplying discrete expansion coefficients by continuous functions.
+\item Routines to integrate a continuous variable over an orthogonal domain to compute the expansion coefficients. This process will be referred to in this document as ``deconstruction,'' since a continuous field is decomposed into a finite set of expansion coefficients.
+\item Routines to multiply a set of expansion coefficients by orthogonal polynomials to form a continuous field form a set of finite coefficients. This process will be referred to in this document as ``construction,'' since a continuous field is formed from a set of discrete expansion coefficients.
 \item Use the constructed field in some internal capacity that defines the coupling, such as in the specification of a boundary condition or heat source.
 \end{enumerate}
 
-For the three physics codes to be discussed, each of these four capabilities will be described in detail.
+After a summary of orthogonal polynomials available, each of these four capabilities will be described in detail for MOOSE, OpenMC, and Nek. 
 
 \subsection{Choices of Orthogonal Polynomials}
 \label{sec:Polynomials}
@@ -301,67 +376,40 @@ This section describes several choices of orthogonal polynomials that can be use
 Legendre polynomials are orthogonal over \( -1 \leq z \leq 1\), and hence are suitable for expanding solutions along the axes of fuel pins, along one direction in a slab, or in any Cartesian dimension. The Legendre polynomials are given as:
 
 \beq
-\label{eq:Legendre}
-P_l(z)=\frac{1}{2^ll!}\frac{d^l}{dx^l}\left\lbrack\left(z^2-1)^l\right)\right\rbrack
+\label{eq:LegendreScaled}
+P_l(z)=\sqrt{\frac{2l+1}{2}}\frac{1}{2^ll!}\frac{d^l}{dx^l}\left\lbrack\left(z^2-1)^l\right)\right\rbrack
 \eeq
 
 which are orthogonal over \(-1\) to \(+1\):
 
 \beq
-\int_{-1}^{+1}P_l(z)P_{l'}(z)dz=\frac{2}{2l+1}\delta_{ll'}
-\eeq
-
-When calculating expansion coefficients, it will be useful to work with scaled Legendre polynomials such that the orthogonality condition gives {\it only} a delta function. These scaled Legendre polynomials are indicated with a tilde:
-
-\beq
-\label{eq:LegendreScaled}
-\tilde{P}_l(z)=\sqrt{\frac{2l+1}{2}}P_l(z)
-\eeq
-
-such that the orthogonality condition becomes:
-
-\beq
 \label{eq:LegendreScaledOrthogonality}
-\int_{-1}^{+1}\tilde{P}_l(z)\tilde{P}_{l'}(z)dz=\delta_{ll'}
+\int_{-1}^{+1}P_l(z)P_{l'}(z)dz=\delta_{ll'}
 \eeq
 
 \subsubsection{Fourier Polynomials}
 
-Fourier polynomials are orthogonal over \(-\pi\leq\theta\leq\pi\), and hence are suitable for expanding along the \(\theta\) direction of a cylindrical fuel pin. The Fourier functions are given as:
+Fourier polynomials are orthogonal over \(-\pi\leq\theta\leq\pi\), and hence are suitable for expanding along the \(\theta\) direction of a cylinder. The Fourier functions are given as:
 
 \beq
-\label{eq:Fourier}
-F_k(\theta)=\cos(k\theta)
+\label{eq:FourierScaled}
+F_k(\theta)=
+\begin{cases}
+\frac{1}{\sqrt{\pi}}\cos{(k\theta)} & k \neq 0\\
+\frac{1}{\sqrt{2\pi}}\cos{(k\theta)} & k = 0\\
+\end{cases}
 \eeq
 
 which are orthogonal over \(-\pi\) to \(+\pi\):
 
 \beqa
 \label{eq:FourierOrthogonal}
-\begin{cases}
-\int_{-\pi}^{+\pi}F_k(\theta)F_{k'}(\theta)d\theta=2\pi\delta_{kk'}& k=k'=0\\
-\int_{-\pi}^{+\pi}F_k(\theta)F_{k'}(\theta)d\theta=\pi\delta_{kk'}& \textrm{else}\\
-\end{cases}
+\int_{-\pi}^{+\pi}F_k(\theta)F_{k'}(\theta)d\theta=\delta_{kk'}
 \eeqa
-
-and hence for \(n=0\), the return value is scaled by \(1/\sqrt{2\pi}\) instead of \(1/\sqrt{\pi}\). 
-
-Similar to Legendre polynomials, it will be more convenient when calculating expansion coefficients for the Fourier polynomials to be scaled such that the orthogonality condition gives {\it only} a delta function. These scaled Fourier polynomials are indicated with a tilde:
-
-\beq
-\label{eq:FourierScaled}
-\tilde{F}_k(\theta)=\frac{1}{\sqrt{\pi}}\cos{(k\theta)}
-\eeq
-
-such that the orthogonality condition becomes:
-
-\beq
-\int_{-\pi}^{+\pi}\tilde{F}_k(\theta)\tilde{F}_{k'}(\theta)d\theta=\delta_{kk'}
-\eeq
 
 \subsubsection{Zernike Polynomials}
 
-Zernike polynomials are orthogonal over the unit circle, and hence are suitable for expanding in the plane of a fuel pin. The Zernike polynomials are given as:
+Zernike polynomials are orthogonal over the unit circle, and hence are suitable for expanding in the plane of a cylinder. The Zernike polynomials are given as:
 
 \beq
 \label{eq:ZernikeScaled}
@@ -372,13 +420,11 @@ Z_n^m(r,\theta)=
 \end{cases}
 \eeq
 
-where \(R_n^{|m|}\) is given as:
-
 \beq
 R_n^{|m|}(r)=\sum_{s=0}^{\frac{n-|m|}{2}}\frac{(-1)^s(n-s)!}{s!\left(\frac{n+|m|}{2}-s\right)!\left(\frac{n-|m|}{2}-s\right)!}r^{n-2s}
 \eeq
 
-Note that \(m\) can only obtain values \(-n, -n+2, -n+4, \cdots, n\). For this definition of the Zernike polynomials, which include the normalization factor that was similarly introduced for Fourier and Legendre polynomials, the orthogonality condition over the unit circle reads:
+Note that \(m\) can only obtain values \(-n, -n+2, -n+4, \cdots, n\). The orthogonality condition is:
 
 \beq
 \label{eq:ZernikeOrthogonal}
@@ -386,158 +432,116 @@ Note that \(m\) can only obtain values \(-n, -n+2, -n+4, \cdots, n\). For this d
 \eeq
 
 \subsection{Deconstructing a Continuous Variable}
-This section describes how a continuous field \(u(r,\theta,z)\) can be deconstructed into a set of expansion coefficients using the orthogonal polynomials discussed in the previous section. The procedure is the same regardless of the orthogonal domain (i.e. if performing a boundary or volume coupling), but will be illustrated for both a boundary coupling over the surface of a cylinder and for a volume coupling over a cylindrical domain. 
-
-For a boundary coupling over the surface of a cylinder, a function \(u(\theta,z)\) can be expressed as:
+This section describes how a continuous field \(u(r,\theta,z)\) can be deconstructed into a set of expansion coefficients using orthogonal polynomials. The procedure is the same regardless of the orthogonal domain (i.e. if performing a boundary or volume coupling), but will be illustrated for both a boundary coupling over the surface of a cylinder and for a volume coupling over a cylindrical volume. For a boundary coupling over the surface of a cylinder, a function \(u(\theta,z)\) can be expressed as:
 
 \beq
 \label{eq:OrthogonalExpansion}
-u(\theta, z)\approx\sum_{k=0}^K\sum_{l=0}^LC_{kl}\tilde{F}_k(\theta)\tilde{P}_l(z)
+u(\theta, z)\approx\sum_{k=0}^K\sum_{l=0}^LC_{kl}F_k(\theta)P_l(z)
 \eeq
 
-where \(\tilde{F}_k(\theta)\) is the \(k\)-th order Fourier function and \(\tilde{P}_l(z)\) is the \(l\)-th order Legendre polynomial. The expansion coefficients for \(u\) can be determined by multiplying both sides of Eq. \eqref{eq:OrthogonalExpansion} by orthogonal polynomials of different order, and applying the orthogonality conditions given in Section \ref{sec:Polynomials}:
+where \(F_k(\theta)\) is the \(k\)-th order Fourier function and \(P_l(z)\) is the \(l\)-th order Legendre polynomial. The expansion coefficients can be determined by multiplying both sides of Eq. \eqref{eq:OrthogonalExpansion} by orthogonal polynomials of different order, and applying the orthogonality conditions given in Section \ref{sec:Polynomials}:
 
 \beq
 \label{eq:ScaledExpansionCoeff}
-C_{kl}=\int_{-1}^{+1}dz\int_{-\pi}^{+\pi}d\theta u(\theta, z)\tilde{F}_k(\theta)\tilde{P}_l(z)
+C_{kl}=\int_{-1}^{+1}dz\int_{-\pi}^{+\pi}d\theta u(\theta, z)F_k(\theta)P_l(z)
 \eeq
 
 Likewise, for a volume coupling over a cylinder, a function \(u(r,\theta,z)\) can be expressed as:
 
 \beq
 \label{eq:ZLReconstruction}
-u(r,\theta,z)=\sum_{l=0}^{L}\sum_{n=0}^N\sum_{m=-n}^{n}C_{l}^{nm}\tilde{P}_l(z)\tilde{Z}_n^m(r,\theta)
+u(r,\theta,z)=\sum_{l=0}^{L}\sum_{n=0}^N\sum_{m=-n}^{n}C_{l}^{nm}P_l(z)Z_n^m(r,\theta)
 \eeq
 
 Again, the coefficients can be determined by multiplying by orthogonal polynomials of different order, and applying orthogonality conditions:
 
 \beq
+\label{eq:ZernikeLegendreCoefficient}
 C_l^{nm}=\int_0^1rdr\int_{0}^{2\pi}d\theta\int_{-1}^{1}dzu(r,\theta,z)P_l(z)Z_n^m(r,\theta)
 \eeq
 
-Hence, all that is required to deconstruct a continuous field into a set of expansion coefficients is to perform multiple integrations over the orthogonal domain.
+Hence, all that is required to deconstruct a continuous field into a set of expansion coefficients is to perform repeated integrations over the orthogonal domain.
 
 \subsection{Constructing a Continuous Variable}
-
 As opposed to deconstruction, constructing a continuous variable from a set of expansion coefficients is more straightforward, since all that is required is repeated evaluation of the orthogonal polynomials, multiplied by expansion coefficients.
 
 \subsection{MOOSE (a.k.a. BISON) Data Transfer}
-This section describes the capabilities introduced into the MOOSE source code that allows evaluation of polynomials, and construction/deconstruction of continuous fields. Because BISON is a Moose ``Animal,'' we can simply use MOOSE as a surrogate for BISON to avoid all of the complicated physics until the entire coupling framework is in place. So, some of these new classes developed would actually be implemented in BISON, and {\it not} in MOOSE. In this section, the only classes that would not be strictly implemented in BISON are:
-
-{\bf Complete this categorization:}
+This section describes the capabilities introduced into the MOOSE source code that allows evaluation of polynomials, and construction/deconstruction of continuous fields. Because BISON is a Moose ``Animal,'' we can simply use MOOSE as a surrogate for BISON to avoid all of the complicated physics until the entire coupling framework is in place. So, some of these new classes developed would actually be implemented in BISON, and {\it not} in MOOSE. In this section, the only classes that would {\it not} be implemented in BISON are:
 
 \begin{itemize}
-\item PolynomialOpenMC (this isn't called by BISON - it's called by the MOOSE MasterApp)
+\item MultiAppOkapiMooseTransfer (this isn't called by BISON - it's called by whatever is the MasterApp)
 \end{itemize}
 
 \subsubsection{Evaluation of Polynomials}
 This section discusses the generic functions added to MOOSE to compute orthogonal polynomials.
 
+\color{magenta}
+No checks are made that any of the normalizing parameters specified as input for these functions match those in external coupled codes.
+\color{black}
+
 \subsubsubsection{{\tt LegendrePolynomial}}
-This function computes the Legendre polynomial in Eq. \eqref{eq:LegendreScaled} for a given value of \(l\) and a specific position (a single value of \(z\)). This function is not particular to the direction in which the Legendre expansion is being made, since only a single number (not a point) is passed in. Because Legendre polynomials are only orthogonal on \([-1, +1]\), but the length of the domain that is being expressed using Legendre polynomials may not necessarily be 2, a scaling factor \(z\) is used to simply stretch or compress the physical domain to the orthogonal domain. The {\tt l\_geom\_norm} required parameter lists the minimum and maximum distances over which the Legendre polynomials will be forced to be orthogonal using a scaling factor. This function exists in both MOON and Okapi, but is cleaner in Okapi.
+This function computes the Legendre polynomial in Eq. \eqref{eq:LegendreScaled} for a given value of \(l\) and a specific position. This function is not particular to the direction in which the Legendre expansion is being made, since only a single number (not a point) is passed in. Because Legendre polynomials are only orthogonal on \([-1, +1]\), a scaling factor \(z\) is used to simply stretch or compress the physical domain to the orthogonal domain. The {\tt l\_geom\_norm} parameter provides the minimum and maximum distances over which the Legendre polynomials will be forced to be orthogonal using a scaling factor. 
+
+\color{magenta}
+This function exists in both MOON and Okapi, but is cleaner in Okapi and should be moved to a MOOSE module for generality.
+\color{black}
 
 \subsubsubsection{{\tt FourierPolynomial}}
-This function computes the Fourier function given in Eq. \eqref{eq:FourierScaled} for a given value of \(k\) and a specific position. The \(\theta\) value at which to evaluate this function is determined as the angle between the positive \(x\)-axis and a point \((x,y)\). This function is not specific to the direction in which the Legendre expansion is being made, i.e. two points are passed in, where the first is assumed to be the distance along the axis relative to which the angle \(\theta\) is determined. Because the fuel rod of interest for coupling exists on \([-\pi, +\pi]\), no additional scaling is needed like for the Legendre polynomials. This function exists in MOON.
+This function computes the Fourier function given in Eq. \eqref{eq:FourierScaled} for a given value of \(k\) and a specific position. The \(\theta\) value at which to evaluate this function is determined as the angle between the two provided points. Because the fuel rod of interest for coupling exists on \([-\pi, +\pi]\), no additional scaling is needed like for the Legendre polynomials.
+
+\color{magenta}
+This function will only give correct results if the domain is centered on \((0, 0)\) since no center for the circle is provided. This function exists in MOON, but should be moved to a MOOSE module for generality.
+\color{black}
 
 \subsubsubsection{{\tt ZernikePolynomial}}
 This function computes a Zernike polynomial given in Eq. \eqref{eq:ZernikeScaled} given orders \(n\) and \(m\). 
 
+\color{magenta}
+This function is available in Okapi, but should be moved to a MOOSE module for generality.
+\color{black}
+
 \subsubsection{Field Deconstruction}
-This section describes how a continuous field is deconstructed into a set of expansion coefficients. 
+This section describes how a continuous field is deconstructed into a set of expansion coefficients in MOOSE.
 
 \subsubsubsection{{\tt NekSideIntegralVariableUserObject}}
-This user object determines an expansion coefficient given a field \(u(\theta, z)\) and the orders of the Fourier and Legendre expansions according to Eq. \eqref{eq:ScaledExpansionCoeff}. This user object only computes {\it one} expansion coefficient at a time, and hence for the example shown in the previous section, 50 of these user objects appear in a single input file. Note that this object does not actually compute the integral of \(u(\theta, z)\) - rather, it computes the integral of the heat flux, since this is the variable of interest that is to be expanded in polynomials for transfer to a boundary condition in Nek. This user object is available in MOON.
+This user object determines an expansion coefficient given a field \(-k\nabla u(\theta, z)\cdot\hat{n}\) and the orders of the Fourier and Legendre expansions according to Eq. \eqref{eq:ScaledExpansionCoeff} for a cylindrical boundary. Note that this user object computes expansion coefficients for heat flux.
 
-\begin{lstlisting}
-  [./nek_f_4_l_9]
-    type = NekSideIntegralVariableUserObject
-    variable = temp
-    boundary = wall
-    legendre_function_name = 'legendre_function'
-    fourier_function_name = 'fourier_function'
-    l_direction = 2
-    l_order = 9
-    f_order = 4
-    aux_scalar_name = heat_flux_scalar_f_4_l
-    diffusion_coefficient_name = 'thermal_conductivity'
-    surface_area_pp = 'surf_area'
-  [../]
-\end{lstlisting}
+\color{magenta}
+This user object should be modified to compute more than one expansion coefficient at a time to reduce bloat in the input file. This user object is available in MOON, but should be relocated to a MOOSE submodule under a name like {\tt FourierLegendreHeatFluxDeconstruction}, since it isn't specific to anything in Nek.
+\color{black}
 
 \subsubsubsection{{\tt ZernikeLegendreDeconstruction}}
-This user object converts a continuous variable into the set of expansion coefficients that would be obtained by expanding the variable in Zernike and Legendre polynomials as shown in Eq. \eqref{eq:ZernikeLegendre}. Note that this user object only computes {\it one} \(C_l^{nm}\) at a time. The {\tt ZLDeconstruction} user object should be used instead, since it computes all of the Zernike coefficients given a single Legendre order. Computing each coefficient \(C_{l}^{nm}\) requires applying orthogonality as shown in Eqs. \eqref{eq:ZernikeOrthogonal} and \eqref{eq:LegendreScaledOrthogonality}. Applying both orthogonality conditions to the expansion gives:
-
-\beq
-C_l^{nm}=\int_0^1rdr\int_{0}^{2\pi}d\theta\int_{-1}^{1}dzu(r,\theta,z)P_l(z)Z_n^m(r,\theta)
-\eeq
-
-In order to determine the correct expansion coefficients, the above integral {\it must} be performed over the integral bounds given, i.e. those over which the functions are orthogonal. However, in the physical domain, the radius of the pin may not be unity, and the \(z\)-extent of the pin may not be from \([-1, 1]\) (though it is assumed that the \(\theta\) coordinate does exist over \([0,2\pi]\)). The integral will be computed in the physical domain. To correctly scale to the orthogonal domain, the integral should be multiplied as follows:
+This user object converts a continuous variable into the set of expansion coefficients that would be obtained by expanding the variable in Zernike and Legendre polynomials as shown in Eq. \eqref{eq:ZernikeLegendreCoefficient}. This user object only computes {\it one} \(C_l^{nm}\) at a time, so the {\tt ZLDeconstruction} user object should be used instead, since it computes all of the Zernike coefficients given a single Legendre order. Because the orthogonal domain likely differs from the physical domain, the actual integral performed is shown below:
 
 \beq
 C_l^{nm}=\frac{1}{R^2}\frac{2}{H}\int_0^1rdr\int_{0}^{2\pi}d\theta\int_{-1}^{1}dzu(r,\theta,z)P_l(z)Z_n^m(r,\theta)
 \eeq
 
-where \(R\) is the radius and \(H\) the height in the physical domain. The factor of 2 appears because the height in the orthogonal domain is 2. To prevent the user from needing to enter a radius and height manually, these terms can be found using a postprocessor in MOOSE. By multiplying the factor above by \(\pi/\pi\), the denominator becomes the volume of the region. Hence, a postprocessor value provides the volume.
+where \(R\) is the radius and \(H\) the height in the physical domain. The factor of 2 appears because the height in the orthogonal domain is 2. By multiplying the factor above by \(\pi/\pi\), the denominator becomes the volume of the region. Hence, a postprocessor value provides the volume instead of relying on input from the user. This object can be restricted to blocks using the {\tt blocks} parameter in the input file. If the block is not specified, then if a variable parameter is present, the blocks are set to all of the blocks that are associated with that variable (i.e. for most simulations, the entire domain). If no variable is specified, then by default the entire domain is used. 
 
-This user object inherits from the {\tt ElementIntegralUserObject}, which inherits from the {\tt ElementUserObject} class. This parent class inherits all of the parameters of the {\tt BlockRestrictable} interface. Hence, this object can be restricted to blocks using the {\tt blocks} parameter in the XML input file. If the block is not specified, then if a variable parameter is present, the blocks are set to all of the blocks that are associated with that variable (i.e. for most simulations, the entire domain). If no variable is specified, then by default the entire domain is used. 
-
-For a given auxiliary SCALAR variable, the coefficients apply for a fixed Legendre order, and increase in the array beginning with the \(n\) index and then the \(m\) index of the Zernike expansion. The most rigorous way to verify that this deconstruction user object has been implemented correctly is to assume some set of coefficients and reconstruct a polynomial using the {\tt ZernikeLegendreReconstruction} function. Then, deconstruct this function using the {\tt ZernikeLegendreDeconstruction}, and verify that the coefficients have not changed. This must be performed over a cylindrical region to ensure that the orthogonality conditions are true. Note that the coefficients will not perfectly match those specified for the function due to errors associated with the quadrature rule used for numeric integration. This user object is available in Okapi.
+\color{magenta}
+No checks are made to ensure that the integration is performed over a cylindrical domain. Results will be inaccurate if the domain is not cylindrical or if the provided functions are not given the same normalization quantities that are implicit in the provided domain. This could be improved by adding a check that the volume computed by the postprocessor matches the volume as-computed by the coupled Legendre and Zernike functions. This user object is available in Okapi, but should be moved to a MOOSE module for generality.
+\color{black}
 
 \subsubsubsection{{\tt ZLDeconstruction}}
-This user object computes {\it all} of the Zernike coefficients given a fixed Legendre order, and hence reduces the number of user objects required in the input file by a factor of the number of Zernike expansion coefficients. The contents of this user object are essentially identical to that of the {\tt ZernikeLegendreDeconstruction} user object, except that loops are used to update an array of values {\tt \_integral\_value}, instead of a singular value.
+This user object computes {\it all} of the Zernike coefficients given a fixed Legendre order, reducing the number of user objects required in the input file by a factor of the number of Zernike expansion coefficients. The contents of this user object are identical to that of the {\tt ZernikeLegendreDeconstruction} user object, except that loops are used to update an array of values instead of a singular value.
+
+\color{magenta}
+No checks are made to ensure that the integration is performed over a cylindrical domain. Results will be inaccurate if the domain is not cylindrical or if the provided functions are not given the same normalization quantities that are implicit in the provided domain. This could be improved by adding a check that the volume computed by the postprocessor matches the volume as-computed by the coupled Legendre and Zernike functions. This user object is available in Okapi, but should be moved to a MOOSE module for generality.
+\color{black}
 
 \subsubsection{Field Reconstruction}
 This section discusses the functions developed in MOOSE to reconstruct a continuous field given expansion coefficients and specified orthogonal functions.
 
 \subsubsubsection{{\tt FourierLegendreReconstruction}}
-This function reconstructs a solution as a finite series of Fourier and Legendre polynomials given expansion coefficients, and evaluates it at a single point according to Eq. \eqref{eq:OrthogonalExpansion}. While {\tt LegendrePolynomial} and {\tt FourierPolynomial} are {\it not} specific to the orientation of the Legendre expansion relative to any of the Cartesian axes, this reconstruction assumes that given a point with three coordinates, that the third coordinate (the \(z\)-coordinate) serves as input to the {\tt LegendrePolynomial} function, while the \(x\) and \(y\) coordinates are input to the {\tt FourierPolynomial} function. This function is available in MOON.
+This function reconstructs a solution as a finite series of Fourier and Legendre polynomials given expansion coefficients, and evaluates it at a single point according to Eq. \eqref{eq:OrthogonalExpansion}. While {\tt LegendrePolynomial} and {\tt FourierPolynomial} are {\it not} specific to the orientation of the Legendre expansion relative to any of the Cartesian axes, this reconstruction assumes that given a point with three coordinates, that the third coordinate (the \(z\)-coordinate) serves as input to the {\tt LegendrePolynomial} function, while the \(x\) and \(y\) coordinates are input to the {\tt FourierPolynomial} function. 
 
-\begin{comment}
-To illustrate how solution reconstruction occurs in MOOSE, consider the following section of a MOON input file. Note that the Legendre and Fourier polynomials are simply instantiated to allow their member {\tt getPolynomialValue} to compute a scalar value given a point (or two for the case of the Fourier polynomial) and an order. The input specifications for {\tt FourierLegendreReconstruction} show that the surface temperature that will be passed from Nek to MOOSE in the form of expansion coefficients will have been expanded in a Legendre order of 10 and a Fourier order of 5. The input to the reconstruction function is a total of {\tt l\_order}\(\times\){\tt f\_order} coefficients. These coefficients are stored in {\tt SCALAR} auxiliary variables. A scalar auxvariable can hold any number of values, and this is implemented as an array of length {\tt ORDER}. For instance, the {\tt temp\_bc\_scalar\_f\_0\_l} auxvariable is declared as {\tt family=SCALAR} and {\tt order=TENTH}, so each of these auxvariables contains 10 scalar values. Each of these variables hence holds the \(C_{0l}, C_{1l}, C_{2l}, C_{3l}, C_{4l}\) values. This helps reduce the total number of variables that must be declared in this input file. For a total of 50 coefficients that are passed back and forth between Nek and MOOSE, this could have been implemented using 50 unique auxvariables, at the expense of a much larger input file.
-
-\begin{lstlisting}
-[Functions]
-  [./legendre_function]
-    type = LegendrePolynomial
-    # z-domain exists from 0.0 to 1.0
-    l_geom_norm = '0.0 1.0'
-  [../]
-  [./fourier_function]
-    type = FourierPolynomial
-  [../]
-  [./fl_reconstruction]
-    type = FourierLegendreReconstruction
-    l_order = 10
-    f_order = 5
-    # Legendre expansion is for the z-coordinate (not x or y)
-    l_direction = 2 
-    legendre_function_name = 'legendre_function'
-    fourier_function_name = 'fourier_function'
-    poly_scalars = 'temp_bc_scalar_f_0_l temp_bc_scalar_f_1_l temp_bc_scalar_f_2_l temp_bc_scalar_f_3_l temp_bc_scalar_f_4_l'
-  [../]
-[]
-\end{lstlisting}
-
-The scalar value returned by the {\tt FourierLegendreReconstruction} function is used in the function Dirichlet boundary condition within MOOSE. 
-
-\begin{lstlisting}
-[BCs]
-  [./wall]
-    type = FunctionDirichletBC
-    variable = temp
-    boundary = 'wall'
-    function = fl_reconstruction
-  [../]
-[]
-\end{lstlisting}
-
-So, this discussion on the functions in MOOSE concludes how MOOSE applies the temperature Dirichlet condition to the MOOSE solve within the fuel given the expansion coefficients from Nek. 
-\end{comment}
+\color{magenta}
+This function can be made more general by allowing the Legendre expansion to be in either \(x\), \(y\), or \(z\) instead of just \(z\). This function is available in MOON, but should be moved to a MOOSE module for generality.
+\color{black}
 
 \subsubsubsection{{\tt ZernikeLegendreReconstruction}}
-This function reconstructs a solution as a finite series of Zernike and Legendre polynomials given expansion coefficients, and evaluates it at a single point according to Eq. \eqref{eq:ZLReconstruction}. This function is very similar to the Fourier-Legendre reconstruction function developed for MOON, except that it also includes the flexibility for the Legendre expansion direction to not be along the \(z\)-direction. This function is available in Okapi.
-
-This function is set up so that the {\tt poly\_coeffs} coupled to this function {\it each} hold all of the expansion coefficients for a {\it fixed} Legendre order \(l\). For instance, for a Legendre expansion of 3 and a Zernike expansion of 2, these coefficients hold:
+This function reconstructs a solution as a finite series of Zernike and Legendre polynomials given expansion coefficients, and evaluates it at a single point according to Eq. \eqref{eq:ZLReconstruction}. This function is very similar to the Fourier-Legendre reconstruction function developed for MOON, except that it also includes the flexibility for the Legendre expansion direction to not be along the \(z\)-direction. This function is set up so that the {\tt poly\_coeffs} coupled to this function {\it each} hold all of the expansion coefficients for a {\it fixed} Legendre order \(l\). For instance, for a Legendre expansion of 3 and a Zernike expansion of 2, these coefficients hold:
 
 \begin{lstlisting}
 l_0_coeffs = 'C000 C01n1 C011 C02n2 C020 C022'
@@ -546,45 +550,59 @@ l_2_coeffs = 'C200 C21n1 C211 C22n2 C2020 C222'
 l_3_coeffs = 'C300 C31n1 C311 C32n2 C320 C322'
 \end{lstlisting}
 
-where the first index represents the \(l\) order, the second the \(n\) order, and the third the \(m\) order, where {\tt n} represents a negative number. Note that the choice in MOON was for each of these {\tt poly\_scalars} aux variables to hold all of the Legendre coefficients for a given Fourier order, which is the opposite of the choice here. 
+where the first index represents the \(l\) order, the second the \(n\) order, and the third the \(m\) order, where {\tt n} represents a negative number. Note that the choice in MOON was for each of these aux variables to hold all of the Legendre coefficients for a given Fourier order, which is the opposite of the choice here. 
+
+\color{magenta}
+This function is available in Okapi, but should be moved to a MOOSE module for generality.
+\color{black}
 
 \subsubsection{Using the Constructed Field}
 This section discusses the capabilities added to MOOSE to use the constructed field to enact physical feedback with other physics.
 
 \subsubsubsection{{\tt KappaFissionToHeatSource}}
-OpenMC provides a set of kappa fission expansion coefficients to MOOSE, which then passes those coefficients to MOOSE (BISON). In order to use those coefficients, they must be converted to a heat source with units of W/volume (the FE mesh is units-agnostic). The {\tt ZernikeLegendreReconstruction} is used to expand these coefficients into a continuous distribution, and then this auxkernel converts the continuous tally distribution to a heat source. There are two general methods in which to do this, both of which assume the user has knowledge of the power of the reactor. The power of the reactor is the sum of the power produced by fission directly in the fuel rod and the power produced by gamma heating (fuel, structural materials, and coolant). The expansion coefficients record the recoverable energy produced from {\it fission}, and hence will only have nonzero values over the fuel. So, assuming the user knows the power produced in each domain over which expansion coefficients are defined (a fuel pin, for example), the heat source can be determined by: 
+OpenMC provides a set of kappa fission expansion coefficients to MOOSE, which then passes those coefficients to MOOSE. In order to use those coefficients, they must be converted to a heat source with units of W/volume (the FE mesh is units-agnostic). The {\tt ZernikeLegendreReconstruction} is used to expand these coefficients into a continuous distribution, and then this auxkernel converts the continuous tally distribution to a heat source. There are two general methods by which to do this, both of which assume the user has knowledge of the power of the expansion domain. The power of the reactor is the sum of the power produced by fission directly in the fuel rod and the power produced by gamma heating (fuel, structural materials, and coolant). The expansion coefficients record the recoverable energy produced from {\it fission}, and hence will only have nonzero values over the fuel. So, assuming the user knows the power produced in each domain over which expansion coefficients are defined (a fuel pin, for example), the heat source can be determined by: 
 
 \begin{itemize}
-\item Multiplying the kappa fission distribution obtained from OpenMC by the user-specified pin fission power, divided by the integrated kappa fission distribution (over the pin). For a kappa fission distribution (units of eV/source particle) from OpenMC \(\kappa\), the fission power is:
+\item Multiplying the kappa fission distribution \(\kappa(\bf{r})\) (eV/source particle) by the user-specified pin fission power, divided by the integrated kappa fission distribution (over the pin):
 
 \beq
 \textrm{fission power}=\kappa(\bf{r})\times\frac{\textrm{user-defined pin fission power}}{\int d\bf{r}\kappa({\bf r})}
 \eeq
 
-The only thing that is required here is that the user know the pin fission power. 
-
-\item Alternatively, if an average energy released per fission \(E_f\), and an average number of source particles born from fission \(\nu\), are known, the fission power may be computed as:
+\item Assuming an average energy released per fission \(E_f\) and an average number of source particles born from fission \(\nu\), the fission power may be computed as:
 
 \beq
 \textrm{fission power}=\kappa(\bf{r})\times\textrm{user-defined pin fission power}\times\frac{\nu}{E_f}
 \eeq
 \end{itemize}
 
-To avoid the need to perform integration, this second approach is currently used, with an energy per fission of 200 MeV and the average number of neutrons born from fission of 2.45. In the future, this can be made more accurate by obtaining more representative average values from tallies.
+The first approach is selected here because it requires less specifications than the second method (i.e. no assumptions are needed for values for \(\nu\) and \(E_f\)) and integration over a volume can easily be performed with a MOOSE postprocessor.
+
+\color{magenta}
+How are changes in power accounted for?
+\color{black}
 
 \subsubsection{Performing the Data Transfer}
-MOOSE controls all data transfers between the coupled external codes. This section describes the MOOSE {\tt Transfer} objects that were created to perform data transfer to/from OpenMC and to/from Nek. The OpenMC and Nek routines that are called from within the MOOSE transfer classes developed are discussed in later sections of this report.
+MOOSE controls all data transfers between the coupled external codes. This section describes the MOOSE {\tt Transfer} objects that were created to perform data transfer to/from OpenMC and to/from Nek. The OpenMC and Nek routines that are called from within the MOOSE transfer classes developed are discussed in Sections \ref{sec:OpenMCTransfer} and \ref{sec:NekTransfer}, respectively. 
 
-\subsubsubsection{{\tt PolynomialOpenMC}}
-This transfer object defines what routines are called to transfer data from MOOSE to OpenMC (to MultiApp), and from OpenMC back to MOOSE (from MultiApp). 
+\subsubsubsection{{\tt MultiAppOkapiMooseTransfer}}
+This transfer object defines data transfer from MOOSE to OpenMC (to MultiApp), and from OpenMC back to MOOSE (from MultiApp). In order to be flexible such that the {\tt MultiAppOkapiMooseTransfer} transfer can be used for both transfer to OpenMC and from OpenMC, the {\tt to\_aux\_scalar} parameter will be a dummy parameter for transfer to OpenMC (because OpenMC does not perform any finite element solve in the MOOSE context), while {\tt source\_variable} will be a dummy variable for transfer from OpenMC for the same reason.
 \\\\
 {\it Transfer to OpenMC}\\
-For transferring data to OpenMC, the associated syntax is shown below. In order to be flexible such that the {\tt PolynomialOpenMC} transfer can be used for both transfer to OpenMC and from OpenMC, the {\tt to\_aux\_scalar} parameter will be a dummy parameter for transfer to OpenMC (because OpenMC does not perform any finite element solve in the MOOSE context), while {\tt source\_variable} will be a dummy variable for transfer from OpenMC for the same reason.
+For transferring data to OpenMC, the associated syntax is shown below. The source variable holds a list of the scalar auxvariables that hold all of the expansion coefficients for a given Legendre order for the temperature in MOOSE (Legendre order of two shown here). These must be present in ascending Legendre order so that OpenMC interprets these coefficients correctly.  Finally, the OpenMC subroutines that are called from {\tt MultiAppOkapiMooseTransfer} methods require the OpenMC cell index in the {\tt cells(:)} array so that we know which cells to change the temperature of. 
+
+\color{magenta}
+This transfer only works for a single coupling cell, since we won't duplicate the transfer block shown below for every single fuel pin. We'll need to write some method to internally link the OpenMC cells with the MOOSE block IDs. 
+
+A routine needs to be developed to receive the expansion coefficients in OpenMC, and store them as a function of the OpenMC cell to which they pertain. This routine will need to not only read the coefficients, but also determine the Zernike and Legendre expansion orders (since they need not be the same orders as those used to expand the kappa fission tally).
+
+Finally, continuous material tracking needs to be implemented in OpenMC to make actual use of these coefficients.
+\color{black}
 
 \begin{lstlisting}
 [Transfers]
   [./to_openmc]
-      type = PolynomialOpenMC
+      type = MultiAppOkapiMooseTransfer
       direction = to_multiapp
       source_variable = 'l_0_coeffs l_1_coeffs l_2_coeffs'
       to_aux_scalar = 'dummy'
@@ -593,24 +611,15 @@ For transferring data to OpenMC, the associated syntax is shown below. In order 
 []
 \end{lstlisting}
 
-The source variable holds a list of the scalar auxvariables that hold all of the expansion coefficients for a given Legendre order for the temperature in MOOSE (Legendre order of two shown here). These must be present in ascending Legendre order so that OpenMC interprets these coefficients correctly.  Finally, the OpenMC subroutines that are called from {\tt PolynomialOpenMC} methods require the OpenMC cell index in the {\tt cells(:)} array so that we know which cells to change the temperature of. 
-
-Loop over all of the source variables, and then over each component of the present source variable. A check is performed to ensure that the order of each of the {\tt source\_variable}s is the same, since each should represent all of the Zernike coefficients given a fixed Legendre order.
-
-{\bf A routine needs to be developed to receive the expansion coefficients in OpenMC, and store them as a function of the OpenMC cell to which they pertain. This routine will need to not only read the coefficients, but also determine the Zernike and Legendre expansion orders (since they need not be the same orders as those used to expand the kappa fission tally)}. 
-
-After OpenMC receives these coefficients, without continuous material tracking implemented, for simplicity and to illustrate the data flow for coupling, the {\tt openmc\_cell\_set\_temperature} subroutine is called and passed the OpenMC cell index and the first expansion coefficient (essentially performing a zero-th order expansion for the temperature. Because the temperature expansion coefficients are computed in BISON using a zeroth order Legendre expansion and an \(n\)-th order Zernike expansion, no additional scaling factors are needed (though we need to apply a \(1/\sqrt{2}\) correction factor for passing coefficients from OpenMC to BISON, since OpenMC currently only has Zernike expansion tallies implemented, which to extend to zeroth-order Legendre, \(n\)-th order Zernike requires multiplication by \(\tilde{P}_0(x)=1/\sqrt{2}\)). Note that to change a temperature in OpenMC requires that you have loaded cross sections at that temperature; a range of temperatures can be loaded during the initialization step by specifying the {\tt temperature\_range} parameter in the settings XML file.
-
-
-
-For transferring data from OpenMC to MOOSE, the {\tt fet\_deconstruction} OpenMC subroutine is first called in order to collect all of the expansion coefficients by tally into the {\tt t \% coeffs(:, :)} array. This array is organized so that the first index refers to the cell index in the cells array, and the second index holds the coefficients. This subroutine sums over all other filters except the cell filter. For instance, if the user specifies multiple material filters, the expansion coefficients are summed over all of those materials, simply returning coefficients by cell. 
-
-For data transfer from OpenMC to MOOSE, because OpenMC does not perform a finite element solve, the source of the data is not any finite element variable, so we use a dummy variable. The auxiliary scalar variables that are to be written represent the expansion coefficients in MOOSE that hold the kappa fission tally distribution. Finally, we must specify which OpenMC cell is acting as the source of the coefficients. Then, we check that all of the {\tt to\_aux\_scalar} variables are of the same length. In order to extract the expansion coefficients from OpenMC, the {\tt get\_coeffs\_from\_cell} OpenMC subroutine stores the expansion coefficients for a specified cell in a C++ array. The size of this C++ array is assumed to be the total length of the auxiliary scalar variables specified in the {\tt to\_aux\_scalar} field (which have already been checked to be the same length). In the {\tt get\_coeffs\_from\_cell} subroutine, a check is made that the C++ array allocated to hold the expansion coefficients is of the appropriate length, so between the equal-length check made in MOOSE, and the total-length check made in OpenMC, there is no possibility of incorrect sizes in this transfer.
+A check is performed to ensure that the order of each of the {\tt source\_variable}s is the same, since each should represent all of the Zernike coefficients given a fixed Legendre order. After OpenMC receives these coefficients, without continuous material tracking implemented, for simplicity and to illustrate the data flow for coupling, the {\tt openmc\_cell\_set\_temperature} subroutine is called and passed the OpenMC cell index and the first expansion coefficient (essentially performing a zero-th order expansion for the temperature). Note that a scaling factor is applied because the \(C_0^{00}\) coefficient has to be multiplied by \(P_0(z)Z_0^0(r,\theta)\). Note that to change a temperature in OpenMC requires that you have loaded cross sections at that temperature; a range of temperatures can be loaded during the initialization step by specifying the {\tt temperature\_range} parameter in the settings XML file.
+\\\\
+{\it Transfer from OpenMC}\\
+For transferring data from OpenMC to MOOSE, the {\tt fet\_deconstruction} OpenMC subroutine is first called in order to collect all of the expansion coefficients into the {\tt coeffs(:, :)} array. This subroutine sums over all other filters except the cell filter. For instance, if the user specifies multiple material filters, the expansion coefficients are summed over all of those materials, simply returning coefficients by cell. The auxiliary scalar variables that are to be written represent the expansion coefficients in MOOSE that hold the kappa fission tally distribution. Finally, we must specify which OpenMC cell is acting as the source of the coefficients. Then, we check that all of the {\tt to\_aux\_scalar} variables are of the same length. In order to extract the expansion coefficients from OpenMC, the {\tt get\_coeffs\_from\_cell} OpenMC subroutine stores the expansion coefficients for a specified cell in a C++ array. The size of this C++ array is assumed to be the total length of the auxiliary scalar variables specified in the {\tt to\_aux\_scalar} field (which have already been checked to be the same length). In the {\tt get\_coeffs\_from\_cell} subroutine, a check is made that the C++ array allocated to hold the expansion coefficients is of the appropriate length, so between the equal-length check made in MOOSE, and the total-length check made in OpenMC, there is no possibility of incorrect sizes in this transfer.
 
 \begin{lstlisting}
 [Transfers]
   [./to_openmc]
-      type = PolynomialOpenMC
+      type = MultiAppOkapiMooseTransfer
       direction = from_multiapp
       source_variable = 'dummy'
       to_aux_scalar = 'l_0_coeffs l_1_coeffs l_2_coeffs'
@@ -619,10 +628,129 @@ For data transfer from OpenMC to MOOSE, because OpenMC does not perform a finite
 []
 \end{lstlisting}
 
+\color{magenta}
+Like the transfer to OpenMC, this transfer only works for a single fuel pin, and in the future we'll need to internally specify which OpenMC cells map to MOOSE blocks.
+\color{black}
+
 \subsubsubsection{{\tt MultiAppPolynomialToNek}}
-This transfer object defines what routines are called to transfer data from MOOSE to Nek, and from Nek back to MOOSE.
+This transfer object defines what routines are called to transfer data from MOOSE to Nek, and from Nek back to MOOSE. In order to be flexible such that the transfer can be used for both transfer to and from Nek, the {\tt to\_aux\_scalar} parameter will be a dummy parameter for transfer to Nek (because Nek does not perform any finite element solve in the MOOSE context), while {\tt source\_variable} will be a dummy variable for transfer from Nek for the same reason.
+\\\\
+{\it Transfer to Nek}\\
+When transferring data from MOOSE to Nek, the expansion coefficients are stored in the {\tt coeff\_fij} array that is the only member of the {\tt expansion\_fcoef\_} struct. {\tt expansion\_fcoef\_} (note the trailing underscore) represents the direct mapping of a Fortran common block to a C++ struct. The {\tt expansion\_fcoef} common block does not appear in any of the core Nek source code, but can be found in the usr file for the compiled MOON problem in two user-defined subroutines, {\tt userchk} and {\tt flux\_reconstruction}. 
+
+The {\tt userchk} subroutine is used to interrogate the solution, and is where the maximum Legendre and Fourier expansion orders are defined ({\tt nl\_max} and {\tt nf\_max}, respectively). 
+
+\begin{lstlisting}[language=Fortran]
+subroutine userchk
+include 'SIZE'
+include 'TOTAL'
+
+! maximum Legendre and Fourier expansion orders
+parameter (nl_max=100)
+parameter (nf_max=100)
+
+common/expansion_tdata/n_legendre, m_fourier
+common/expansion_tcoef/coeff_tij(nl_max,nf_max)
+common/expansion_fcoef/coeff_fij(nl_max,nf_max)
+common/expansion_recon/flux_recon(lx1,ly1,lz1,lelt)
+common/test_passing/ flux_moose, temp_nek
+real sint, sint1, sarea, sarea1, wtmp
+integer e, f
+
+n1=nelt*lx1*ly1*lz1
+n2=nelt*lx2*ly2*lz2
+
+pmin=glmin(pr,n2)
+pmax=glmax(pr,n2)
+wmin=glmin(vz,n1)
+wmax=glmax(vz,n1)
+tmin=glmin(t,n1)
+tmax=glmax(t,n1)
+
+      ifflow=.false.
+
+c      if (istep.eq.0) then
+c         call rzero(t,n1)
+c      endif
+
+      sint1=0.0
+      sarea1=0.0
+
+      do e=1,lelt
+        do f=1,6
+          call surface_int(sint,sarea,t,e,f)
+          if (cbc(f,e,1).eq.'W  ') then
+           sint1=sint1+sint
+           sarea1=sarea1+sarea
+          endif
+         enddo
+      enddo
+
+      call  gop(sint1,wtmp,'+  ',1)
+      call  gop(sarea1,wtmp,'+  ',1)
+
+      temp_nek=sint1/sarea1
+
+      sint1=0.0
+      sarea1=0.0
+
+      do e=1,lelt
+        do f=1,6
+          call surface_int(sint,sarea,flux_recon,e,f)
+          if (cbc(f,e,1).eq.'W  ') then
+           sint1=sint1+sint
+           sarea1=sarea1+sarea
+          endif
+         enddo
+      enddo
+
+      call  gop(sint1,wtmp,'+  ',1)
+      call  gop(sarea1,wtmp,'+  ',1)
+
+      flux_moose=sint1/sarea1
+
+      call heat_balance(flux_moose)
+
+      if (nid.eq.0) then
+         write(6,*)"*** Temperature: ",tmin," - ",tmax
+         write(6,*)"*** Average Temperature: ",temp_nek,coeff_tij(1,1)
+         write(6,*)"*** Average Flux: ",flux_moose,coeff_fij(1,1)
+      endif
+
+c     Will this be overwritten -----------------
+c      write(6,*)"*** Setting polynomial orders ..."
+      n_legendre=10
+      m_fourier=5
+c-----------------------------------------------
+
+c This is for testing -----------
+c      call flux_reconstruction()
+c      call nek_expansion()
+c      call nek_diag()
+c      if (nid.eq.0) write(6,*)" *** Expansion done"
+c      call nek_testp()
+c      call exitt()
+c--------------------------------
+
+c This is to test coefficients with MOOSE --
+c      do i0=1,n_legendre
+c        do j0=1,m_fourier
+c        if (nid.eq.0) write(6,*)"C(",i0,",",j0,")=",
+c     &      coeff_fij(i0,j0)
+c        enddo
+c      enddo
+c------------------------------------------
+      return
+      end
+\end{lstlisting}
+
+
+
+
+
 
 \subsection{OpenMC Data Transfer}
+\label{sec:OpenMCTransfer}
 This section describes the capabilities introduced into the OpenMC source code that allow evaluation of polynomials, construction/deconstruction of continuous fields, and the use of this transferred data to enact physical changes, such as changing temperatures and densities. The information in this section is based upon the {\tt zernike} branch provided by Matt Ellis, and corrections and extensions that were made are indicated where applicable.
 
 \subsubsection{Evaluation of Polynomials}
@@ -830,29 +958,23 @@ This subroutine is used to write coefficients from OpenMC into an array passed i
 {\bf Note that this routine only matches with the first FET tally that exists for the specified cell, so this hinges on the assumption that at most one FET tally is defined for a cell.}
 
 \subsubsection{Field Reconstruction}
-This section discusses the changes made in the OpenMC source code to receive a set of expansion coefficients from an external code and expand them into a continuous field.
+This section discusses the changes made in the OpenMC source code to receive a set of expansion coefficients from an external code and expand them into a continuous field. First, a discussion is given of the mechanical receipt of coefficients from an external code and how that is expanded into a continuous field. The data transferred to OpenMC are temperatures and densities in the fuel and fluid coolant. In order to understand how to use these reconstructed fields to set temperatures and densities, it is necessary to understand how temperatures and densities are treated in OpenMC. The remaining sections then discuss how a constructed field is used to change temperatures and densities.
 
 \subsubsubsection{{\tt receive\_coeffs\_for\_cell(cell\_id, cell\_coeffs, n)}}
 This subroutine was added in order to receive expansion coefficients from an external code and store them in the {\tt received\_coeffs} array. A cell ID is passed in, which is converted to the index in the {\tt cells} array. Then, in a loop over all the tallies, all non-FET tallies will be skipped over (those that do not have {\tt coeffs} allocated). Then, if {\tt tallies(i) \% received\_coeffs} has not already been allocated, such as will be the case for the very first receipt of information from an external physics code, it will be allocated. The number of cells is assumed to match the number of cells tallied for the expansion coefficient sent {\it out} from OpenMC, while the number of coefficients is assumed to be equal to the length of the array passed into this subroutine. Hence, the order of the expansion produced by OpenMC does not need to match that received from an external code. An implicit assumption exists here that each of the cells for receiving coefficients will have the same number of coefficients, similar for the reverse case of coefficients generated by OpenMC. 
 
 For all other cases except the first receipt of coefficients from an external code, the {\tt received\_coeffs} array will have already been allocated, so the number of coefficients for the first cell is checked against the length of the array passed into this subroutine, and an error is thrown if the sizes do not match. This implicitly assumes that the order of the expansion for each tally does not change during the simulation and that the expansion order is the same for all cells belonging to the matching OpenMC {\tt kappa-fission-zn} tally. {\bf This tally only matches with the first matching FET tally in OpenMC, which will cause problems if more than one FET is defined for the same cell in OpenMC.} An error will be thrown if no matching tallies in OpenMC exist over the cell ID passed in, but this is logical because domains are to be linked between OpenMC and an external physics code by volume coupling.
 
-\subsubsection{Using the Constructed Field}
-The data transferred to OpenMC are temperatures and densities in the fuel and fluid coolant. In order to understand how to use these reconstructed fields to set temperatures and densities, it is necessary to understand how temperatures and densities are treated in OpenMC.
-
-
-
-
-
-The expansion coefficients received from MOOSE are stored each Picard iteration in the global {\tt expansion\_coeffs} array by calling the {\tt receive\_coeffs} subroutine from the {\tt coupling} module. It is assumed that the SCALAR variables used as the {\tt source\_variable} in the transfer lists the expansion coefficients, where they have been grouped by all the Zernike coefficients (organized by increasing \(n\), with increasing \(m\) for each \(n\)) in increasing Legendre order. For instance, the following would be the correct syntax in the input file for a transfer to OpenMC of coefficients associated with a Legendre order of 2 and a Zernike order of 1.
+When these coefficients are used internally by OpenMC, it is assumed that the SCALAR variables used as the {\tt source\_variable} in the transfer lists the expansion coefficients grouped by all the Zernike coefficients (organized by increasing \(n\), with increasing \(m\) for each \(n\)) in increasing Legendre order. For instance, the following would be the correct syntax in the input file for a transfer to OpenMC of coefficients associated with a Legendre order of 2 and a Zernike order of 1.
 
 \begin{lstlisting}
 [Transfers]
   [./to_openmc]
-    type = PolynomialOpenMC
+    type = MultiAppOkapiMooseTransfer
     direction = to_multiapp
     source_variable = 'l_0_coeffs l_1_coeffs l_2_coeffs'
     to_aux_scalar = 'foo'
+    openmc_cell = 1
   [../]
 []
 \end{lstlisting}
@@ -863,11 +985,9 @@ where {\tt l\_0\_coeffs} then holds the following coefficients in the following 
 \textrm{{\tt l\_0\_coeffs}}= \begin{bmatrix}C_0^{n=0,m=0} & C_0^{n=1, m=-1} & C_0^{n=1,m=1} & C_0^{n=2,m=-2} & C_0^{n=2,m=0} & C_0^{n=2,m=2}\end{bmatrix}
 \eeq
 
-It is critical that the order of the source variables in the transfer be in order of increasing Legendre order (the Zernike order is implemented correctly automatically by nature of the {\tt ZLDeconstruction} user object). 
+\subsubsection{Changing Temperatures}
+The expansion coefficients received from an external code are stored each Picard iteration in the {\tt tallies(i) \% received\_coeffs} array.
 
-
-
-\subsubsubsection{Changing Temperatures}
 This section describes how temperatures are set in OpenMC for a normal, non-coupled simulation in order to elicit what changes are needed to modify a temperature in OpenMC and obtain the correct end result of changing the temperature at which cross sections are evaluated.
 
 \begin{enumerate}
@@ -935,10 +1055,11 @@ This completes the loading of temperature-dependent cross sections. The use of t
 
 So, in order to use a reconstructed temperature field in OpenMC simply requires changed the temperatures of the appropriate cell, since the cell temperatures are used to determine which cross section values to use. Because the cross sections are forced to be calculated for every particle at the {\it start} of the transport subroutine, there is no need to reset or clear cross sections between Picard steps. 
 
-\subsubsubsection{Changing Densities}
+\subsubsection{Changing Densities}
 This section discusses the changes made in OpenMC to allow fluid densities to be changed given information from Nek. 
 
 \subsection{Nek Data Transfer}
+\label{sec:NekTransfer}
 This section describes the capabilities introduced into the Nek source code that allows evaluation of polynomials, and construction/deconstruction of continuous fields. 
 
 Nek COMMON blocks map directly into C structs. 
@@ -950,7 +1071,8 @@ MOOSE transfer a heat flux to Nek to apply on the boundary between the fuel and 
 
 
 
-\subsubsection{Using the Constructed Field}
+
+\subsubsection{Changing a Surface Boundary Condition}
  
 
 \section{Executioners and Timesteppers}
@@ -1007,243 +1129,60 @@ So, as long as the routines needed from an external code can be cast into one or
 \end{itemize}
 
 \subsection{OpenMC Execution}
-This section describes the OpenMC executioner and time stepper created that will call the OpenMC routines that are needed to perform a Monte Carlo simulation within the MOOSE framework.
+This section describes the OpenMC executioner and time stepper created that will call the OpenMC routines that are needed to perform a Monte Carlo simulation within the MOOSE framework. 
 
 \subsubsection{{\tt OpenMCExecutioner}}
-The {\tt OpenMCExecutioner} inherits from the {\tt Transient} executioner, and hence the methods that are overridden are described in detail here.
+Because OpenMC will be run in a transient simulation, the executioner that wraps calls to OpenMC routines inherits from the {\tt Transient} executioner.
 
-\subsubsubsection{{\tt OpenMCExecutioner::postExecute()}}
-This method should perform any finalization actions to be performed at the very end of the coupled simulation (a single time). Hence, this method contains routines to deallocate allocated memory. (Do I need to separate out the \% clear statements?)
-
-\subsubsection{{\tt OpenMCTimeStepper}}
-
-\subsubsubsection{{\tt OpenMCTimeStepper::step()}}
-This is the method that should be called to run an OpenMC simulation for each Picard iteration (any possibly multiple Picard iterations per timestep). The {\tt solveStep()} method of the executioner calls the {\tt step()} method of the time stepper for each step, and hence these actions are placed in the OpenMC time stepper, rather than in the executioner itself.  
-
-Because data transfer from MOOSE to OpenMC will occur in a Transfer object, this section should be independent of any input information. The core action kernel of OpenMC is the {\tt openmc\_run()} subroutine, which performs all of the logic of iterating over batches, generations, and particles and simulating the transport of each particle through the geometry. Below is shown a commented version of this subroutine. 
-
-No changes were made to the {\tt openmc\_run} subroutine. However, for this routine to run multiple times in a row, several changes were made to other parts of the OpenMC source code. The normal progression of an OpenMC simulation consists of three steps - {\tt openmc\_init}, {\tt openmc\_run}, and {\tt openmc\_finalize}. If instead the simulation flow consists of a single call to {\tt openmc\_init}, followed by an arbitrary number of calls to {\tt openmc\_run}, and followed by a single call to {\tt openmc\_finalize}, then the following changes must be made regarding the {\tt openmc\_run} portion:
+\subsubsubsection{{\tt init()}}
+This method is called once at the very beginning of the simulation to perform tasks that are required for {\it all} OpenMC runs needed later in the coupled simulation such as memory allocation, MPI setup, reading initial data from XML files, etc. The actions taken by this method are completely independent of any input information from MOOSE such as temperatures that are to be coupled during Picard iterations. This method simply calls the {\tt init()} method of the {\tt Transient} executioner, followed by the {\tt openmc\_init} subroutine. This subroutine performs the following major actions:
 
 \begin{itemize}
-\item OpenMC creates a {\tt stl\_vector} module that simulates the actions of the vector class in C++. This class defines members such as {\tt push\_back}, which simply appends entries to vectors. These data structures must be cleared before restarting {\tt openmc\_run}, or else the data structures will continue to increase in length, and results will be incorrect (is this still true with c-api branch?).
-\item In the variable declaration sections of several OpenMC modules, variables are initialized. For example, the {\tt k\_sum(2)} array, which holds the cumulative sum of all computed values of \(k_{eff}\) in order to compute an average \(k_{eff}\) at the end of a single OpenMC simulation, is initialized to zero in the variable declaration portion of the {\tt eigenvalue} module. When calling {\tt openmc\_run} several times in a row, {\tt k\_sum(2)} is only set to zero the very first time - for further calls, the magnitudes of its entries simply keep increasing. Therefore, the {\tt openmc\_reset} subroutine, which should be called before every {\tt openmc\_run} call, correctly resets such variables. 
+\item Read input files and build data structures for the geometry, materials, tallies, and other variables.
+\item Initialize a random number seed.
+\item Read cross section data.
+\item Sample the particle source sites and the particle direction and energy. For a fixed source simulation, these are known explicitly and are specified in an input file, but for an eigenvalue problem, a rough initial source is either specified in the input file or is assumed to be some default source. 
 \end{itemize}
+
+The only major change made to this subroutine was to change its parameter list to accept an MPI communicator, instead of initializing MPI itself. This permits an external code to setup MPI, which would then not be duplicated by OpenMC.
+
+\subsubsection{{\tt OpenMCTimeStepper}}
+The OpenMC time stepper is where the calls to the routines needed to run and finalize an OpenMC simulation are made.
+
+\subsubsubsection{{\tt step()}}
+This method is called once every Picard step, and contains a call to {\tt openmc\_reset}, which resets tally variables and other run-particular variables, followed by {\tt openmc\_run}, which transports the particles through the geometry by iterating over over batches, generations, and particles. 
+
+\subsubsubsection{{\tt postExecute()}}
+This method is called once at the very end of the coupled simulation, and calls {\tt openmc\_finalize}, which writes OpenMC output files (only for the last time step) and performs other basic tasks such as freeing allocated memory.
 
 \subsection{Nek Execution}
 This section describes the Nek executioner and time stepper created that will call the Nek routines that are needed to perform a computational fluid dynamics simulation within the MOOSE framework.
 
 \subsubsection{{\tt NekExecutioner}}
-The Nek executioner has all of the same parameters as the transient executioner, and only redefines the {\tt init()}, {\tt preStep()}, and {\tt postStep()} methods. The {\tt init()} method is called before executing the time stepper. The {\tt preStep()} and {\tt postStep()} methods are called surrounding the {\tt computeDT()}, {\tt takeStep()}, and {\tt endStep()} methods, and hence essentially surround the call to the methods that perform an actual time step solution.  
+Because Nek will be run in a transient simulation, the executioner that wraps calls to Nek routines inherits from the {\tt Transient} executioner.
 
-\begin{lstlisting}
-#include "NekExecutioner.h"
-#include "NekInterface.h"
+\subsubsubsection{{\tt init()}}
+This method is called once at the very beginning of the simulation to perform tasks that are required for {\it all} Nek runs need later in the coupling simulation such as memory allocation, MPI setup, reading initial data, etc. The actions taken by this method are completely independent of any input information from MOOSE such as boundary conditions that are to be coupled during Picard iterations. This method calls the {\tt init()} method of the {\tt Transient} executioner, followed by the {\tt nek\_init} subroutine. This subroutine is defined in the core Nek source code, and performs the following actions:
 
-template<>
-InputParameters validParams<NekExecutioner>() {
-  InputParameters params = validParams<Transient>();
-  return params;
-}
+\begin{enumerate}
+\item If the communicator passed into the subroutine is not a valid communicator, then MPI is initialized. A duplicate communicator is created to avoid name collisions.
+\item Read the {\tt SESSION.NAME}, {\tt SIZE}, and {\tt .rea} files and set values based on parameters in these files.
+\item Initialize variables, setup the domain topology, compute quadrature points and weights.
+%\item Call the {\tt usrdat} subroutine.
+\item Generate the geometry, compute Jacobians, set initial conditions, compute material properties, and initialize timers to zero.
+\end{enumerate}
 
-NekExecutioner::NekExecutioner(const InputParameters & parameters) :
-    Transient(parameters) { }
+\subsubsubsection{{\tt preStep()}}
+This method is called once at the start of each time step (not once per Picard solve, but once for each value of \(t\)). This method calls the {\tt preStep} method of the {\tt Transient} executioner, followed by the {\tt nek\_init\_step} subroutine, which is defined in the {\tt usr} file.
 
-void NekExecutioner::init() {
-  Transient::init();
-  FORTRAN_CALL(Nek5000::nek_init)(_communicator.get());
-}
-
-void NekExecutioner::preStep() {
-  Transient::preStep();
-  FORTRAN_CALL(Nek5000::nek_init_step)();
-}
-
-void NekExecutioner::postStep() {
-  Transient::postStep();
-  FORTRAN_CALL(Nek5000::nek_finalize_step)();
-}
-\end{lstlisting}
+\subsubsubsection{{\tt postStep()}}
+This method is called once at the end of each time step (not once per Picard solve, but once for each value of \(t\)). This method calls the {\tt postStep} method of the {\tt Transient} executioner, followed by the {\tt nek\_finalize\_step} subroutine, which is defined in the {\tt usr} file.
 
 \subsubsection{{\tt NekTimeStepper}}
+Note that unlike the OpenMC time stepper, the {\tt postExecute} method is not overridden, primarily because there is no dynamic memory that needs to be freed.
 
-
-
-
-
-
-
-\section{OpenMC Theory}
-This section provides my notes on the Monte Carlo method used in OpenMC. For the purposes of code coupling, it is important to understand how the numerical algorithm is mapped into Fortran code, since this algorithm is to be split up into modular pieces that should be able to run in a particular order, but otherwise independently. For instance, the transport loop requires an initialization period to get problem parameters from the user, but then the simulation should be able to run repeatedly, in many independent instances. 
-
-The central limit theorem guarantees that the variance of the sample mean is inversely proportional to the number of particles \(N\):
-
-\beq
-\sigma^2\propto\frac{1}{N}
-\eeq
-
-OpenMC performs a Monte Carlo simulation one particle at a time. Before any transporting can occur, initializations are required. 
-
-\subsection{OpenMC Data Structures}
-This section discusses the data structures such as timers and particles used in the simulation process. 
-
-\subsubsection{Banks - {\tt bank\_header.F90}}
-A bank is used for storing fission sites in eigenvalue calculations. All of the state information of a neutron is not needed in order to sample from the fission sites in the next generation, storing this information in a Bank datatype uses less memory. The bank sites are associated with a scalar weight (that applies to all of the bank sites), the location of a bank particle (3 coordinates), directional cosines (3 velocities), an energy/energy group, and a delayed group. 
-
-\subsubsection{Materials - {\tt material\_header.F90}}
-Each material has a unique identifier, and is associated with a number of nuclides (i.e. a material is a mixture). The nuclides and nuclide number densities are stored in arrays indexed by the constituent nuclide. 
-
-\subsubsection{Timers - {\tt timer\_header.F90}}
-There are two general ways to report differences in time - {\tt system\_clock} and {\tt cpu\_time}. The system clock reports wall time, or elapsed time, while CPU time only reports time used by the CPU. The {\tt Timer} data type defines {\tt start} and {\tt stop} methods. The argument passed to the system clock call is a variable that holds the number of CPU counts relative to some arbitrary point in time. The value held in a timer is computed using the {\tt get\_value} method, which takes the difference between the integer numbers stored in the start and stop counters, and divides it by the count rate of the computer. So, these timers do {\it not} accumulate - they can only measure the time difference between two instances in time. The {\tt reset} method turns the timer off and sets the start counts to zero and the elapsed time to zero.
-
-\subsection{\tt OpenMCExecutioner::init()}
-This method is called one time, at the very beginning of the entire simulation. In other words, this method is not called for each time step. This method should perform tasks that are required for {\it all} OpenMC runs needed later in the coupled simulation, such as memory allocation, MPI setup, reading initial data from XML files, etc. The actions taken by this method should be completely independent of any input information from MOOSE such as temperatures that are to be coupled during Picard iterations. 
-
-The {\tt openmc\_init} subroutine is shown below, with comments indicating what each included subroutine performs. The following modifications were made to the {\tt openmc\_init} subroutine in order to separate out actions that should be performed once per entire coupled simulation, versus once per receipt of a data transfer from a coupled MOOSE simulation. 
-
-The initialization process includes the following major steps:
-
-\begin{itemize}
-\item Read input files and build data structures for the geometry, materials, tallies, and other variables.
-\item Initialize a random number seed if not provided in the user input.
-\item Read cross section data. For multi-group problems, combine information for individual nuclides into material-specific cross section data. 
-\item Initialize any special energy grid treatments, such as a union energy grid or lethargy bins. 
-\item Sample the particle source sites and the particle direction and energy. For a fixed source simulation, these are known explicitly and are specified in an input file, but for an eigenvalue problem, a rough initial source is either specified in the input file or is assumed to be some default source. 
-\end{itemize}
-
-\begin{lstlisting}[language=fortran]
-  subroutine openmc_init(intracomm)
-#ifdef MPIF08
-    type(MPI_Comm), intent(in) :: intracomm     ! MPI intracommunicator
-#else
-    integer, intent(in), optional :: intracomm  ! MPI intracommunicator
-#endif
-
-    ! this timer records the entire runtime (start to finish - time_total%stop() is called at the end of finalize_simulation() (at the end of openmc_run()). If we leave this here, then this time_total will represent the time from start of the coupled MOOSE-OpenMC simulation to wherever time_total%stop() is called. As-is, this will represent the time from the start of the coupled simulation to the end time of the first Picard iteration (not the first time step - i.e. the first complete OpenMC run). We need to adjust this timer, because otherwise the timer will be started in openmc_init, and it will be repeatedly stopped in openmc_run(). Stopping a timer that has not yet been started will simply return zero elapsed time, which will not be accurate. 
-    call time_total%start() 
-    
-    ! represents time from start to stop of openmc_init()
-    call time_initialize%start()
-
-#ifdef MPI
-    ! Determine the number of processes in the intra-communicator and the rank of each process. This does not call MPI_INIT unless MPI_INIT has not yet been called (and hence shouldn't pose a problem when coupling with MOOSE, which calls MPI_INIT). This also creates compound MPI data types (MPI_BANK type, which has five members - weight, position, velocity, energy, and delayed neutron group). In order to correctly use an MPI custom data type, we need to know where the addresses of that custom data type are in the custom data structure - MPI_GET_ADDRESS is used to adjust the displacements so that they are portable amongst different systems. 
-    call initialize_mpi(intracomm)
-#endif
-
-    ! Initialize the HDF5 library (h5open_f), and create custom HDF5 data types for coordinates and velocities, banks (hdf5_bank_t) (which inserts the types for coordinates and velocities). This will be used when writing output files that show the bank information in HDF5 format.
-    call hdf5_initialize()
-
-    ! Read command line arguments. Because OpenMC is called as a library, nothing is passed on the command line - its functions and subroutines are called directly. I tried setting an OpenMC command line parameter when calling a MOOSE executable, and it wasn't recognized. When calling OpenMC as a library, it counts "-1" command line arguments (i.e. when I run the MOOSE executable). The number of OpenMP threads can be set from the command line. This allocates/deallocates memory to hold the number and values of command line arguments. 
-    call read_command_line()
-
-    ! Read XML input files (settings, geometry, materials, and tallies). 
-    ! read_settings_xml(): The number of OpenMP threads can be set in the input file, after which omp_set_num_threads() is called. The settings.xml file specifies the source distribution - the default is to use an isotropic point source at the origin with a Watt spectrum. This call allocates storage for the source. Instead of using the default, the source can be specified from an input file, or as a guess in the input file. The source can be specified as only the fissile material, or a variety of other options. If not specified, the default angular distribution is isotropic. This also sets up and allocates the Shannon entropy mesh, weight/energy cutoffs, particle traces and tracks, the UFS mesh, statepoint file requirements (by default only written for the last batch), resonance scattering methods, and temperature settings (nearest or interpolation).
-    ! read_geometry_xml(): This method parses the geometry settings. Memory is allocated for the cells, for which a material or a fill must be specified. This also applies any rotations and translations for filler universes. Cell temperatures are read. If the temperature is not specified, it is set to the temperature read from the material data. The temperature is converted to sqrt(kT) instead of Kelvin. The cells are stored in a dictionary. Then, the surfaces array is allocated. Boundary conditions are read and applied to the surfaces data structure. The opposite surface is determined for periodic boundaries. Then, any lattices are read, and an array allocated for the lattices. 
-    ! read_materials/_xml(): Read in the cross sections and the windowed multipole library, and store paths into environment variables. Temperatures are assigned to cells that don't already have temperatures assigned using the assign_temperatures(material_temps) method. 
-    ! read_tallies_xml(): This reads tallies.xml and allocates memory for a mesh and tally filters, and creates instances of certain tally objects. 
-    
-    call read_input_xml()
-
-    ! Initialize random number generator -- this has to be done after the input
-    ! files have been read in case the user specified a seed for the random
-    ! number generator. Do we need to recreate random seeds for each timestep?
-    call initialize_prng()
-
-    ! Read plots.xml if it exists -- this has to be done separate from the other
-    ! XML files because we need the PRNG to be initialized first. 
-    if (run_mode == MODE_PLOTTING) call read_plots_xml()
-
-    ! Use dictionaries to redefine index pointers. This changes the IDs used for
-    ! surfaces and materials. This also assigns boundary conditions to surfaces.
-    call adjust_indices()
-
-    ! Initialize distribcell_filters. This is needed if any tallies have distribcell 
-    ! filters, or if there are any distributed materials or temperatures. A material 
-    ! is "distributed" if each instance of the cell gets its own material (such as 
-    ! the fuel in fuel pin universes that fill a lattice universe). 
-    call prepare_distribcell()
-
-    ! After reading input and basic geometry setup is complete, build lists of
-    ! neighboring cells for efficient tracking. Then, when a particle crosses a
-    ! surface, you have to search a smaller number of neighboring cells to 
-    ! determine where the particle will go. 
-    call neighbor_lists()
-
-    ! Check to make sure there are not too many nested coordinate levels in the
-    ! geometry since the coordinate list is statically allocated for performance. 
-    if (maximum_levels(universes(root_universe)) > MAX_COORD) then
-      call fatal_error("Too many nested coordinate levels in the geometry. &
-           &Try increasing the maximum number of coordinate levels by &
-           &providing the CMake -Dmaxcoord= option.")
-    end if
-
-    if (run_mode /= MODE_PLOTTING) then
-      ! Construct information needed for nuclear data
-      if (run_CE) then
-        ! Construct log energy grid for cross-sections
-        call logarithmic_grid()
-      end if
-
-      ! Allocate and setup tally stride, filter_matches, and tally maps. This 
-      ! allocates global tallies and sets up tally arrays. 
-      call configure_tallies()
-
-      ! Set up tally procedure pointers. 
-      call init_tally_routines()
-
-      ! Determine how much work each processor should do (allocate the particles amongst the processors). 
-      call calculate_work()
-
-      ! Allocate source bank, and for eigenvalue simulations also allocate the fission bank. If using OpenMP, each thread needs its own private fission bank. At the end of each generation, all of the information from the OpenMP threads is re-combined into the master_fission_bank. 
-      call allocate_banks()
-
-      ! If this is a restart run, load the state point data and binary source file. 
-      ! This overwrites some parameters, while keeping the restart values of others. 
-      if (restart_run) call load_state_point()
-    end if
-
-    if (master) then
-      if (run_mode == MODE_PLOTTING) then
-        ! Display plotting information
-        if (verbosity >= 5) call print_plot()
-      else
-        ! Write summary information
-        if (output_summary) call write_summary()
-      end if
-    end if
-
-    ! Check for particle restart run
-    if (particle_restart_run) run_mode = MODE_PARTICLE
-
-    ! Warn if overlap checking is on
-    if (master .and. check_overlaps .and. run_mode /= MODE_PLOTTING) then
-      call warning("Cell overlap checking is ON.")
-    end if
-
-    ! Stop initialization timer
-    call time_initialize%stop()
-
-  end subroutine openmc_init
-\end{lstlisting}
-
-
-
-
-
-
-
-
-\subsection{Preparing for the Next Coefficient Transfer from MOOSE}
-Within {\tt openmc\_reset}, the {\tt expansion\_coeffs} array is cleared before each new Picard step (why is this not done with the other vector-type variables?). Note that the {\tt clear} method for the {\tt VectorReal} type only sets the size to zero - the actual numerical values are still held in memory. 
-
-\subsection{Freeing Memory at End of Simulation}
-Finally, it is cleared at the end of the simulation within {\tt free\_memory}, which is called from the {\tt openmc\_finalize} subroutine.
-
-
-
-
-
-
-
+\subsubsubsection{{\tt step()}}
+This method is called once per Picard step, and calls the {\tt nek\_step} method, which is defined in the {\tt usr} file.
 
 \section{The Mechanics of Coupling}
 This section discusses how each of the external codes are built to permit their use from within the MOOSE framework, as well as the input files required for each external code, and how those input files should be located relative to the executable of the main Moose App.
