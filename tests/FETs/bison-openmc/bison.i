@@ -100,7 +100,7 @@
     type = ZLDeconstruction
     variable = bison_temp
     l_order = 0
-    n_order_to_openmc = 1
+    n_order = 1
     legendre_function = legendre
     zernike_function = zernike
     l_direction = 2

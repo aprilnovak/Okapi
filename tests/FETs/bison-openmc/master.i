@@ -14,6 +14,7 @@
 [Problem]
   solve = true
   kernel_coverage_check = false
+  dbg = true
 []
 
 [Mesh]
@@ -97,7 +98,7 @@
 # This transfer specifies the cell index in the OpenMC cells array so that
 # we know which cell to pass the information to/receive the information from.
   [./to_openmc]
-    type = PolynomialOpenMC
+    type = MultiAppOkapiMooseTransfer
     multi_app = openmc
     direction = to_multiapp
     openmc_cell = 1
@@ -107,7 +108,7 @@
     dbg = true
   [../]
   [./from_openmc]
-    type = PolynomialOpenMC
+    type = MultiAppOkapiMooseTransfer
     multi_app = openmc
     direction = from_multiapp
     openmc_cell = 1
