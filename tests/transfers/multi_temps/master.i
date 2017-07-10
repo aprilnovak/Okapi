@@ -94,7 +94,7 @@
 
 [Transfers]
   [./to_openmc]
-    type = PolynomialOpenMC
+    type = MultiAppOkapiMooseTransfer
     multi_app = openmc
     direction = to_multiapp
     source_variable = 'l_0_coeffs l_1_coeffs'

@@ -88,7 +88,7 @@
 # l_0_coeffs is used.
 [Transfers]
   [./to_openmc]
-    type = PolynomialOpenMC
+    type = MultiAppOkapiMooseTransfer
     multi_app = openmc
     direction = to_multiapp
     source_variable = 'l_0_coeffs'
