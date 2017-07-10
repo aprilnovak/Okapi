@@ -39,7 +39,7 @@ ZLDeconstruction::ZLDeconstruction(const InputParameters & parameters)
     _qp(0),
     _u(coupledValue("variable")),
     _l_order(getParam<int>("l_order")),
-    _n_order(getParam<int>("n_order_to_openmc")),
+    _n_order(getParam<int>("n_order")),
     _legendre_function(dynamic_cast<LegendrePolynomial&>\
       (_mci_feproblem.getFunction(parameters.get<std::string>("legendre_function")))),
     _zernike_function(dynamic_cast<ZernikePolynomial&>\
