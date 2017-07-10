@@ -49,12 +49,12 @@ namespace OpenMC {
     void fet_deconstruction();
 
     // obtain coefficients given cell ID. This is used for transferring data
-    // from OpenMC to MOOSE.
-    void get_coeffs_from_cell(int *, double [], int *);
+    // from OpenMC to MOOSE. This returns an error code.
+    int get_coeffs_from_cell(int, double [], int);
 
     // set coefficients in OpenMC given a cell ID. This is used for
-   // transferring data from MOOSE to OpenMC.
-   void receive_coeffs_for_cell(int *, double [], int *);
+   // transferring data from MOOSE to OpenMC. This returns an error code.
+   int receive_coeffs_for_cell(int, double [], int);
   }
 }
 
