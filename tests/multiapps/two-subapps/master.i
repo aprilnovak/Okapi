@@ -77,7 +77,7 @@
 
 [Transfers]
   [./to_bison]
-    type = PolynomialOpenMC
+    type = MultiAppOkapiMooseTransfer
     multi_app = bison
     direction = to_multiapp
     source_variable = 'l_0_coeffs_power'
@@ -85,7 +85,7 @@
     execute_on = timestep_end
   [../]
   [./to_openmc]
-    type = PolynomialOpenMC
+    type = MultiAppOkapiMooseTransfer
     multi_app = openmc
     direction = to_multiapp
     source_variable = 'l_0_coeffs_temp'
@@ -98,7 +98,7 @@
   [../]
 
   [./from_bison]
-    type = PolynomialOpenMC
+    type = MultiAppOkapiMooseTransfer
     multi_app = bison
     direction = from_multiapp
     source_variable = 'l_0_coeffs_temp_bison'
@@ -106,7 +106,7 @@
     execute_on = timestep_end
   [../]
   [./from_openmc]
-    type = PolynomialOpenMC
+    type = MultiAppOkapiMooseTransfer
     multi_app = openmc
     direction = from_multiapp
     source_variable = 'dummy_openmc'
