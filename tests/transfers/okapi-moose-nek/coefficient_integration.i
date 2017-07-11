@@ -1,6 +1,5 @@
 [Problem]
-  kernel_coverage_check = false
-  solve = false
+#  kernel_coverage_check = false
 []
 
 [Mesh]
@@ -22,6 +21,10 @@
     family = SCALAR
     order = TENTH
   [../]
+  [./f_0_temp_BC]
+    family = SCALAR
+    order = TENTH
+  [../]
 []
 
 [ICs]
@@ -33,7 +36,7 @@
 []
 
 [Kernels]
-active = ''
+#active = ''
   [./Diffusion]
     type = Diffusion
     variable = temp
@@ -77,17 +80,25 @@ active = ''
   [../]
 []
 
-[Executioner]
-  type = Transient
-  scheme     = 'Explicit-Euler' # Others available: backward Euler, Crank-Nicholson, etc.
-  dt         = 0.001      # Initial timestep size
-  start_time = 0        # Starting time
-  num_steps  = 5000     # Number of Steps
-  nl_rel_tol = 1e-6     # Nonlinear relative tolerance
-  l_tol      = 1e-6     # Linear tolerance
+#[Executioner]
+#  type = Transient
+#  scheme     = 'Explicit-Euler' # Others available: backward Euler, Crank-Nicholson, etc.
+#  dt         = 0.001      # Initial timestep size
+#  start_time = 0        # Starting time
+#  num_steps  = 5000     # Number of Steps
+#  nl_rel_tol = 1e-6     # Nonlinear relative tolerance
+#  l_tol      = 1e-6     # Linear tolerance
+#
+#  petsc_options_iname = '-pc_type -pc_hypre_type'
+#  petsc_options_value = 'hypre boomeramg'
+#[]
 
-  petsc_options_iname = '-pc_type -pc_hypre_type'
-  petsc_options_value = 'hypre boomeramg'
+[Executioner]
+  type = OpenMCExecutioner
+  num_steps = 5
+  [./TimeStepper]
+    type = OpenMCTimeStepper
+  [../]
 []
 
 [Outputs]
@@ -100,7 +111,6 @@ active = ''
   [./nek]
     type = TransientMultiApp
     app_type = MoonApp
-    sub_cycling = true
     positions = '0 0 0'
     input_files = picard_sub_subcycling.i
     library_path = /homes/anovak/projects/moon/lib
@@ -108,7 +118,7 @@ active = ''
 []
 
 [Transfers]
-active = 'to_nek'
+active = 'to_nek from_nek'
   [./to_nek]
     type = MultiAppMoonOkapiTransfer
     direction = to_multiapp
@@ -116,12 +126,11 @@ active = 'to_nek'
     source_variable = 'f_0_flux_BC'
     to_aux_scalar = 'foo'
   [../]
-
   [./from_nek]
     type = MultiAppMoonOkapiTransfer
     direction = from_multiapp
     multi_app = nek
     source_variable = 'foo'
-    to_aux_scalar = 'temp_bc_scalar_f_0_l temp_bc_scalar_f_1_l temp_bc_scalar_f_2_l temp_bc_scalar_f_3_l temp_bc_scalar_f_4_l'
+    to_aux_scalar = 'f_0_temp_BC'
   [../]
 []
