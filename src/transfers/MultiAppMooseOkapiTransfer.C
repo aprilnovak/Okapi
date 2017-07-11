@@ -1,5 +1,6 @@
 #include "MultiAppMooseOkapiTransfer.h"
 #include "ExtraFunctions.h"
+#include "OpenMCErrorHandling.h"
 #include "OpenMCInterface.h"
 #include "math.h"
 
@@ -110,18 +111,9 @@ MultiAppMooseOkapiTransfer::execute()
 
           // send all expansion coefficients for a cell to OpenMC at one time and
           // perform error handling
-          int err;
-          err = OpenMC::receive_coeffs_for_cell(_cell,
+          int err  = OpenMC::receive_coeffs_for_cell(_cell,
             moose_coeffs, num_coeffs_from_moose);
-          if (err == -1)
-            mooseError("Invalid cell ID specified for storing expansion coefficients"
-              " for kappa-fission-zn tally!");
-          if (err == -2)
-            mooseError("Number of expansion coefficients passed for cell"
-              " does not equal its allocated size!");
-          if (err == -3)
-            mooseError("Cannot set expansion coefficients for cell because"
-              " no kappa-fission-zn tallies are defined in OpenMC!");
+          ErrorHandling::receive_coeffs_for_cell(err);
 
       // Change a temperature in OpenMC. For now, only use a single coefficient,
       //   since there's no continuous material tracking yet. Note that changing
@@ -188,16 +180,7 @@ MultiAppMooseOkapiTransfer::execute()
          // error handling.
          int err = OpenMC::get_coeffs_from_cell(_cell,
            omc_coeffs, num_coeffs_from_openmc);
-         if (err == -1)
-           mooseError("Invalid cell ID specified for retrieving expansion"
-             " coefficients for kappa-fission-zn tally!");
-         if (err == -2)
-           mooseError("Length of array to receive coefficients does not match"
-             " number of coefficients! Check that the array to hold coefficients"
-             " has been allocated with the proper size.");
-         if (err == -3)
-           mooseError("Cannot get expansion coefficients from cell because no"
-             " kappa-fission-zn tallies are defined in OpenMC!");
+         ErrorHandling::get_coeffs_from_cell(err);
 
          if (_dbg)
          {
@@ -227,5 +210,5 @@ MultiAppMooseOkapiTransfer::execute()
     }
   }
 
-  _console << "Finished MultiAppMooseOkapiTransfer transfer" << name() << std::endl;
+  _console << "Finished MultiAppMooseOkapiTransfer transfer " << name() << std::endl;
 }

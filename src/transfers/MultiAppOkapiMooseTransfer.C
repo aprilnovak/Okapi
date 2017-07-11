@@ -1,5 +1,6 @@
 #include "MultiAppOkapiMooseTransfer.h"
 #include "ExtraFunctions.h"
+#include "OpenMCErrorHandling.h"
 #include "OpenMCInterface.h"
 #include "math.h"
 
@@ -150,28 +151,20 @@ MultiAppOkapiMooseTransfer::execute()
         }
 
         // send all expansion coefficients for a cell to OpenMC at one time
-        int err;
-        err = OpenMC::receive_coeffs_for_cell(_cell, moose_coeffs, num_coeffs_from_moose);
-        if (err == -1)
-          mooseError("Invalid cell ID specified for storing expansion coefficients"
-            " for kappa-fission-zn tally!");
-        if (err == -2)
-          mooseError("Number of expansion coefficients passed for cell"
-            " does not equal its allocated size!");
-        if (err == -3)
-          mooseError("Cannot set expansion coefficients for cell because"
-            " no kappa-fission-zn tallies are defined in OpenMC!");
-      }
+        int err = OpenMC::receive_coeffs_for_cell(_cell, moose_coeffs,
+          num_coeffs_from_moose);
+        ErrorHandling::receive_coeffs_for_cell(err);
 
-      /* Change a temperature in OpenMC. For now, only use a single coefficient,
-         since there's no continuous material tracking yet. Note that changing
-         a temperature in OpenMC requires that you've loaded cross section data
-         at that temperature, so use the temperature_range parameter in the
-         settings XML file. Because this isn't expanded in OpenMC, here we have
-         to apply the scaling factors for a zero-th order Legendre and zero-th
-         order Zernike expansion. */
-      OpenMC::openmc_cell_set_temperature(_cell, \
-        (source_variables[0]->sln())[0] / sqrt(2.0 * M_PI));
+        /* Change a temperature in OpenMC. For now, only use a single coefficient,
+           since there's no continuous material tracking yet. Note that changing
+           a temperature in OpenMC requires that you've loaded cross section data
+           at that temperature, so use the temperature_range parameter in the
+           settings XML file. Because this isn't expanded in OpenMC, here we have
+           to apply the scaling factors for a zero-th order Legendre and zero-th
+           order Zernike expansion. */
+        OpenMC::openmc_cell_set_temperature(_cell, \
+          (source_variables[0]->sln())[0] / sqrt(2.0 * M_PI));
+      }
       break;
     }
 
@@ -222,30 +215,21 @@ MultiAppOkapiMooseTransfer::execute()
       double omc_coeffs[num_coeffs_from_openmc];
 
       // store coefficients from OpenMC into the omc_coeffs array
-      int err;
-      err = OpenMC::get_coeffs_from_cell(_cell, omc_coeffs, num_coeffs_from_openmc);
-      if (err == -1)
-        mooseError("Invalid cell ID specified for retrieving expansion"
-          " coefficients for kappa-fission-zn tally!");
-      if (err == -2)
-        mooseError("Length of array to receive coefficients does not match"
-          " number of coefficients! Check that the array to hold coefficients"
-          " has been allocated with the proper size.");
-      if (err == -3)
-        mooseError("Cannot get expansion coefficients from cell because no"
-          " kappa-fission-zn tallies are defined in OpenMC!");
+      int err = OpenMC::get_coeffs_from_cell(_cell, omc_coeffs,
+        num_coeffs_from_openmc);
+      ErrorHandling::get_coeffs_from_cell(err);
 
-     if (_dbg)
-     {
-        _console << "Transferring " << num_coeffs_from_openmc << " coefficients"
-          " from OpenMC to MOOSE..." << std::endl;
-        _console << "For cell " << _cell << ":" << std::endl;
+      if (_dbg)
+      {
+         _console << "Transferring " << num_coeffs_from_openmc << " coefficients"
+           " from OpenMC to MOOSE..." << std::endl;
+         _console << "For cell " << _cell << ":" << std::endl;
 
-        for (int i = 0; i < num_coeffs_from_openmc; ++i)
-          _console << omc_coeffs[i] << " ";
+         for (int i = 0; i < num_coeffs_from_openmc; ++i)
+           _console << omc_coeffs[i] << " ";
 
-        _console << std::endl;
-     }
+         _console << std::endl;
+      }
 
       // Loop over the variables that we are going to write
       for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
@@ -256,12 +240,12 @@ MultiAppOkapiMooseTransfer::execute()
         {
           to_variables[i]->sys().solution().set(dof[j],
             omc_coeffs[i * num_zernike_coeffs_per_var + j]);
-          to_variables[i]->sys().solution().close();
         }
+        to_variables[i]->sys().solution().close();
       }
 
       break;
-    }
+    } // end FROM_MULTIAPP
   }
 
   _console << "Finished MultiAppOkapiMooseTransfer transfer" << name() << std::endl;
