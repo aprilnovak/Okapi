@@ -17,9 +17,6 @@
 #include "OpenMCExecutioner.h"
 #include "OpenMCTimeStepper.h"
 
-// functions for passing data
-#include "ZernikeLegendreReconstruction.h"
-
 // transfers
 #include "MultiAppOkapiMooseTransfer.h"
 #include "MultiAppMooseOkapiTransfer.h"
@@ -76,7 +73,6 @@ OkapiMCSApp::registerObjects(Factory & factory)
   registerKernel(MomFrictionForce);
   registerExecutioner(OpenMCExecutioner);
   registerTimeStepper(OpenMCTimeStepper);
-  registerFunction(ZernikeLegendreReconstruction);
   registerTransfer(MultiAppOkapiMooseTransfer);
   registerTransfer(MultiAppMooseOkapiTransfer);
   registerTransfer(MultiAppMoonOkapiTransfer);
