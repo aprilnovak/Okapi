@@ -115,6 +115,13 @@
     input_files = picard_sub_subcycling.i
     library_path = /homes/anovak/projects/moon/lib
   [../]
+  [./bison]
+    type = TransientMultiApp
+    app_type = BuffaloApp
+    positions = '0 0 0'
+    input_files = bison.i
+    library_path = /homes/anovak/projects/buffalo/lib
+  [../]
 []
 
 [Transfers]
