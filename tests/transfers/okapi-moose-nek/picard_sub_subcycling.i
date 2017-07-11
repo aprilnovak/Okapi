@@ -20,10 +20,8 @@
 
 [Executioner]
   type = NekExecutioner
-  num_steps = 20
   [./TimeStepper]
     type = NekTimeStepper
-    dt = 0.001
   [../]
 []
 
