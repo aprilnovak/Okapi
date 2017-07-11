@@ -47,7 +47,7 @@
 []
 
 [Variables]
-  [./bison_temp]
+  [./temp]
   [../]
 []
 
@@ -66,7 +66,7 @@
   [../]
   [./kappa_fission] # holds eV/particle field from OpenMC
   [../]
-  [./bison_heat] # holds the heat source used in kernel
+  [./fission_heat] # holds the fission heat source
   [../]
 []
 
@@ -76,37 +76,36 @@
     variable = kappa_fission
     function = kappa_fission_reconstruction
   [../]
-  #[./bison_power]
-  #  type = KappaFissionToHeatSource
-  #  variable = bison_heat
-  #  kappa_fission_source = bison_kappa_fission
-  #  power = 20
-  #  kappa_fission_pp = 'kappa_fission'
-  #  volume_pp = 'volume'
-  #[../]
+  [./fission_heat]
+    type = KappaFissionToHeatSource
+    variable = fission_heat
+    kappa_fission_source = kappa_fission
+    power = 20
+    kappa_fission_pp = 'kappa_fission_integral'
+    volume_pp = 'volume'
+  [../]
 []
 
 [Kernels]
-active = 'diffusion time'
   [./diffusion]
     type = Diffusion
-    variable = bison_temp
+    variable = temp
   [../]
   [./time]
     type = TimeDerivative
-    variable = bison_temp
+    variable = temp
   [../]
   [./source]
     type = CoupledForce
-    variable = bison_temp
-    v = bison_heat
+    variable = temp
+    v = fission_heat
   [../]
 []
 
 [BCs]
   [./temp]
     type = FunctionDirichletBC
-    variable = bison_temp
+    variable = temp
     function = temp_BC_reconstruction
     boundary = 'wall'
   [../]
@@ -117,17 +116,16 @@ active = 'diffusion time'
 []
 
 [Postprocessors]
-active = 'volume'
   [./volume]
     type = VolumePostprocessor
     block_id = '1'
     execute_on = timestep_begin
   [../]
-  [./kappa_fission]
+  [./kappa_fission_integral]
     type = ElementIntegralVariablePostprocessor
     block_id = '1'
     execute_on = timestep_begin
-    variable = bison_kappa_fission
+    variable = kappa_fission
   [../]
 []
 
