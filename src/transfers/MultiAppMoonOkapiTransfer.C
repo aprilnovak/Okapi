@@ -23,13 +23,15 @@ InputParameters validParams<MultiAppMoonOkapiTransfer>()
   params.addRequiredParam<std::vector<VariableName> >("to_aux_scalar",
     "The name of the scalar Aux variable in the MultiApp to transfer"
     " the value to.");
+  params.addParam<bool>("dbg", false, "Whether to turn on debugging information.");
   return params;
 }
 
 MultiAppMoonOkapiTransfer::MultiAppMoonOkapiTransfer(const InputParameters & parameters) :
     MultiAppTransfer(parameters),
     _source_var_names(getParam<std::vector<VariableName>>("source_variable")),
-    _to_aux_names(getParam<std::vector<VariableName>>("to_aux_scalar"))
+    _to_aux_names(getParam<std::vector<VariableName>>("to_aux_scalar")),
+    _dbg(parameters.get<bool>("dbg"))
 {
 }
 
@@ -72,16 +74,20 @@ MultiAppMoonOkapiTransfer::execute()
       for (unsigned int i = 0; i < num_apps; i++)
         if (_multi_app->hasLocalApp(i))
         {
+          if(_dbg)
+            _console << "Writing flux BC coefficients from Nek to Okapi..." << std::endl;
+
           for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
           {
-            _console << _source_var_names[i] << '\n';
             auto & soln_values = source_variables[i]->sln();
             for (auto j = beginIndex(soln_values); j < source_var_size; ++j)
             {
-              _console << soln_values[j] << ' ';
+              if (_dbg)
+                _console << soln_values[j] << ' ';
               Nek5000::expansion_fcoef_.coeff_fij[i*100+j] = soln_values[j];
             }
-            _console << '\n';
+            if (_dbg)
+              _console << '\n';
           }
         }
       FORTRAN_CALL(Nek5000::flux_reconstruction)();
@@ -111,14 +117,22 @@ MultiAppMoonOkapiTransfer::execute()
             " are not all the same!");
       }
 
+      if(_dbg)
+        _console << "Writing temp BC coefficients from MOON to Okapi..." << std::endl;
       for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
       {
         std::vector<dof_id_type> & dof = to_variables[i]->dofIndices();
         auto & soln_values = to_variables[i]->sln();
         for (auto j = beginIndex(soln_values); j < write_var_size; ++j)
+        {
           to_variables[i]->sys().solution().set(dof[j],
             Nek5000::expansion_tcoef_.coeff_tij[i*100+j]);
 
+          if (_dbg)
+            _console << soln_values[j] << ' ';
+        }
+        if (_dbg)
+          _console << '\n';
         to_variables[i]->sys().solution().close();
       }
 

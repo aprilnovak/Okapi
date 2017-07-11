@@ -27,6 +27,7 @@ public:
 protected:
   std::vector<VariableName> _source_var_names;
   std::vector<VariableName> _to_aux_names;
+  bool _dbg;
 };
 
 #endif /* MULTIAPPMOONOKAPITRANSFER_H */
