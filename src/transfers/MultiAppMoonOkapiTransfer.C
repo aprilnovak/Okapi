@@ -126,7 +126,7 @@ MultiAppMoonOkapiTransfer::execute()
         if (_dbg) _console << "Write variable " << i << ": ";
         for (auto j = beginIndex(soln_values); j < write_var_size; ++j)
         {
-          if (_dbg) _console << dof[j] << ' ';
+          if (_dbg) _console << Nek5000::expansion_tcoef_.coeff_tij[i*100+j] << ' ';
           to_variables[i]->sys().solution().set(dof[j],
             Nek5000::expansion_tcoef_.coeff_tij[i*100+j]);
         }
