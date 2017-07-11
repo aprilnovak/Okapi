@@ -12,11 +12,11 @@
 #include "libmesh/meshfree_interpolation.h"
 #include "libmesh/system.h"
 
-
-// Define the input parameters
 template<>
 InputParameters validParams<MultiAppMoonOkapiTransfer>()
 {
+  /* This transfer is used to transfer information between Okapi and
+     MOON when MOON is the sub App to an Okapi Master App. */
   InputParameters params = validParams<MultiAppTransfer>();
   params.addRequiredParam<std::vector<VariableName> >("source_variable",
     "The auxiliary scalar variable to read values from");
@@ -44,19 +44,29 @@ MultiAppMoonOkapiTransfer::execute()
 
   switch (_direction)
   {
-    // MasterApp -> SubApp
+    // Okapi -> MOON. This direction transfers coefficients for a heat flux
+    // boundary condition.
     case TO_MULTIAPP:
     {
       FEProblemBase & from_problem = _multi_app->problemBase();
-
-      std::vector<MooseVariableScalar *>
-        source_variables(_source_var_names.size());
+      std::vector<MooseVariableScalar *> source_variables(num_vars_to_read);
 
       for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
       {
         source_variables[i] = &from_problem.getScalarVariable(_tid,
           _source_var_names[i]);
         source_variables[i]->reinit();
+      }
+
+      // Check that the order of each of the source variables is the same by
+      // comparing with the size of the first variable.
+      int source_var_size =
+        source_variables[beginIndex(_source_var_names)]->sln().size();
+      for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
+      {
+        if (source_variables[i]->sln().size() != source_var_size)
+          mooseError("The order of the source variables for the "
+            "MultiAppMoonOkapiTransfer are not all the same!");
       }
 
       // Loop through each of the sub apps
@@ -66,7 +76,6 @@ MultiAppMoonOkapiTransfer::execute()
           for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
           {
             _console << _source_var_names[i] << '\n';
-
             auto & soln_values = source_variables[i]->sln();
             for (auto j = beginIndex(soln_values); j < soln_values.size(); ++j)
             {
@@ -77,7 +86,6 @@ MultiAppMoonOkapiTransfer::execute()
           }
         }
       FORTRAN_CALL(Nek5000::flux_reconstruction)();
-
       break;
     }
 
