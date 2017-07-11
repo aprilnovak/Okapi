@@ -68,38 +68,6 @@ active = ''
   [../]
 []
 
-[Materials]
-active = ''
-  [./k]
-    type = GenericConstantMaterial
-    prop_names = 'thermal_conductivity'
-    prop_values = '1.0'
-    block = 'interior'
-  [../]
-[]
-
-[Postprocessors]
-active = ''
-  [./surf_area]
-    type = AreaPostprocessor
-    boundary = wall
-    execute_on = timestep_begin
-  [../]
-[]
-
-#[Executioner]
-#  type = Transient
-#  scheme     = 'Explicit-Euler' # Others available: backward Euler, Crank-Nicholson, etc.
-#  dt         = 0.001      # Initial timestep size
-#  start_time = 0        # Starting time
-#  num_steps  = 5000     # Number of Steps
-#  nl_rel_tol = 1e-6     # Nonlinear relative tolerance
-#  l_tol      = 1e-6     # Linear tolerance
-#
-#  petsc_options_iname = '-pc_type -pc_hypre_type'
-#  petsc_options_value = 'hypre boomeramg'
-#[]
-
 [Executioner]
   type = OpenMCExecutioner
   num_steps = 5
