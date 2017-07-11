@@ -18,7 +18,6 @@
 #include "OpenMCTimeStepper.h"
 
 // functions for passing data
-#include "LegendrePolynomial.h"
 #include "ZernikePolynomial.h"
 #include "ZernikeLegendreReconstruction.h"
 
@@ -78,7 +77,6 @@ OkapiMCSApp::registerObjects(Factory & factory)
   registerKernel(MomFrictionForce);
   registerExecutioner(OpenMCExecutioner);
   registerTimeStepper(OpenMCTimeStepper);
-  registerFunction(LegendrePolynomial);
   registerFunction(ZernikePolynomial);
   registerFunction(ZernikeLegendreReconstruction);
   registerTransfer(MultiAppOkapiMooseTransfer);
