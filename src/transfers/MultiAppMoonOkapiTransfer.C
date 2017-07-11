@@ -38,7 +38,7 @@ MultiAppMoonOkapiTransfer::MultiAppMoonOkapiTransfer(const InputParameters & par
 void
 MultiAppMoonOkapiTransfer::execute()
 {
-  _console << "Beginning PolynomialToNekTransfer " << name() << std::endl;
+  _console << "Beginning MultiAppMoonOkapiTransfer " << name() << std::endl;
 
   int num_apps = _multi_app->numGlobalApps();
   int num_vars_to_read = _source_var_names.size();
@@ -50,9 +50,9 @@ MultiAppMoonOkapiTransfer::execute()
     // boundary condition.
     case TO_MULTIAPP:
     {
+      // Get the source variables from the Okapi master App
       FEProblemBase & from_problem = _multi_app->problemBase();
       std::vector<MooseVariableScalar *> source_variables(num_vars_to_read);
-
       for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
       {
         source_variables[i] = &from_problem.getScalarVariable(_tid,
@@ -75,19 +75,19 @@ MultiAppMoonOkapiTransfer::execute()
         if (_multi_app->hasLocalApp(i))
         {
           if(_dbg)
-            _console << "Writing flux BC coefficients from Nek to Okapi..." << std::endl;
+            _console << "Writing flux BC coeffs from Okapi to MOON..." << std::endl;
 
           for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
           {
             auto & soln_values = source_variables[i]->sln();
+            if (_dbg) _console << "Source var " << i << ": ";
             for (auto j = beginIndex(soln_values); j < source_var_size; ++j)
             {
-              if (_dbg)
-                _console << soln_values[j] << ' ';
+              if (_dbg) _console << soln_values[j] << ' ';
+              // store the coefficients in Nek5000 arrays
               Nek5000::expansion_fcoef_.coeff_fij[i*100+j] = soln_values[j];
             }
-            if (_dbg)
-              _console << '\n';
+            if (_dbg) _console << '\n';
           }
         }
       FORTRAN_CALL(Nek5000::flux_reconstruction)();
@@ -118,21 +118,19 @@ MultiAppMoonOkapiTransfer::execute()
       }
 
       if(_dbg)
-        _console << "Writing temp BC coefficients from MOON to Okapi..." << std::endl;
+        _console << "Writing temp BC coeffs from MOON to Okapi..." << std::endl;
       for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
       {
         std::vector<dof_id_type> & dof = to_variables[i]->dofIndices();
         auto & soln_values = to_variables[i]->sln();
+        if (_dbg) _console << "Write variable " << i << ": ";
         for (auto j = beginIndex(soln_values); j < write_var_size; ++j)
         {
+          if (_dbg) _console << dof[j] << ' ';
           to_variables[i]->sys().solution().set(dof[j],
             Nek5000::expansion_tcoef_.coeff_tij[i*100+j]);
-
-          if (_dbg)
-            _console << soln_values[j] << ' ';
         }
-        if (_dbg)
-          _console << '\n';
+        if (_dbg) _console << '\n';
         to_variables[i]->sys().solution().close();
       }
 
@@ -140,5 +138,5 @@ MultiAppMoonOkapiTransfer::execute()
     }
   }
 
-  _console << "Finished PolynomialToNekTransfer" << name() << std::endl;
+  _console << "Finished MultiAppMoonOkapiTransfer" << name() << std::endl;
 }
