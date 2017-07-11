@@ -249,70 +249,65 @@ In a coupled solve, the following steps occur. We arbitrarily choose BISON to ex
 \end{enumerate}
 
 \subsection{OpenMC, Nek, and BISON Coupling}
-When coupling more than two applications using the MOOSE framework, there are several options for the coupling structure. In order to motivate the structure selected, an understanding of the limitations of the MOOSE coupling framework must be understood. The general coupling framework for a MOOSE simulation consists of a Master App and MultiApps. For each time step, unless sub-cycling is turned on (in which case one of the Apps may run at finer time steps than the others), all of the Apps will execute. The order in which the execution of the Apps occurs is controlled with the {\tt execute\_on} parameter, which can take several values, most commonly {\tt timestep\_begin} and {\tt timestep\_end}. The MultiApps that execute on the start of a time step and on the end of a time step bound the execution of the Master App. If there are more than two MultiApps to a Master App, then in order to ensure full exchange of information at each time step, a custom routine for transferring data {\it in time} (not a custom {\tt Transfer} class, to be discussed later) is required. This would require developing a custom {\tt MultiApp} class, which is where the execution in time is controlled.
+When coupling more than two applications using the MOOSE framework, there are several options for the coupling structure. In order to motivate the structure selected, an understanding of the limitations of the MOOSE coupling framework must be understood. The general coupling framework for a MOOSE simulation consists of a Master App and MultiApps. For each time step, unless sub-cycling is turned on (in which case one of the Apps may run at finer time steps than the others), all of the Apps, including the Master App, will execute. The order in which the execution of the Apps occurs is controlled with the {\tt execute\_on} parameter, which can take several values, most commonly {\tt timestep\_begin} and {\tt timestep\_end}. The MultiApps that execute on the start of a time step and on the end of a time step bound the execution of the Master App. If there are more than two MultiApps to a Master App, then in order to ensure full exchange of information at each time step, a custom routine for transferring data {\it in time} (not a custom {\tt Transfer} class, to be discussed later) is required. This would require developing a custom {\tt MultiApp} class, which is where the execution in time is controlled (note that there are other options for the {\tt execute\_on} parameter, but they are related to the finite element solve, such as {\tt linear\_residual} - with an external code that is not running any MOOSE kernels, these options don't make sense).
 
-To keep the coupling as simple as possible and to avoid the need to develop custom Multi Apps (which is more intensive than developing custom transfers, executioners, and time steppers), the coupling is chosen to be limited to two MultiApps per Master App. When selecting the Master App, the Master App can either perform a solve (and hence be one of Okapi, BISON, or MOON) or simply exist to transfer data between the Multi Apps (and hence be one of Okapi, BISON, MOON, PRONGHORN, RATTLESNAKE, etc. - the animal itself doesn't matter because it's only using capabilities in the MOOSE framework, not any physics-specific capabilities). If we restrict ourselves to only using two peer MultiApps per Master App, then the Master App must perform a physical solve. For a Master App that performs a physical solve, there are three options:
+To keep the coupling as simple as possible and to avoid the need to develop custom Multi Apps (which is more intensive than developing custom transfers, executioners, and time steppers), the coupling is chosen to be limited to two distinct MultiApps per Master App. Note that this does {\it not} limit a total of two MultiApps per Master App - if the MultiApps are BISON and MOON, there may be many parallel instances of BISON, so long as there are only two distinct MultiApps (BISON and MOON). When selecting the Master App, the Master App can either perform a solve (and hence be one of Okapi, BISON, or MOON) or simply exist to transfer data between the Multi Apps (and hence be one of Okapi, BISON, MOON, PRONGHORN, RATTLESNAKE, etc. - the animal itself doesn't matter because it's only using capabilities in the MOOSE framework, not any physics-specific capabilities). The complication with using a master App for this three-way coupling that does not perform any physics solve is that it becomes much more difficult to control the execution of three peer Apps. There are only two available execution instructions - {\tt timestep\_begin} and {\tt timestep\_end}, which does not offer enough flexibility in specification to define how {\it three} peer Apps should run.
 
-\begin{enumerate}
-\item BISON is the Master App.
-\item MOON is the Master App. 
-\item Okapi is the Master App.
-\end{enumerate}
+If we restrict ourselves to only using two peer MultiApps per Master App, then the Master App must perform a physical solve. For a Master App that performs a physical solve, either BISON, MOON, or Okapi can be the Master App. Because multiple fuel pins can be simulated entirely in parallel (since a boundary coupling is employed with Nek), it would be inadvisable to have BISON be the Master App. This would restrict the coupling to a single fuel pin because there can only be a single Master App. A non-trivial amount of MPI code {\it could} allow this configuration to work correctly, but it would be much easier for either Okapi or MOON to be the Master App. 
 
-Because multiple fuel pins can be simulated entirely in parallel (since a boundary coupling is employed with Nek), it would be inadvisable to have BISON be the Master App. This would restrict the coupling to a single fuel pin because there can only be a single Master App. A non-trivial amount of work with MPI could allow this configuration to work correctly, but it would be much easier for either Okapi or MOON to be the Master App. However, because MOON was initially developed with BISON as the Master App, the first efforts at coupling will attempt to reuse as much as possible from MOON, and use BISON as the Master App. This is discussed in the next section.
+The choice between MOON and Okapi for the Master App is more arbitrary than the choice to not choose BISON as the Master App, but is still based on characteristics of the coupling. Because Okapi is the only App that will solve for the entire domain (MOON solves in the fluid, BISON solves in the fuel), it is logical to choose Okapi as the Master App. So, Okapi is selected as the Master App, which both performs its own solve and transfers data between BISON and MOON. The figure below shows all of the necessary methods to perform a three-way coupled simulation, with numbers indicating the order in which they would occur for a single Picard step. BISON is arbitrarily chosen to run first. 
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=18.5cm]{OpenMC-BISON-Nek-complicated.png}
 \end{figure}
 
-All of the data transfer classes developed for this coupling follow the same naming convention of {\tt MultiApp<SubApp><MasterApp>Transfer}. Because MOOSE-wrapped Apps, rather than generic MOOSE ``animals,'' are being coupled, a distinction must be made on which App is the MultiApp and which is the Master App. For instance, if Okapi is the MasterApp, then {\tt MultiAppMooseOkapiTransfer} coordinates data transfer between Buffalo and Okapi when Okapi is the Master App. If Buffalo is the Master App, then the data transfer class {\tt MultiAppOkapiMooseTransfer} controls the data transfer. The reason this distinction is necessary, when the actions to be taken during the transfer are essentially the same, is that the MOOSE-wrapped Apps are not sufficiently generic to permit data transfer the same as if it were a Sub App or a Master App.
-
-With Okapi as the Master App, either BISON can be run before MOON, or MOON run before BISON. If BISON executes on {\tt timestep\_begin}, and MOON on {\tt timestep\_end}, the sequence of events following initialization of all Apps is as follows, which is repeated for each Picard step:
+With Okapi as the Master App, either BISON can be run before MOON, or MOON run before BISON. Section \ref{sec:ICs} will discuss how boundary conditions are set based on which of the MultiApps executes first. For either choice of App running at the beginning of a time step versus at the end of a time step, the sequence of events is as follows. For MOON executing first:
 
 \begin{enumerate}
-\item Transfer from Okapi to BISON a kappa-fission distribution and a temperature BC.
-\item Solve BISON.
-\item Transfer from BISON to Okapi a temperature distribution and a heat flux BC.
-\item Solve OpenMC.
-\item Transfer from Okapi to MOON a heat flux BC (not updated by OpenMC from its most recent solve).
+\item Initialize the Master App. The actions performed here are generally the same regardless of which App is the Master App (i.e. this is not the stage at which the OpenMC input XML files would be read), since this purely sets up the entire MOOSE simulation by initializing MPI, allocating storage, etc.
+\item Initialize MOON. This calls the {\tt NekExecutioner::init()} method and reads Nek input files to perform internal actions such as setting initial values.
+\item Initialize BISON. This calls the initialization method of the executioner specified in the BISON input file.
+\item Initialize the Master App. This step is not redundant with step 1, but rather this calls the {\tt init()} method of the {\tt OpenMCExecutioner}, which reads OpenMC input files and performs internal actions such as setting initial values.
+\item Execute all transfers on {\tt timestep\_begin} with direction {\tt to\_multiapp}.
+	\begin{enumerate}
+	\item Transfer flux boundary condition coefficients from Okapi to MOON.
+	\end{enumerate}
 \item Solve Nek.
-\item Transfer from MOON to Okapi a fluid density distribution and a temperature BC.
+\item Execute all transfers on {\tt timestep\_begin} with direction {\tt from\_multiapp}.
+	\begin{enumerate}
+	\item Transfer temperature boundary condition coefficients from MOON to Okapi.
+	\end{enumerate}
+\item Solve Okapi.
+\item Execute all transfers on {\tt timestep\_end} with direction {\tt to\_multiapp}.
+	\begin{enumerate}
+	\item Transfer kappa fission distribution coefficients from Okapi to BISON.
+	\end{enumerate}
+\item Solve BISON.
+\item Execute all transfers on {\tt timestep\_end} with direction {\tt from\_multiapp}.
+	\begin{enumerate}
+	\item Transfer fuel temperature coefficients from BISON to Okapi.
+	\end{enumerate}
 \end{enumerate}
 
-This approach requires setting an initial condition on the:
+And for BISON executing first, the sequence of events are similar, except that steps 5-7 dealing with MOON execution and transfer are swapped with steps 9-11 dealing with BISON execution and transfer.
 
-\begin{itemize} 
-\item kappa-fission distribution; the transfer of the kappa-fission distribution from Okapi to BISON requires developing some method for setting an initial condition on this parameter internally in OpenMC, since it is not a Moose variable that can be set from one of the Moose input files.
-\item temperature BC; because this is a Moose variable, an estimate for this can simply be set in the master Moose input file.
-\item fluid density distribution; because Okapi runs before Nek in this case, an initial condition must be set on this field - this can be done from within the OpenMC XML files.
-\end{itemize}
-
-For these three initial conditions, inconsistencies can easily be introduced - if the temperature BC grossly differs from the fluid density distribution specified, convergence might be slow.
-
-If MOON executes on {\tt timestep\_begin} and BISON on {\tt timestep\_end}, the sequence of events following initialization of all Apps is as follows, which is repeated for each Picard step:
-
-\begin{enumerate}
-\item Transfer from Okapi to MOON a heat flux BC.
-\item Solve Nek.
-\item Transfer from MOON to Okapi a fluid density distribution and a temperature BC.
-\item Solve OpenMC.
-\item Transfer from Okapi to BISON a kappa-fission distribution and a temperature BC (not updated by OpenMC from its most recent solve).
-\item Solve BISON.
-\item Transfer from BISON to Okapi a temperature distribution and a heat flux BC.
-\end{enumerate}
-
-This approach requires setting an initial condition on the:
+\section{Initial Conditions}
+\label{sec:ICs}
+This section discusses how initial conditions are applied to OpenMC, Nek, and BISON for a coupled solve. There are two generally types of initializations that are performed for a single physics code:
 
 \begin{itemize}
-\item heat flux BC; because this is a Moose variable, this can simply be set in the master input file.
-\item temperature distribution; because OpenMC runs before BISON, an initial condition must be set on the temperature distribution. Because this distribution is internal to OpenMC, some method must be developed to set an initial condition on the temperature distribution.
+\item General initializations that specify the geometry, materials, and problem parameters that will remain unchanged throughout a simulation
+\item Initial values for solution variables that are needed to begin the finite difference time marching
 \end{itemize}
 
-For this setup, inconsistencies can also be introduced - the initial conditions on heat flux BC and temperature distribution can be conflicting.
+It becomes increasingly difficult as the number of coupled codes increases to ensure consistency between all of the initial conditions and system specifications. To attempt to achieve consistency, all initial conditions should be set from MOOSE. However, if desired, these MOOSE initial conditions can be omitted, and initial conditions set in the usual manner in the code's input files (OpenMC's XML files or Nek's {\tt rea} file). 
 
-\subsubsection{BISON Master App}
-This section discusses the three-way coupling achieved between BISON, Okapi, and MOON, where BISON is the Master App. As discussed previously, this only works for a single fuel pin (one instance of BISON) because there cannot be multiple instances of a Master App without significant MPI ``glue'' code. 
+Either MOON or Buffalo may execute first, so the required initial conditions depends on this choice. Note that the requirements to set boundary conditions also depends on the extent to which the transfer classes have been completed - if the capability to transfer fluid density has not yet been implemented in Nek, for example, then an initial condition must be specified on the fluid density for OpenMC. 
+
+
+
+
 
 \section{Data Transfer}
 This section first discusses the general requirements needed to transfer information between two physics codes. Then, subsections focusing on MOOSE, OpenMC, and Nek will individually describe the data transfer capabilities introduced in order to transfer information between all three codes. When coupling two codes, there are two general ways in which the data can be transferred:
