@@ -1,6 +1,6 @@
-#
-# Testing a solution that is second order in space and first order in time
-#
+[Problem]
+  kernel_coverage_check = false
+[]
 
 [Mesh]
   # This is a cylinder with r=0.5, z=(0,1)
@@ -17,62 +17,22 @@
 []
 
 [AuxVariables]
-  [./heat_flux_scalar_f_0_l]
-    family = SCALAR
-    order = TENTH
-  [../]
-  [./heat_flux_scalar_f_1_l]
-    family = SCALAR
-    order = TENTH
-  [../]
-  [./heat_flux_scalar_f_2_l]
-    family = SCALAR
-    order = TENTH
-  [../]
-  [./heat_flux_scalar_f_3_l]
-    family = SCALAR
-    order = TENTH
-  [../]
-  [./heat_flux_scalar_f_4_l]
-    family = SCALAR
-    order = TENTH
-  [../]
-  [./temp_bc_scalar_f_0_l]
-    family = SCALAR
-    order = TENTH
-  [../]
-  [./temp_bc_scalar_f_1_l]
-    family = SCALAR
-    order = TENTH
-  [../]
-  [./temp_bc_scalar_f_2_l]
-    family = SCALAR
-    order = TENTH
-  [../]
-  [./temp_bc_scalar_f_3_l]
-    family = SCALAR
-    order = TENTH
-  [../]
-  [./temp_bc_scalar_f_4_l]
+  [./f_0_flux_BC]
     family = SCALAR
     order = TENTH
   [../]
 []
 
 [ICs]
-  [./v_ic]
+  [./f_0_flux_BC]
     type = ScalarComponentIC
-    variable = 'temp_bc_scalar_f_0_l'
+    variable = 'f_0_flux_BC'
     values = '1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0'
-  [../]
-  [./temp_ic]
-    type = FunctionIC
-    variable = temp
-    function = '0.0'
   [../]
 []
 
 [Kernels]
+active = ''
   [./Diffusion]
     type = Diffusion
     variable = temp
@@ -84,37 +44,13 @@
 []
 
 [Functions]
-active = 'bc_func'
-  # BCFunction just returns 0.0 right now
   [./bc_func]
     type = ConstantFunction
-  [../]
-  [./legendre_function]
-    type = LegendrePolynomial
-    l_geom_norm = '0.0 1.0'
-  [../]
-  [./fourier_function]
-    type = FourierPolynomial
-  [../]
-  [./fl_reconstruction]
-    type = FourierLegendreReconstruction
-    l_order = 10
-    f_order = 5
-    l_direction = 2
-    legendre_function_name = 'legendre_function'
-    fourier_function_name = 'fourier_function'
-    poly_scalars = 'temp_bc_scalar_f_0_l temp_bc_scalar_f_1_l temp_bc_scalar_f_2_l temp_bc_scalar_f_3_l temp_bc_scalar_f_4_l'
+    value = 0.0
   [../]
 []
 
 [BCs]
-active = 'wall'
-  [./wall1]
-    type = FunctionDirichletBC
-    variable = temp
-    boundary = 'wall'
-    function = fl_reconstruction
-  [../]
   [./wall]
     type = FunctionDirichletBC
     variable = temp
@@ -127,18 +63,6 @@ active = 'wall'
   [./k]
     type = GenericConstantMaterial
     prop_names = 'thermal_conductivity'
-    prop_values = '1.0'
-    block = 'interior'
-  [../]
-  [./cp]
-    type = GenericConstantMaterial
-    prop_names = 'specific_heat'
-    prop_values = '1.0'
-    block = 'interior'
-  [../]
-  [./rho]
-    type = GenericConstantMaterial
-    prop_names = 'density'
     prop_values = '1.0'
     block = 'interior'
   [../]
@@ -188,7 +112,7 @@ active = 'to_nek'
     type = MultiAppMoonOkapiTransfer
     direction = to_multiapp
     multi_app = nek
-    source_variable = 'heat_flux_scalar_f_0_l heat_flux_scalar_f_1_l heat_flux_scalar_f_2_l heat_flux_scalar_f_3_l heat_flux_scalar_f_4_l '
+    source_variable = 'f_0_flux_BC'
     to_aux_scalar = 'foo'
   [../]
 
