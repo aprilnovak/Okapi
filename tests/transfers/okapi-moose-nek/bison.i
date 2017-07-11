@@ -8,6 +8,20 @@
   boundary_name = 'top bottom wall'
 []
 
+[Functions]
+  [./legendre]
+    type = LegendrePolynomial
+    l_geom_norm = '0.0 1.0'
+    dbg = false
+  [../]
+  [./zernike]
+    type = ZernikePolynomial
+    radius = 0.5
+    center = '0.0 0.0'
+    dbg = false
+  [../]
+[]
+
 [Variables]
   [./bison_temp]
   [../]

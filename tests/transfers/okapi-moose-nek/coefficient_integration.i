@@ -13,6 +13,17 @@
   nx = 1
 []
 
+[Functions]
+  [./bc_func]
+    type = ConstantFunction
+    value = 0.0
+  [../]
+  [./fuel_temp_function] # constant initial fuel temp
+    type = ParsedFunction
+    value = 900.0
+  [../]
+[]
+
 [Variables]
   [./temp]
   [../]
@@ -27,15 +38,22 @@
     family = SCALAR
     order = TENTH
   [../]
-  [./bar]
-  [../]
 []
 
 [ICs]
-  [./f_0_flux_BC]
+  [./f_0_flux_BC] # initial condition on the wall heat flux, used by Nek
     type = ScalarComponentIC
     variable = 'f_0_flux_BC'
     values = '1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0'
+  [../]
+[]
+
+[AuxKernels]
+active = ''
+  [./fuel_temp_ic]
+    type = FunctionAux
+    variable = fuel_temp_continuous_ic
+    function = fuel_temp_function
   [../]
 []
 
@@ -51,12 +69,6 @@
   [../]
 []
 
-[Functions]
-  [./bc_func]
-    type = ConstantFunction
-    value = 0.0
-  [../]
-[]
 
 [BCs]
 active = ''
@@ -102,7 +114,7 @@ active = ''
 []
 
 [Transfers]
-  [./to_nek]
+  [./to_nek] # transfers heat flux BC
     type = MultiAppMoonOkapiTransfer
     direction = to_multiapp
     multi_app = nek
@@ -110,7 +122,7 @@ active = ''
     to_aux_scalar = 'foo'
     execute_on = timestep_begin
   [../]
-  [./from_nek]
+  [./from_nek] # writes temperature BC
     type = MultiAppMoonOkapiTransfer
     direction = from_multiapp
     multi_app = nek
