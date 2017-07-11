@@ -7,6 +7,9 @@
 // auxkernels
 #include "KappaFissionToHeatSource.h"
 
+// ics
+#include "OpenMCTempScalarComponentIC.h"
+
 // test kernels (not used)
 #include "MomFrictionForce.h"
 
@@ -71,6 +74,7 @@ void
 OkapiMCSApp::registerObjects(Factory & factory)
 {
   registerAuxKernel(KappaFissionToHeatSource);
+  registerInitialCondition(OpenMCTempScalarComponentIC);
   registerKernel(MomFrictionForce);
   registerExecutioner(OpenMCExecutioner);
   registerTimeStepper(OpenMCTimeStepper);
