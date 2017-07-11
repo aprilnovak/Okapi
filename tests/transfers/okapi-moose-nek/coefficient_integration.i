@@ -3,10 +3,9 @@
 []
 
 [Problem]
-#  kernel_coverage_check = false
+  kernel_coverage_check = false
 []
 
-# We need to define a dummy mesh for the master App, even though it isnt used.
 [Mesh]
   type = GeneratedMesh
   dim = 1
@@ -30,53 +29,21 @@
 []
 
 [AuxVariables]
-  [./f_0_flux_BC]
+  [./f_0_coeffs_temp_BC] # middle-man storage for temp BC
     family = SCALAR
     order = TENTH
   [../]
-  [./f_0_temp_BC]
+  [./f_0_coeffs_flux_BC]
     family = SCALAR
     order = TENTH
   [../]
 []
 
 [ICs]
-  [./f_0_flux_BC] # initial condition on the wall heat flux, used by Nek
+  [./f_0_coeffs_flux_BC] # initial condition on the wall heat flux, used by Nek
     type = ScalarComponentIC
-    variable = 'f_0_flux_BC'
+    variable = 'f_0_coeffs_flux_BC'
     values = '1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0'
-  [../]
-[]
-
-[AuxKernels]
-active = ''
-  [./fuel_temp_ic]
-    type = FunctionAux
-    variable = fuel_temp_continuous_ic
-    function = fuel_temp_function
-  [../]
-[]
-
-[Kernels]
-#active = ''
-  [./Diffusion]
-    type = Diffusion
-    variable = temp
-  [../]
-  [./Time]
-    type = TimeDerivative
-    variable = temp
-  [../]
-[]
-
-
-[BCs]
-active = ''
-  [./wall]
-    type = FunctionDirichletBC
-    variable = temp
-    boundary = 'wall'
-    function = bc_func
   [../]
 []
 
@@ -118,7 +85,7 @@ active = ''
     type = MultiAppMoonOkapiTransfer
     direction = to_multiapp
     multi_app = nek
-    source_variable = 'f_0_flux_BC'
+    source_variable = 'f_0_coeffs_flux_BC'
     to_aux_scalar = 'foo'
     execute_on = timestep_begin
   [../]
@@ -127,7 +94,7 @@ active = ''
     direction = from_multiapp
     multi_app = nek
     source_variable = 'foo'
-    to_aux_scalar = 'f_0_temp_BC'
+    to_aux_scalar = 'f_0_coeffs_temp_BC'
     execute_on = timestep_begin
   [../]
   [./to_bison]
@@ -137,6 +104,14 @@ active = ''
     source_variable = 'bar'
     to_aux_scalar = 'l_0_coeffs_kappa_fission'
     openmc_cell = 1
+    execute_on = timestep_end
+  [../]
+  [./to_bison_flux]
+    type = MultiAppScalarToAuxScalarTransfer
+    direction = to_multiapp
+    multi_app = bison
+    source_variable = 'f_0_coeffs_temp_BC'
+    to_aux_scalar = 'f_0_coeffs_temp_BC_bison'
     execute_on = timestep_end
   [../]
   [./from_bison]

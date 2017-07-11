@@ -9,6 +9,11 @@
 []
 
 [Functions]
+  [./fourier]
+    type = FourierPolynomial
+    center = '0.0 0.0'
+    dbg = false
+  [../]
   [./legendre]
     type = LegendrePolynomial
     l_geom_norm = '0.0 1.0'
@@ -30,6 +35,15 @@
     poly_coeffs = 'l_0_coeffs_kappa_fission'
     dbg = false
   [../]
+  [./temp_BC_reconstruction]
+    type = FourierLegendreReconstruction
+    l_order = 9
+    f_order = 0
+    l_direction = 2
+    legendre_function = legendre
+    fourier_function = fourier
+    poly_coeffs = 'f_0_coeffs_temp_BC_bison'
+  [../]
 []
 
 [Variables]
@@ -38,11 +52,15 @@
 []
 
 [AuxVariables]
-  [./l_0_coeffs_kappa_fission]
+  [./l_0_coeffs_kappa_fission] # where kappa-fission coefficients are received
     family = SCALAR
     order = THIRD
   [../]
-  [./l_0_coeffs_temp]
+  [./f_0_coeffs_temp_BC_bison] # where heat flux coefficients are copied
+    family = SCALAR
+    order = TENTH
+  [../]
+  [./l_0_coeffs_temp] # where temperature coefficients are placed
     family = SCALAR
     order = THIRD
   [../]
@@ -86,26 +104,11 @@ active = 'diffusion time'
 []
 
 [BCs]
-  [./constant_temp]
-    type = DirichletBC
+  [./temp]
+    type = FunctionDirichletBC
     variable = bison_temp
+    function = temp_BC_reconstruction
     boundary = 'wall'
-    value = 673 # Kelvin
-  [../]
-[]
-
-[UserObjects]
-active = ''
-  [./l0]
-    type = ZLDeconstruction
-    variable = bison_temp
-    l_order = 0
-    n_order = 1
-    legendre_function = legendre
-    zernike_function = zernike
-    l_direction = 2
-    aux_scalar_name = 'l_0_coeffs_temp_bison'
-    volume_pp = 'volume'
   [../]
 []
 
