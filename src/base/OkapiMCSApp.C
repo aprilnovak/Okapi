@@ -4,9 +4,6 @@
 #include "ModulesApp.h"
 #include "MooseSyntax.h"
 
-// auxkernels
-#include "KappaFissionToHeatSource.h"
-
 // ics
 #include "OpenMCTempScalarComponentIC.h"
 
@@ -68,7 +65,6 @@ OkapiMCSApp__registerObjects(Factory & factory)
 void
 OkapiMCSApp::registerObjects(Factory & factory)
 {
-  registerAuxKernel(KappaFissionToHeatSource);
   registerInitialCondition(OpenMCTempScalarComponentIC);
   registerKernel(MomFrictionForce);
   registerExecutioner(OpenMCExecutioner);
