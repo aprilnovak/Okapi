@@ -265,13 +265,13 @@ The choice between MOON and Okapi for the Master App is more arbitrary than the 
 With Okapi as the Master App, either BISON can be run before MOON, or MOON run before BISON. Section \ref{sec:ICs} will discuss how boundary conditions are set based on which of the MultiApps executes first. For either choice of App running at the beginning of a time step versus at the end of a time step, the sequence of events is as follows. For MOON executing first:
 
 \begin{enumerate}
-\item Initialize the Master App. The actions performed here are generally the same regardless of which App is the Master App (i.e. this is not the stage at which the OpenMC input XML files would be read), since this purely sets up the entire MOOSE simulation by initializing MPI, allocating storage, etc.
+\item Initialize the Master App. The actions performed here are generally the same regardless of which App is the Master App (i.e. this is not the stage at which the OpenMC input XML files would be read), since this purely sets up the entire MOOSE simulation by initializing MPI, allocating storage, etc. This is where initial conditions specified in the master input file are set.
 \item Initialize MOON. This calls the {\tt NekExecutioner::init()} method and reads Nek input files to perform internal actions such as setting initial values.
 \item Initialize BISON. This calls the initialization method of the executioner specified in the BISON input file.
 \item Initialize the Master App. This step is not redundant with step 1, but rather this calls the {\tt init()} method of the {\tt OpenMCExecutioner}, which reads OpenMC input files and performs internal actions such as setting initial values.
 \item Execute all transfers on {\tt timestep\_begin} with direction {\tt to\_multiapp}.
 	\begin{enumerate}
-	\item Transfer flux boundary condition coefficients from Okapi to MOON.
+	\item Transfer heat flux boundary condition coefficients from Okapi to MOON.
 	\end{enumerate}
 \item Solve Nek.
 \item Execute all transfers on {\tt timestep\_begin} with direction {\tt from\_multiapp}.
@@ -305,9 +305,30 @@ It becomes increasingly difficult as the number of coupled codes increases to en
 
 Either MOON or Buffalo may execute first, so the required initial conditions depends on this choice. Note that the requirements to set boundary conditions also depends on the extent to which the transfer classes have been completed - if the capability to transfer fluid density has not yet been implemented in Nek, for example, then an initial condition must be specified on the fluid density for OpenMC. 
 
+\subsection{MOON Before BISON}
+When MOON runs before BISON, initial conditions must be specified for fields that are inputs to MOON and for those fields that are inputs to Okapi that would have been determined by BISON. This section discusses how to set these initial conditions.
 
+\subsubsection{Fuel Wall Heat Flux and Temperature}
+Because BISON does not run before MOON for the very first time step, an initial condition must be set on the fuel wall heat flux. Because this is a MOOSE variable (represented as a scalar auxvariable), it is most sensible to define this parameter directly in the master input file. The fuel wall heat flux is directly related to the fuel temperature, since the wall heat flux is simply \(-k\nabla\cdot T\hat{n}\), where \(T\) is the fuel temperature. So, if the user is going to specify the wall heat flux, it would be good to ensure consistency with the initial condition specified on fuel temperature. 
 
+The initial condition on fuel temperature is required because BISON does not run before Okapi for the very first time step. An initial condition on fuel temperature can be set either in OpenMC XML input files or through an initial condition class in the MOOSE master input file. Because it is logical to specify the wall heat flux initial condition directly in the master input file, for consistency the fuel temperature initial condition is also specified in the master input file. 
 
+For simple cases, all temperature initial conditions needed by OpenMC can be specified in the OpenMC XML files, and the heat flux BC determined by hand. 
+
+\subsubsubsection{{\tt OpenMCTempScalarComponentIC}}
+This class takes as input a set of expansion coefficients for fuel temperature and stores these coefficients in OpenMC data structures. There are two ways the user can utilize this class:
+
+\begin{enumerate}
+\item Provide the values of the expansion coefficients directly
+\item Define a continuous function for the temperature, use a {\tt FunctionAux} auxkernel to apply this function to an auxvariable, integrate that auxvariable using the {\tt ZLDeconstruction} user object to compute a new scalar variable holding the initial expansion coefficients, and pass this second scalar variable to the initial condition class.
+\end{enumerate}
+
+This flexibility allows the user to specify either the coefficients directly or a continuous field for which the coefficients are determined internally. For both cases, a dummy variable must be provided of the correct order, though none of its entries are filled.
+
+\subsubsubsection{{\tt WallHeatFluxFunctionIC}}
+The continuous temperature field is also used to determine the continuous wall heat flux, which is deconstructed into a set of expansion coefficients for the wall heat flux. In this way, the initial conditions on wall heat flux and fuel temperature are consistent with one another.
+
+\subsection{BISON Before MOON}
 
 \section{Data Transfer}
 This section first discusses the general requirements needed to transfer information between two physics codes. Then, subsections focusing on MOOSE, OpenMC, and Nek will individually describe the data transfer capabilities introduced in order to transfer information between all three codes. When coupling two codes, there are two general ways in which the data can be transferred:
@@ -460,40 +481,24 @@ Hence, all that is required to deconstruct a continuous field into a set of expa
 \subsection{Constructing a Continuous Variable}
 As opposed to deconstruction, constructing a continuous variable from a set of expansion coefficients is more straightforward, since all that is required is repeated evaluation of the orthogonal polynomials, multiplied by expansion coefficients.
 
-\subsection{MOOSE (a.k.a. BISON) Data Transfer}
-This section describes the capabilities introduced into the MOOSE source code that allows evaluation of polynomials, and construction/deconstruction of continuous fields. Because BISON is a Moose ``Animal,'' we can simply use MOOSE as a surrogate for BISON to avoid all of the complicated physics until the entire coupling framework is in place. So, some of these new classes developed would actually be implemented in BISON, and {\it not} in MOOSE. In this section, the only classes that would {\it not} be implemented in BISON are:
-
-\begin{itemize}
-\item MultiAppOkapiMooseTransfer (this isn't called by BISON - it's called by whatever is the MasterApp)
-\end{itemize}
+\subsection{MOOSE Data Transfer}
+This section describes the capabilities introduced into the MOOSE source code that allows evaluation of polynomials, and construction/deconstruction of continuous fields. These functions are placed in a local branch of MOOSE so that BISON, Okapi, and MOON can all access these functions. The remote version of this special coupling version of MOOSE is located at {\tt git@github.com:aprilnovak/coupling-moose.git}.
 
 \subsubsection{Evaluation of Polynomials}
-This section discusses the generic functions added to MOOSE to compute orthogonal polynomials.
+This section discusses the generic functions added to MOOSE to compute orthogonal polynomials. MOON previously had several of these functions in its own source - to avoid duplication when other MOOSE animals require the access to the same functions, the {\tt LegendrePolynomial} and {\tt FourierPolynomial} functions were moved from MOON to MOOSE.
 
 \color{magenta}
 No checks are made that any of the normalizing parameters specified as input for these functions match those in external coupled codes.
 \color{black}
 
 \subsubsubsection{{\tt LegendrePolynomial}}
-This function computes the Legendre polynomial in Eq. \eqref{eq:LegendreScaled} for a given value of \(l\) and a specific position. This function is not particular to the direction in which the Legendre expansion is being made, since only a single number (not a point) is passed in. Because Legendre polynomials are only orthogonal on \([-1, +1]\), a scaling factor \(z\) is used to simply stretch or compress the physical domain to the orthogonal domain. The {\tt l\_geom\_norm} parameter provides the minimum and maximum distances over which the Legendre polynomials will be forced to be orthogonal using a scaling factor. 
-
-\color{magenta}
-This function exists in both MOON and Okapi, but is cleaner in Okapi and should be moved to a MOOSE module for generality.
-\color{black}
+This function computes the Legendre polynomial in Eq. \eqref{eq:LegendreScaled} for a given value of \(l\) and a specific position. Because Legendre polynomials are only orthogonal on \([-1, +1]\), a scaling factor \(z\) is used to simply stretch or compress the physical domain to the orthogonal domain. The {\tt l\_geom\_norm} parameter provides the minimum and maximum distances over which the Legendre polynomials will be forced to be orthogonal using a scaling factor. 
 
 \subsubsubsection{{\tt FourierPolynomial}}
-This function computes the Fourier function given in Eq. \eqref{eq:FourierScaled} for a given value of \(k\) and a specific position. The \(\theta\) value at which to evaluate this function is determined as the angle between the two provided points. Because the fuel rod of interest for coupling exists on \([-\pi, +\pi]\), no additional scaling is needed like for the Legendre polynomials.
-
-\color{magenta}
-This function will only give correct results if the domain is centered on \((0, 0)\) since no center for the circle is provided. This function exists in MOON, but should be moved to a MOOSE module for generality.
-\color{black}
+This function computes the Fourier function given in Eq. \eqref{eq:FourierScaled} for a given value of \(k\) and a specific position. The \(\theta\) value at which to evaluate this function is determined as the angle between the two provided points. The user must provide the center of the circle for correct normalization. Because the fuel rod of interest for coupling exists on \([-\pi, +\pi]\), no additional scaling is needed.
 
 \subsubsubsection{{\tt ZernikePolynomial}}
 This function computes a Zernike polynomial given in Eq. \eqref{eq:ZernikeScaled} given orders \(n\) and \(m\). 
-
-\color{magenta}
-This function is available in Okapi, but should be moved to a MOOSE module for generality.
-\color{black}
 
 \subsubsection{Field Deconstruction}
 This section describes how a continuous field is deconstructed into a set of expansion coefficients in MOOSE.
@@ -529,11 +534,15 @@ No checks are made to ensure that the integration is performed over a cylindrica
 This section discusses the functions developed in MOOSE to reconstruct a continuous field given expansion coefficients and specified orthogonal functions.
 
 \subsubsubsection{{\tt FourierLegendreReconstruction}}
-This function reconstructs a solution as a finite series of Fourier and Legendre polynomials given expansion coefficients, and evaluates it at a single point according to Eq. \eqref{eq:OrthogonalExpansion}. While {\tt LegendrePolynomial} and {\tt FourierPolynomial} are {\it not} specific to the orientation of the Legendre expansion relative to any of the Cartesian axes, this reconstruction assumes that given a point with three coordinates, that the third coordinate (the \(z\)-coordinate) serves as input to the {\tt LegendrePolynomial} function, while the \(x\) and \(y\) coordinates are input to the {\tt FourierPolynomial} function. 
+This function reconstructs a solution as a finite series of Fourier and Legendre polynomials given expansion coefficients, and evaluates it at a single point according to Eq. \eqref{eq:OrthogonalExpansion}. This function is set up so that the {\tt poly\_coeffs} coupled to this function {\it each} hold all of the expansion coefficients for a {\it fixed} Fourier order \(f\). For instance, for a Legendre expansion of 4 and a Fourier expansion of 2, these coefficients hold:
 
-\color{magenta}
-This function can be made more general by allowing the Legendre expansion to be in either \(x\), \(y\), or \(z\) instead of just \(z\). This function is available in MOON, but should be moved to a MOOSE module for generality.
-\color{black}
+\begin{lstlisting}
+f_0_coeffs = 'C00 C01 C02 C03 C04 C05'
+f_1_coeffs = 'C10 C11 C12 C13 C14 C15'
+f_2_coeffs = 'C20 C21 C22 C23 C24 C25'
+\end{lstlisting}
+
+where the first index represents the \(f\) order and the second the \(n\) order. Note that the choice in MOON was for each of these aux variables to hold all of the Legendre coefficients for a given Fourier order.
 
 \subsubsubsection{{\tt ZernikeLegendreReconstruction}}
 This function reconstructs a solution as a finite series of Zernike and Legendre polynomials given expansion coefficients, and evaluates it at a single point according to Eq. \eqref{eq:ZLReconstruction}. This function is very similar to the Fourier-Legendre reconstruction function developed for MOON, except that it also includes the flexibility for the Legendre expansion direction to not be along the \(z\)-direction. This function is set up so that the {\tt poly\_coeffs} coupled to this function {\it each} hold all of the expansion coefficients for a {\it fixed} Legendre order \(l\). For instance, for a Legendre expansion of 3 and a Zernike expansion of 2, these coefficients hold:
@@ -546,10 +555,6 @@ l_3_coeffs = 'C300 C31n1 C311 C32n2 C320 C322'
 \end{lstlisting}
 
 where the first index represents the \(l\) order, the second the \(n\) order, and the third the \(m\) order, where {\tt n} represents a negative number. Note that the choice in MOON was for each of these aux variables to hold all of the Legendre coefficients for a given Fourier order, which is the opposite of the choice here. 
-
-\color{magenta}
-This function is available in Okapi, but should be moved to a MOOSE module for generality.
-\color{black}
 
 \subsubsection{Using the Constructed Field}
 This section discusses the capabilities added to MOOSE to use the constructed field to enact physical feedback with other physics.
