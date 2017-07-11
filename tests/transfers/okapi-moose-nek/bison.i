@@ -14,11 +14,11 @@
 []
 
 [AuxVariables]
-  [./l_0_coeffs_power_bison]
+  [./l_0_coeffs_power]
     family = SCALAR
     order = THIRD
   [../]
-  [./l_0_coeffs_temp_bison]
+  [./l_0_coeffs_temp]
     family = SCALAR
     order = THIRD
   [../]
