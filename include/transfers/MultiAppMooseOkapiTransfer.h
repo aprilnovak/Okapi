@@ -4,7 +4,6 @@
 // MOOSE includes
 #include "MultiAppTransfer.h"
 
-// Forward declerations
 class MultiAppMooseOkapiTransfer;
 
 template<>
