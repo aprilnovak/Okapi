@@ -43,61 +43,51 @@ MultiAppMooseOkapiTransfer::MultiAppMooseOkapiTransfer(const InputParameters & p
 void
 MultiAppMooseOkapiTransfer::execute()
 {
-  _console << "Beginning MultiAppMooseOkapiTransfer Transfer " << name() << std::endl;
+  _console << "Beginning MultiAppMooseOkapiTransfer Transfer " <<
+    name() << std::endl;
+
   int num_apps = _multi_app->numGlobalApps();
   int num_vars_to_read = _source_var_names.size();
   int num_vars_to_write = _to_aux_names.size();
 
   FEProblemBase & from_problem = _multi_app->problemBase();
 
-
   switch (_direction)
   {
-    // MasterApp -> SubApp. For MOOSE-OpenMC coupling, this represents the
-    //   transfer of information from MOOSE to OpenMC. This transfers all
-    //   of the expansion coefficients.
-    case TO_MULTIAPP:
+    // MOOSE -> Okapi. This transfer is the same as the TO_MULTIAPP transfer of
+    // the MultiAppOkapiMooseTransfer class.
+    case FROM_MULTIAPP:
     {
       std::vector<MooseVariableScalar *> source_variables(num_vars_to_read);
       for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
       {
-        source_variables[i] = &from_problem.getScalarVariable(_tid,\
+        source_variables[i] = &from_problem.getScalarVariable(_tid,
           _source_var_names[i]);
         source_variables[i]->reinit();
       }
 
-      for (unsigned int i = 0; i < num_apps; i++)
+      // Check that all of the source variables are of the same order.
+      int source_var_size =
+        source_variables[beginIndex(_source_var_names)]->sln().size();
+      for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
+      {
+        if (source_variables[i]->sln().size() != source_var_size)
+          mooseError("Order of source variables for MultiAppMooseOkapiTranfser"
+            " are not all the same!");
+      }
+
+      for (int i = 0; i < num_apps; i++)
         if (_multi_app->hasLocalApp(i))
         {
-          // first, we need to determine how many coefficients will be passed from
-         //    MOOSE to OpenMC. A check is made after computing these quantities to
-         //    ensure that all of the source auxvariables are of the same order, but
-         //    so that we don't need to duplicate the loop structure below, we assume
-         //    that the number of variables to transfer equals the number of variables
-         //    to read multiplied by the order of the first of these variables. If
-         //    the source variables are actually the same size, an error will be thrown
-         //    before this would become a problem.
-          int num_coeffs_from_moose = num_vars_to_read *
-            source_variables[beginIndex(_source_var_names)]->sln().size();
+          // number of coefficients from moose. The moose_coeffs array will hold
+          // these coefficients before passing them to OpenMC.
+          int num_coeffs_from_moose = num_vars_to_read * source_var_size;
           double moose_coeffs[num_coeffs_from_moose];
-          
-//          legendre_order_from_MOOSE = num_vars_to_read - 1;
+
           for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
           {
             // Loop through each entry in a single SCALAR variable
             auto & soln_values = source_variables[i]->sln();
-
-            // Check that Zernike order is the same for each coupled scalar auxvar
-//            old_zernike_order = zernike_order_from_MOOSE;
-//
-//            if (i > 0)
-//              if (old_zernike_order != zernike_order_from_MOOSE)
-//                mooseError("The order of the Zernike expansion does not "
-//                  "match each coupling Legendre coefficient aux variable.");
-//
-//            zernike_order_from_MOOSE =
-//              zernike_order_from_coeffs(soln_values.size());
-//
             for (auto j = beginIndex(soln_values); j < soln_values.size(); ++j)
               moose_coeffs[i * num_vars_to_read + j] = soln_values[j];
 
@@ -116,9 +106,11 @@ MultiAppMooseOkapiTransfer::execute()
           _console << std::endl;
         }
 
-        // send all expansion coefficients for a cell to OpenMC at one time
+        // send all expansion coefficients for a cell to OpenMC at one time and
+        // perform error handling
         int err;
-        err = OpenMC::receive_coeffs_for_cell(_cell, moose_coeffs, num_coeffs_from_moose);
+        err = OpenMC::receive_coeffs_for_cell(_cell,
+          moose_coeffs, num_coeffs_from_moose);
         if (err == -1)
           mooseError("Invalid cell ID specified for storing expansion coefficients"
             " for kappa-fission-zn tally!");
@@ -136,14 +128,14 @@ MultiAppMooseOkapiTransfer::execute()
       //   at that temperature, so use the temperature_range parameter in the
       //   settings XML file. Because this isn't expanded in OpenMC, here we have
       //   to apply the scaling factors for a zero-th order Legendre and zero-th
-      //   order Zernike expansion. 
+      //   order Zernike expansion.
       OpenMC::openmc_cell_set_temperature(_cell, \
         (source_variables[0]->sln())[0] / sqrt(2.0 * M_PI));
       break;
     }
 
-    // SubApp -> MasterApp
-/*    case FROM_MULTIAPP:
+    // Okapi -> MOON
+    case TO_MULTIAPP:
     {
       // Before transferring any data back up to the Master App (MOOSE),
       //   OpenMC stores the expansion coefficients in an array sorted by
@@ -154,43 +146,38 @@ MultiAppMooseOkapiTransfer::execute()
       std::vector<MooseVariableScalar *> to_variables(num_vars_to_write);
       for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
       {
-        to_variables[i] = &from_problem.getScalarVariable(_tid,\
+        to_variables[i] = &from_problem.getScalarVariable(_tid,
           _to_aux_names[i]);
         to_variables[i]->reinit();
       }
 
-      // Initialize an array to hold the expansion coefficients we'll receive
-      //   from OpenMC. This array holds _all_ of the expansion coefficients
-      //   for the cell we specify. For a generic Zernike-Legendre expansion,
-      //   the order used by OpenMC is specified in the tallies XML file. It is
-      //   assumed that this XML order matches the available slots to write in
-      //   the to_aux_scalar variables provided from MOOSE, so this is used to
-      //   determine how large of an array to specify here that will be written.
-      //   A check is provided in OpenMC to make sure that the length of the
-      //   t % coeffs array) matches what is allocated in C++ to receive it.
-
-      // Check that all of the coupled variables are of the same length
-      int zernike_order_from_OpenMC = zernike_order_from_coeffs(
-        to_variables[beginIndex(_to_aux_names)]->sln().size());
-      for (int i = 0; i < num_vars_to_write; ++i)
+      // Check that all of the variables to write are the same size
+      int write_var_size = to_variables[beginIndex(_to_aux_names)]->sln().size();
+      for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
       {
-        if (i > 0)
-          if (old_zernike_order_OpenMC != zernike_order_from_OpenMC)
-            mooseError("The order of the Zernike expansion does not "
-              "match each coupling Legendre coefficient aux variable.");
-        old_zernike_order_OpenMC = (to_variables[i]->sln()).size();
+        if (to_variables[i]->sln().size() != write_var_size)
+          mooseError("The order of the variables to write for the "
+            " MultiAppMooseOkapiTransfer are not all the same!");
       }
 
-      // Determine size of array to allocate based on size of MOOSE variables
-      int num_zernike_coeffs_per_var =
-        (to_variables[beginIndex(_to_aux_names)]->sln()).size();
+      // Initialize an array to hold the expansion coefficients we'll receive
+      // from OpenMC. This array holds _all_ of the expansion coefficients
+      // for the cell we specify. For a generic Zernike-Legendre expansion,
+      // the order used by OpenMC is specified in the tallies XML file. It is
+      // assumed that this XML order matches the available slots to write in
+      // the to_aux_scalar variables provided from MOOSE, so this is used to
+      // determine how large of an array to specify here that will be written.
+      // A check is provided in OpenMC to make sure that the length of the
+      // t % coeffs array) matches what is allocated in C++ to receive it.
 
-      int num_coeffs_from_openmc = num_vars_to_write * num_zernike_coeffs_per_var;
+      // Determine size of array to allocate based on size of MOOSE variables
+      int num_coeffs_from_openmc = num_vars_to_write * write_var_size;
       double omc_coeffs[num_coeffs_from_openmc];
 
-      // store coefficients from OpenMC into the omc_coeffs array
-      int err;
-      err = OpenMC::get_coeffs_from_cell(_cell, omc_coeffs, num_coeffs_from_openmc);
+      // store coefficients from OpenMC into the omc_coeffs array and perform
+      // error handling.
+      int err = OpenMC::get_coeffs_from_cell(_cell,
+        omc_coeffs, num_coeffs_from_openmc);
       if (err == -1)
         mooseError("Invalid cell ID specified for retrieving expansion"
           " coefficients for kappa-fission-zn tally!");
@@ -219,16 +206,16 @@ MultiAppMooseOkapiTransfer::execute()
       {
         std::vector<dof_id_type> & dof = to_variables[i]->dofIndices();
         auto & soln_values = to_variables[i]->sln();
-        for (auto j = beginIndex(soln_values); j < soln_values.size(); ++j)
+        for (auto j = beginIndex(soln_values); j < write_var_size; ++j)
         {
           to_variables[i]->sys().solution().set(dof[j],
-            omc_coeffs[i * num_zernike_coeffs_per_var + j]);
+            omc_coeffs[i * write_var_size + j]);
           to_variables[i]->sys().solution().close();
         }
       }
 
       break;
-    }*/
+    }
   }
 
   _console << "Finished MultiAppMooseOkapiTransfer transfer" << name() << std::endl;
