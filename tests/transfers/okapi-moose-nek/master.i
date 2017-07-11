@@ -66,7 +66,7 @@
     type = TransientMultiApp
     app_type = MoonApp
     positions = '0 0 0'
-    input_files = picard_sub_subcycling.i
+    input_files = nek.i
     library_path = /homes/anovak/projects/moon/lib
     execute_on = timestep_begin
   [../]

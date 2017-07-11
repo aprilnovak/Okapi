@@ -1,3 +1,7 @@
+# Minimal Nek-wrapped MOOSE application.
+# MOOSE Requires a mesh and a variable even
+# if they are not used.
+
 [Mesh]
   type = GeneratedMesh
   dim = 1
@@ -16,10 +20,8 @@
 
 [Executioner]
   type = NekExecutioner
-  num_steps = 20
   [./TimeStepper]
     type = NekTimeStepper
-    dt = 0.001
   [../]
 []
 
