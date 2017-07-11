@@ -6,13 +6,11 @@
 #  kernel_coverage_check = false
 []
 
+# We need to define a dummy mesh for the master App, even though it isnt used.
 [Mesh]
-  # This is a cylinder with r=0.5, z=(0,1)
-  file = 3D_sideset.exo
-  block_id = '1'
-  block_name = 'interior'
-  boundary_id = '100 200 300'
-  boundary_name = 'top bottom wall'
+  type = GeneratedMesh
+  dim = 1
+  nx = 1
 []
 
 [Variables]
@@ -61,6 +59,7 @@
 []
 
 [BCs]
+active = ''
   [./wall]
     type = FunctionDirichletBC
     variable = temp
@@ -70,6 +69,7 @@
 []
 
 [Materials]
+active = ''
   [./k]
     type = GenericConstantMaterial
     prop_names = 'thermal_conductivity'
@@ -79,6 +79,7 @@
 []
 
 [Postprocessors]
+active = ''
   [./surf_area]
     type = AreaPostprocessor
     boundary = wall
