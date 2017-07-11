@@ -69,7 +69,6 @@ MultiAppMoonOkapiTransfer::execute()
             "MultiAppMoonOkapiTransfer are not all the same!");
       }
 
-      // Loop through each of the sub apps
       for (unsigned int i = 0; i < num_apps; i++)
         if (_multi_app->hasLocalApp(i))
         {
@@ -77,7 +76,7 @@ MultiAppMoonOkapiTransfer::execute()
           {
             _console << _source_var_names[i] << '\n';
             auto & soln_values = source_variables[i]->sln();
-            for (auto j = beginIndex(soln_values); j < soln_values.size(); ++j)
+            for (auto j = beginIndex(soln_values); j < source_var_size; ++j)
             {
               _console << soln_values[j] << ' ';
               Nek5000::expansion_fcoef_.coeff_fij[i*100+j] = soln_values[j];
@@ -89,40 +88,38 @@ MultiAppMoonOkapiTransfer::execute()
       break;
     }
 
-    // SubApp -> MasterApp
+    // MOON -> Okapi. This direction is used to transfer coefficients for a
+    // temperature BC, fluid density, and fluid temperature.
     case FROM_MULTIAPP:
     {
       FORTRAN_CALL(Nek5000::nek_expansion)();
-      // The number of sub applications
-      unsigned int num_apps = _multi_app->numGlobalApps();
 
-      std::vector<MooseVariableScalar *> to_variables(_to_aux_names.size());
-      for (auto i = beginIndex(_to_aux_names); i < _to_aux_names.size(); ++i)
+      std::vector<MooseVariableScalar *> to_variables(num_vars_to_write);
+      for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
       {
-        to_variables[i] = &_multi_app->problemBase().getScalarVariable(_tid, _to_aux_names[i]);
+        to_variables[i] = &_multi_app->problemBase().getScalarVariable(_tid,
+          _to_aux_names[i]);
         to_variables[i]->reinit();
       }
 
-      for (auto i = beginIndex(_to_aux_names); i < _to_aux_names.size(); ++i)
+      // Check that all of the variables to write are of the same order.
+      int write_var_size = to_variables[beginIndex(_to_aux_names)]->sln().size();
+      for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
       {
-        // The dof indices for the scalar variable of interest
+        if (to_variables[i]->sln().size() != write_var_size)
+          mooseError("Order of variables to write with MultiAppMoonOkapiTransfer"
+            " are not all the same!");
+      }
+
+      for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
+      {
         std::vector<dof_id_type> & dof = to_variables[i]->dofIndices();
-
-//      // Error if there is a size mismatch between the scalar AuxVariable and the number of sub apps
-//      if (num_apps != scalar.sln().size())
-//        mooseError("The number of sub apps (" << num_apps << ") must be equal to the order of the scalar AuxVariable (" << scalar.order() << ")");
-
-        // Loop over each sub-app and populate the AuxVariable values from the postprocessors
-//        for (unsigned int i=0; i<_multi_app->numGlobalApps(); i++)
-
-//        if (_multi_app->hasLocalApp(i) && _multi_app->isRootProcessor())
-          // Note: This can't be done using MooseScalarVariable::insert() because different processors will be setting dofs separately.
         auto & soln_values = to_variables[i]->sln();
-        for (auto j = beginIndex(soln_values); j < soln_values.size(); ++j)
-        {
-          to_variables[i]->sys().solution().set(dof[j], Nek5000::expansion_tcoef_.coeff_tij[i*100+j]);
-          to_variables[i]->sys().solution().close();
-        }
+        for (auto j = beginIndex(soln_values); j < write_var_size; ++j)
+          to_variables[i]->sys().solution().set(dof[j],
+            Nek5000::expansion_tcoef_.coeff_tij[i*100+j]);
+
+        to_variables[i]->sys().solution().close();
       }
 
       break;
