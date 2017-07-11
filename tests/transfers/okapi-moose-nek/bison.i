@@ -20,6 +20,16 @@
     center = '0.0 0.0'
     dbg = false
   [../]
+  [./kappa_fission_reconstruction]
+    type = ZernikeLegendreReconstruction
+    l_order = 0
+    n_order = 1
+    l_direction = 2
+    legendre_function = legendre
+    zernike_function = zernike
+    poly_coeffs = 'l_0_coeffs_kappa_fission'
+    dbg = false
+  [../]
 []
 
 [Variables]
@@ -28,7 +38,7 @@
 []
 
 [AuxVariables]
-  [./l_0_coeffs_power]
+  [./l_0_coeffs_kappa_fission]
     family = SCALAR
     order = THIRD
   [../]
@@ -36,54 +46,26 @@
     family = SCALAR
     order = THIRD
   [../]
-  [./bison_kappa_fission] # holds eV/particle field from OpenMC
+  [./kappa_fission] # holds eV/particle field from OpenMC
   [../]
   [./bison_heat] # holds the heat source used in kernel
   [../]
 []
 
 [AuxKernels]
-active = ''
-  [./bison_kappa_fisson]
+  [./kappa_fisson]
     type = FunctionAux
-    variable = bison_kappa_fission
-    function = reconstruction
+    variable = kappa_fission
+    function = kappa_fission_reconstruction
   [../]
-  [./bison_power]
-    type = KappaFissionToHeatSource
-    variable = bison_heat
-    kappa_fission_source = bison_kappa_fission
-    power = 20
-    kappa_fission_pp = 'kappa_fission'
-    volume_pp = 'volume'
-  [../]
-[]
-
-# The expansion for power produced by OpenMC is expanded in the Master App.
-# Then, an aux variable in the Master App (FunctionAux kernel) is used to
-# take advantage of normal MOOSE transfer capabilities to send it to BISON.
-# The only disadvantage here is that we would need to duplicate these
-# functions for every pin...
-[Functions]
-active = ''
-  [./legendre]
-    type = LegendrePolynomial
-    l_geom_norm = '0.0 1.0'
-  [../]
-  [./zernike]
-    type = ZernikePolynomial
-    radius = 0.5
-    center = '0.0 0.0'
-  [../]
-  [./reconstruction]
-    type = ZernikeLegendreReconstruction
-    l_order = 0
-    n_order = 1
-    l_direction = 2
-    legendre_function = legendre
-    zernike_function = zernike
-    poly_coeffs = 'l_0_coeffs_power_bison'
-  [../]
+  #[./bison_power]
+  #  type = KappaFissionToHeatSource
+  #  variable = bison_heat
+  #  kappa_fission_source = bison_kappa_fission
+  #  power = 20
+  #  kappa_fission_pp = 'kappa_fission'
+  #  volume_pp = 'volume'
+  #[../]
 []
 
 [Kernels]

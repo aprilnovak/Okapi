@@ -135,7 +135,7 @@ active = ''
     direction = to_multiapp
     multi_app = bison
     source_variable = 'bar'
-    to_aux_scalar = 'l_0_coeffs_power'
+    to_aux_scalar = 'l_0_coeffs_kappa_fission'
     openmc_cell = 1
     execute_on = timestep_end
   [../]
