@@ -85,7 +85,6 @@
     variable = fission_heat
     kappa_fission_source = kappa_fission
     power = 20
-    kappa_fission_pp = 'kappa_fission_integral'
     volume_pp = 'volume'
   [../]
 []
@@ -164,12 +163,6 @@
     type = AreaPostprocessor
     boundary = 'wall'
     execute_on = timestep_begin
-  [../]
-  [./kappa_fission_integral]
-    type = ElementIntegralVariablePostprocessor
-    block_id = '1'
-    execute_on = timestep_begin
-    variable = kappa_fission
   [../]
 []
 

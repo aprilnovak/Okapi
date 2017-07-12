@@ -13,11 +13,6 @@
   [../]
 []
 
-[AuxVariables]
-  [./aux]
-  [../]
-[]
-
 [Executioner]
   type = NekExecutioner
   [./TimeStepper]

@@ -12,19 +12,8 @@
   nx = 1
 []
 
-[Functions]
-  [./bc_func]
-    type = ConstantFunction
-    value = 500.0
-  [../]
-  [./fuel_temp_function] # constant initial fuel temp
-    type = ParsedFunction
-    value = 900.0
-  [../]
-[]
-
 [Variables]
-  [./temp]
+  [./u]
   [../]
 []
 
@@ -33,7 +22,7 @@
     family = SCALAR
     order = TENTH
   [../]
-  [./f_0_coeffs_flux_BC]
+  [./f_0_coeffs_flux_BC] # middle-man storage for flux BC
     family = SCALAR
     order = TENTH
   [../]
@@ -53,12 +42,6 @@
   [./TimeStepper]
     type = OpenMCTimeStepper
   [../]
-[]
-
-[Outputs]
-  exodus = true
-  csv = true
-  print_perf_log = true
 []
 
 [MultiApps]
@@ -97,6 +80,7 @@
     to_aux_scalar = 'f_0_coeffs_temp_BC'
     execute_on = timestep_begin
   [../]
+
   [./to_bison]
     type = MultiAppMooseOkapiTransfer
     direction = to_multiapp
@@ -131,4 +115,8 @@
     to_aux_scalar = 'f_0_coeffs_flux_BC'
     execute_on = timestep_end
   [../]
+[]
+
+[Outputs]
+  exodus = true
 []
