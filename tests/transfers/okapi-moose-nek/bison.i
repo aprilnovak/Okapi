@@ -56,7 +56,11 @@
     family = SCALAR
     order = THIRD
   [../]
-  [./f_0_coeffs_temp_BC_bison] # where heat flux coefficients are copied
+  [./f_0_coeffs_temp_BC_bison] # where temp BC coefficients are copied
+    family = SCALAR
+    order = TENTH
+  [../]
+  [./f_0_coeffs_flux_BC_bison] # where flux BC coefficients are placed
     family = SCALAR
     order = TENTH
   [../]
@@ -111,6 +115,41 @@
   [../]
 []
 
+[UserObjects]
+  [./l_0_temp_coeffs]
+    type = ZLDeconstruction
+    variable = temp
+    l_order = 0
+    n_order = 1
+    legendre_function = legendre
+    zernike_function = zernike
+    l_direction = 2
+    aux_scalar_name = 'l_0_coeffs_temp'
+    volume_pp = 'volume'
+  [../]
+  [./f_0_coeffs_flux_BC]
+    type = FLDeconstruction
+    flux_integral = true
+    variable = temp
+    l_order = 9
+    f_order = 0
+    legendre_function = legendre
+    fourier_function = fourier
+    l_direction = 2
+    aux_scalar_name = 'f_0_coeffs_flux_BC_bison'
+    surface_area_pp = 'surface_area'
+    diffusion_coefficient_name = 'thermal_conductivity'
+    boundary = 'wall'
+  [../]
+[]
+
+[Materials]
+  [./thermal_conductivity]
+    type = GenericConstantMaterial
+    value = 1.0
+  [../]
+[]
+
 [Executioner]
   type = Transient
 []
@@ -119,6 +158,11 @@
   [./volume]
     type = VolumePostprocessor
     block_id = '1'
+    execute_on = timestep_begin
+  [../]
+  [./surface_area]
+    type = AreaPostprocessor
+    boundary = 'wall'
     execute_on = timestep_begin
   [../]
   [./kappa_fission_integral]

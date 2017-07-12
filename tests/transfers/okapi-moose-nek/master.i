@@ -15,7 +15,7 @@
 [Functions]
   [./bc_func]
     type = ConstantFunction
-    value = 0.0
+    value = 500.0
   [../]
   [./fuel_temp_function] # constant initial fuel temp
     type = ParsedFunction
@@ -106,7 +106,7 @@
     openmc_cell = 1
     execute_on = timestep_end
   [../]
-  [./to_bison_flux]
+  [./to_bison_temp]
     type = MultiAppScalarToAuxScalarTransfer
     direction = to_multiapp
     multi_app = bison
@@ -121,6 +121,14 @@
     source_variable = 'l_0_coeffs_temp'
     to_aux_scalar = 'bar'
     openmc_cell = 1
+    execute_on = timestep_end
+  [../]
+  [./from_bison_flux]
+    type = MultiAppScalarToAuxScalarTransfer
+    direction = from_multiapp
+    multi_app = bison
+    source_variable = 'f_0_coeffs_flux_BC_bison'
+    to_aux_scalar = 'f_0_coeffs_flux_BC'
     execute_on = timestep_end
   [../]
 []

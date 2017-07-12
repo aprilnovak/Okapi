@@ -9,7 +9,7 @@
   <particles>1000</particles>
 
   <!-- set the temperature method -->
-  <temperature_method>interpolation</temperature_method>
+  <temperature_method>nearest</temperature_method>
   <temperature_range> 200.0 1000.0 </temperature_range>
 
   <!-- The starting source is a uniform distribution over the entire pin
