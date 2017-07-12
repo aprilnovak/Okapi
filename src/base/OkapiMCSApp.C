@@ -20,7 +20,6 @@
 #include "MultiAppMoonOkapiTransfer.h"
 
 // user objects
-#include "ZernikeLegendreDeconstruction.h"
 #include "ZLDeconstruction.h"
 
 template <>
@@ -72,7 +71,6 @@ OkapiMCSApp::registerObjects(Factory & factory)
   registerTransfer(MultiAppOkapiMooseTransfer);
   registerTransfer(MultiAppMooseOkapiTransfer);
   registerTransfer(MultiAppMoonOkapiTransfer);
-  registerUserObject(ZernikeLegendreDeconstruction);
   registerUserObject(ZLDeconstruction);
 }
 
