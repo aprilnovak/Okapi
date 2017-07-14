@@ -1,6 +1,4 @@
 OkapiMCS
 =====
 
-"Fork OkapiMCS" to create a new MOOSE-based application.
-
-For more information see: [http://mooseframework.org/create-an-app/](http://mooseframework.org/create-an-app/)
+Okapi is OpenMC wrapped as a MOOSE App that allows relatively easy coupling to any MOOSE-based application. Most of the development notes have been located in docs/manual.tex for coupling OpenMC with a BISON surrogate and OpenMC-BISON-Nek coupling.
