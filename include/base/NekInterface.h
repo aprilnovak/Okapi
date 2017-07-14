@@ -1,3 +1,9 @@
+// Okapi is a wrapper around OpenMC, but we also use it as the Master App to
+// pass information to Nek, so we need to include an interface to the Nek
+// routines that we'll call. Because Nek is written mostly in Fortran 77, we
+// control name mangling using the FORTRAN_CALL macro defined in Moose.h.
+// Nek common blocks map directly to C structs.
+
 #ifndef NEKINTERFACE_H
 #define NEKINTERFACE_H
 
@@ -6,10 +12,8 @@
 // String length for file paths in Nek5000
 #define PATHLEN 132
 
-
 namespace Nek5000
 {
-  // Nek Fortran interface
   extern "C" {
 
     // CFILES common block
@@ -47,25 +51,39 @@ namespace Nek5000
         nzd;
     } dimn_;
 
-    // DIMN common block
     extern struct {
       double flux_moose, temp_nek;
     } test_passing_;
 
+    // holds temperature expansion coefficients created by Nek that are passed
+    // to MOOSE
     extern struct {
       double coeff_tij[];
     } expansion_tcoef_;
 
+    // holds flux expansion coefficients created by MOOSE that are passed to Nek
     extern struct {
       double coeff_fij[];
     } expansion_fcoef_;
 
-    // subroutine nek_init(intracomm)
-    void FORTRAN_CALL(nek_init)(const int&);  // Ron likes this better now
+    // holds expansion orders for temperature BC expansion
+    extern struct {
+      int n_legendre;
+      int m_fourier;
+   } expansion_tdata_;
+
+    // routines to run Nek
+    void FORTRAN_CALL(nek_init)(const int&);
     void FORTRAN_CALL(nek_init_step)();
     void FORTRAN_CALL(nek_step)();
     void FORTRAN_CALL(nek_finalize_step)();
+
+    // deconstructs a continuous variable in Nek into a set of expansion
+    // coefficients using a Fourier-Legendre expansion
     void FORTRAN_CALL(nek_expansion)();
+
+    // reconstruct a continuous field in Nek using expansion coefficients
+    // from MOOSE
     void FORTRAN_CALL(flux_reconstruction)();
   }
 }
