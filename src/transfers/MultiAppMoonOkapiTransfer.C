@@ -95,7 +95,8 @@ MultiAppMoonOkapiTransfer::execute()
     }
 
     // MOON -> Okapi. This direction is used to transfer coefficients for a
-    // temperature BC, fluid density, and fluid temperature.
+    // temperature BC, fluid density, and fluid temperature. Currently only
+    // the temperature BC is passed.
     case FROM_MULTIAPP:
     {
       FORTRAN_CALL(Nek5000::nek_expansion)();
