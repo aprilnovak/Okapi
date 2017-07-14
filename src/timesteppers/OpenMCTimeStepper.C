@@ -17,7 +17,7 @@ OpenMCTimeStepper::OpenMCTimeStepper(const InputParameters & parameters) :
 
 /* This method is a pure virtual function, so it must be redefined by any
 daughter class, even if the behavior doesn't change. */
-Real 
+Real
 OpenMCTimeStepper::computeInitialDT()
 {
   return _dt;
@@ -25,7 +25,7 @@ OpenMCTimeStepper::computeInitialDT()
 
 /* This method is a pure virtual function, so it must be redefined by any
 daughter class, even if the behavior doesn't change. */
-Real 
+Real
 OpenMCTimeStepper::computeDT()
 {
   return _dt;
@@ -34,18 +34,24 @@ OpenMCTimeStepper::computeDT()
 void
 OpenMCTimeStepper::step()
 {
+  // reset tallies to zero, "clear" any OpenMC instances of std::vector
+  // implementation, etc.
   OpenMC::openmc_reset();
+
+  // perform all the logic for a Monte Carlo solve
   OpenMC::openmc_run();
-//  OpenMC::FORTRAN_CALL_MOD(run_simulation, simulation)();
 }
 
 void
 OpenMCTimeStepper::postExecute()
 {
+  // free dynamically allocated memory, write output files, etc.
   OpenMC::openmc_finalize();
 }
 
-
+/* If Okapi is run as the Master App, we'll need to modify this to use a better
+   estimate of convergence, since otherwise no subcycling would occur for a
+   Picard step. */
 bool
 OpenMCTimeStepper::converged()
 {
