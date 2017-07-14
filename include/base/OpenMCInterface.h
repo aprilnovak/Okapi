@@ -1,15 +1,14 @@
-// test interface file that will be used to try to call a fortran subroutine
-// held in a *.F90 file. This Fortran function prototype will be declared in
-// this file.
+// For coupling an external core into the Moose framework, we need to inform
+// MOOSE about the names of those external functions/routines we'll be calling
+// so that the MOOSE-wrapped App will compile. All external code routines must
+// be forward-declared here with the proper name mangling. In OpenMC, we use
+// the bind(c) attribute so that the names in the Fortran dynamic library are
+// the same as those in the MOOSE dynamic library. For older Fortran 77 code,
+// use the FORTRAN_CALL macro defined in Moose.h, since the ISO_C_BINDING
+// intrinsics don't apply for Fortran 77.
 
-#ifndef PRONGHORN_INTERFACE_H
-#define PRONGHORN_INTERFACE_H
-
-#include "Moose.h" // include for access to FORTRAN_CALL macro
-#include <vector>
-
-// define a macro for name mangling of subroutines/functions in Fortran modules
-#define FORTRAN_CALL_MOD(name, mod) __##mod##_MOD_##name
+#ifndef OPENMC_INTERFACE_H
+#define OPENMC_INTERFACE_H
 
 namespace OpenMC {
 /* need to prevent name mangling between C++ and Fortran, since C++ permits
@@ -24,21 +23,14 @@ namespace OpenMC {
        single process), or _actually_ in serial. "#ifdef MPI" is used within
        OpenMC to differentiate between these two cases, but because this variable
        is defined within the OpenMC CMake file, it is not known to MOOSE. I
-       assume that MPI is defined in OpenMC, such that openmc_init must be called
-       with an intracommunicator. */
+       assume that "MPI" is defined in OpenMC, such that openmc_init must be
+       called with an intracommunicator. */
 
-    /* Routines that are used to run OpenMC. */
+    // Routines that are used to run OpenMC.
     void openmc_init(const int &);
-    void initialize_coupling(); // initializes cell mapping
     void openmc_reset();
     void openmc_run();
     void openmc_finalize();
-
-    // tell OpenMC about the order of the expansion for transfer  _from_ MOOSE
-//    void receive_coupling_info(int, int);
-
-    // read expansion coefficients into OpenMC array
-//    void receive_coeffs(double);
 
     // set a cell temperature given a temperature. This is used for transferring
     // data from MOOSE to OpenMC.
@@ -58,4 +50,4 @@ namespace OpenMC {
   }
 }
 
-#endif // PRONGHORN_INTERFACE_H
+#endif // OPENMC_INTERFACE_H
