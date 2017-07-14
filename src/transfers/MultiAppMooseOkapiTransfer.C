@@ -51,8 +51,6 @@ MultiAppMooseOkapiTransfer::execute()
   int num_vars_to_read = _source_var_names.size();
   int num_vars_to_write = _to_aux_names.size();
 
-//  FEProblemBase & from_problem = _multi_app->problemBase();
-
   switch (_direction)
   {
     // MOOSE -> Okapi. This transfer is used to pass coefficients for fuel
@@ -70,7 +68,7 @@ MultiAppMooseOkapiTransfer::execute()
           {
             source_variables[i] = &from_problem.getScalarVariable(_tid,
               _source_var_names[i]);
-            source_variables[i]->reinit(); // not done in my MOOSE transfer
+            source_variables[i]->reinit();
           }
 
           // Check that all of the source variables are of the same order
@@ -115,16 +113,18 @@ MultiAppMooseOkapiTransfer::execute()
             moose_coeffs, num_coeffs_from_moose);
           ErrorHandling::receive_coeffs_for_cell(err);
 
-      // Change a temperature in OpenMC. For now, only use a single coefficient,
-      //   since there's no continuous material tracking yet. Note that changing
-      //   a temperature in OpenMC requires that you've loaded cross section data
-      //   at that temperature, so use the temperature_range parameter in the
-      //   settings XML file. Because this isn't expanded in OpenMC, here we have
-      //   to apply the scaling factors for a zero-th order Legendre and zero-th
-      //   order Zernike expansion.
-      OpenMC::openmc_cell_set_temperature(_cell, \
-        (source_variables[0]->sln())[0] / sqrt(2.0 * M_PI));
-
+        // Change a temperature in OpenMC. For now, only use a single coefficient,
+        // since there's no continuous material tracking yet. Note that changing
+        // a temperature in OpenMC requires that you've loaded cross section
+        // data at that temperature, so use the temperature_range parameter in the
+        // settings XML file. Because this isn't expanded in OpenMC, here we have
+        // to apply the scaling factors for a zero-th order Legendre and zero-th
+        // order Zernike expansion.
+        Real l0_temp_exp = (source_variables[0]->sln())[0] / sqrt(2.0 * M_PI);
+        if (_dbg)
+          _console << "Setting cell " << _cell << " temperature to " <<
+            l0_temp_exp << std::endl;
+        OpenMC::openmc_cell_set_temperature(_cell, l0_temp_exp);
         }
       }
 
@@ -136,8 +136,8 @@ MultiAppMooseOkapiTransfer::execute()
     case TO_MULTIAPP:
     {
       // Before transferring any data back up to the Master App (MOOSE),
-      //   OpenMC stores the expansion coefficients in an array sorted by
-      //   OpenMC cell index.
+      // OpenMC stores the expansion coefficients in an array sorted by
+      // OpenMC cell index.
       OpenMC::fet_deconstruction();
 
      for (unsigned int i = 0; i < num_apps; ++i)
