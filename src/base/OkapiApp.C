@@ -1,4 +1,4 @@
-#include "OkapiMCSApp.h"
+#include "OkapiApp.h"
 #include "Moose.h"
 #include "AppFactory.h"
 #include "ModulesApp.h"
@@ -24,45 +24,45 @@
 
 template <>
 InputParameters
-validParams<OkapiMCSApp>()
+validParams<OkapiApp>()
 {
   InputParameters params = validParams<MooseApp>();
   return params;
 }
 
-OkapiMCSApp::OkapiMCSApp(InputParameters parameters) : MooseApp(parameters)
+OkapiApp::OkapiApp(InputParameters parameters) : MooseApp(parameters)
 {
   Moose::registerObjects(_factory);
   ModulesApp::registerObjects(_factory);
-  OkapiMCSApp::registerObjects(_factory);
+  OkapiApp::registerObjects(_factory);
 
   Moose::associateSyntax(_syntax, _action_factory);
   ModulesApp::associateSyntax(_syntax, _action_factory);
-  OkapiMCSApp::associateSyntax(_syntax, _action_factory);
+  OkapiApp::associateSyntax(_syntax, _action_factory);
 }
 
-OkapiMCSApp::~OkapiMCSApp() {}
+OkapiApp::~OkapiApp() {}
 
 // External entry point for dynamic application loading
 extern "C" void
-OkapiMCSApp__registerApps()
+OkapiApp__registerApps()
 {
-  OkapiMCSApp::registerApps();
+  OkapiApp::registerApps();
 }
 void
-OkapiMCSApp::registerApps()
+OkapiApp::registerApps()
 {
-  registerApp(OkapiMCSApp);
+  registerApp(OkapiApp);
 }
 
 // External entry point for dynamic object registration
 extern "C" void
-OkapiMCSApp__registerObjects(Factory & factory)
+OkapiApp__registerObjects(Factory & factory)
 {
-  OkapiMCSApp::registerObjects(factory);
+  OkapiApp::registerObjects(factory);
 }
 void
-OkapiMCSApp::registerObjects(Factory & factory)
+OkapiApp::registerObjects(Factory & factory)
 {
   registerInitialCondition(OpenMCTempScalarComponentIC);
   registerKernel(MomFrictionForce);
@@ -76,11 +76,11 @@ OkapiMCSApp::registerObjects(Factory & factory)
 
 // External entry point for dynamic syntax association
 extern "C" void
-OkapiMCSApp__associateSyntax(Syntax & syntax, ActionFactory & action_factory)
+OkapiApp__associateSyntax(Syntax & syntax, ActionFactory & action_factory)
 {
-  OkapiMCSApp::associateSyntax(syntax, action_factory);
+  OkapiApp::associateSyntax(syntax, action_factory);
 }
 void
-OkapiMCSApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & /*action_factory*/)
+OkapiApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & /*action_factory*/)
 {
 }
