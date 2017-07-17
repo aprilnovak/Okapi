@@ -72,9 +72,9 @@
 
 % change spacing around sections
 \titlespacing*{\section}
-{0pt}{10ex}{1ex}
+{0pt}{8ex}{1ex}
 \titlespacing*{\subsection}
-{0pt}{7ex}{1ex}
+{0pt}{5ex}{1ex}
 
 % new commands for shorter writing of equations
 \newcommand{\beq}{\begin{equation}}
@@ -144,12 +144,11 @@
 
 This document is intended to describe the coupling methodology between Nek, a \gls{cfd} code developed by \gls{anl}, OpenMC, a Monte Carlo code developed by \gls{anl}, and BISON, a nuclear fuel performance code developed by \gls{inl}. Previous work by Matthew Ellis and others at MIT resulted in the coupling of OpenMC to MOOSE, and work by a joint effort of \gls{anl} and \gls{inl} resulted in the coupling of Nek to MOOSE. So, the coupling of all three codes together will attempt to utilize as much as possible regarding this previous work. The purpose of this report is to document the coupling process, justify decisions made, and illustrate how to use these codes in a coupled manner.
 
-This report is organized beginning with a description of the overall coupling methodology, followed by a discussion of the nuts-and-bolts requirements for coupling two codes in terms of the data transfer between the codes and executing non-MOOSE codes from within the MOOSE framework. Finally, the end of this document discusses the mechanics of coupling the three codes together in terms of the build configuration requirements.
+This report is organized beginning with a description of the overall coupling methodology, followed by a discussion of the nuts-and-bolts requirements for coupling two codes in terms of the data transfer between the codes and executing non-MOOSE codes from within the MOOSE framework. Finally, the end of this document discusses the mechanics of coupling the three codes together in terms of the build configuration. This document serves as my working notes, so any lingering ``dangers'' that are not fully resolved are indicated in pink font.
 
-This document serves as my working notes, so any lingering ``dangers'' that are not fully resolved are indicated in pink font.
-
+\clearpage
 \section{Overall Coupling Methodology}
-This section discusses the overall coupling methodology that was pursued between OpenMC-BISON, BISON-Nek, and finally OpenMC-BISON-Nek. The immediate jump to the coupling of all three codes together was not performed because taking smaller steps often helps reveal difficulties that would otherwise be compounded and confusing when performing the full three-way coupling. When coupling two distinct projects, there are generally three ways to perform the coupling:
+This section discusses the overall coupling methodology that was pursued between OpenMC-BISON, BISON-Nek, and finally OpenMC-BISON-Nek. The immediate jump to the coupling of all three codes was not performed because taking smaller steps often helps reveal difficulties that would otherwise be compounded and confusing when performing the full three-way coupling. When coupling two distinct projects, there are generally three ways to perform the coupling:
 
 \begin{enumerate}
 \item Make virtually no changes to the source code either project, but write an external script that will:
@@ -179,29 +178,31 @@ This section discusses the overall coupling methodology that was pursued between
 	}
 	\end{algorithm}
 	
-\item Use an existing driver with a sufficiently general structure that the codes you want to couple can be structurally modified to be callable from within the existing driver by directly calling code routines (no editing of text files). This approach, by virtue of using an existing driver, allows you to immediately take advantage of the ability to couple to any other codes that have been cast in terms of the existing driver's methods. However, this approach requires a good understanding of the existing driver, which can be much more time consuming than developing a custom driver from scratch. In addition, using an existing coupling framework could potentially restrict control over parallelism and performance, since applications must be mapped to the structure of the existing driver, which may not be ideal for every application.
+\item Use an existing driver with a sufficiently general structure that the codes you want to couple can be structurally changed to be composed of routines that can be called from within the existing driver (no editing of text files). This approach, by virtue of using an existing driver, allows you to immediately take advantage of the ability to couple to any other codes that have been cast in terms of that driver's methods. However, this approach requires a good understanding of the existing driver, which can be much more time consuming than developing a custom driver from scratch. In addition, using an existing coupling framework can potentially restrict control over parallelism and performance, since the driver structure may not be ideal for every application.
 \end{enumerate}
 
-Adapting OpenMC and Nek to an existing driver framework was selected for this work for the reasons given above. The MOOSE framework was selected for the following reasons:
+Adapting OpenMC and Nek to an existing driver framework was selected for this work for the reasons given above. Work at ANL has simultaneously worked towards developing a custom driver to run OpenMC and Nek, but this will not be discussed here. The MOOSE framework was selected as the driver for the following reasons:
 
 \begin{enumerate}
-\item Many applications have been developed with the MOOSE framework, such as nuclear fuels simulations (BISON), porous media thermal-hydraulics (PRONGHORN), radiation damage and structural modeling (GRIZZLY), and many other physics. Using the MOOSE coupling framework allows OpenMC and Nek to essentially become "MOOSE" Animals in that they can not only be coupled to each other, as the scope of this project seeks, but to these other codes with relatively minor effort.
+\item Many applications have been developed with the MOOSE framework, such as nuclear fuels simulations (BISON), porous media thermal-hydraulics (PRONGHORN), and many other physics. Using the MOOSE coupling framework allows OpenMC and Nek to essentially become "MOOSE" Animals in that they can not only be coupled to each other, as the scope of this project seeks, but to these other codes with relatively minor effort.
 \item Significant work has already been performed with coupling OpenMC to MOOSE and Nek to MOOSE, so the coupling of OpenMC with Nek in principle can directly take advantage of this existing work.
 \item The MOOSE framework is easy-to-use and has significant coupling capabilities already developed, as well as an accessible development team for assistance.
 \end{enumerate}
 
-If the parallel performance is not acceptable, then the work developed in constructing OpenMC and Nek as MOOSE applications can still be reused for a custom driver due to MOOSE's modular structure. The MOOSE coupling framework performs coupling in a tree-like structure. A Master App controls the entire coupled solve, and is the App that performs actions such as initializing MPI. For the Master App, there may be any number of sub-applications. The terminology "Sub-app" and "MultiApp" are essentially the same, where the use of sub app is used primarily to denote that a MultiApp is "down-the-tree" from another MultiApp. 
+If the parallel performance is not acceptable, then the work developed in constructing OpenMC and Nek as MOOSE applications can still be reused for a custom driver due to MOOSE's modular structure. The MOOSE coupling framework performs coupling in a tree-like structure. A Master App controls the entire coupled solve, and is the App that performs actions such as initializing MPI and transferring data amongst all of the Apps. For the Master App, there may be any number of sub-applications. The terminology "Sub-app" and "MultiApp" are essentially the same, where the use of sub app is used primarily to denote that a MultiApp is "down-the-tree" from another MultiApp. 
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=10cm]{multiapp_hierarchy.png}
+\includegraphics[width=10cm]{figures/multiapp_hierarchy.png}
 \caption{MasterApp and MultiApp structure for a MOOSE simulation.}
 \end{figure}
 
-When using the MOOSE coupling framework, decisions must be made regarding the Master App-Multi App structure, such as which App acts as the Master App, and which as the Multi Apps. The remainder of this section discusses the high-level coupling strategy for OpenMC-MOOSE, Nek-MOOSE, and finally OpenMC-Nek-BISON. 
+When using the MOOSE coupling framework, decisions must be made regarding the Master App-Multi App structure, such as which App acts as the Master App, and which as the Multi Apps. When only two codes are coupled, this choice is arbitrary, but when three or more codes are coupled this choice becomes important in determining the coupling structure, as will be discussed later. The remainder of this section discusses the high-level coupling strategy for OpenMC-MOOSE, Nek-MOOSE, and finally OpenMC-Nek-BISON. 
 
 \subsection{OpenMC and BISON Coupling}
-This section discusses the OpenMC-BISON coupling, illustrated through a pair of specific example input files that can be found in {\tt okapimcs/tests/FETs/bison-openmc}. For the most generic OpenMC-BISON coupling, MOOSE is the Master App, and OpenMC is wrapped as a MOOSE App so that it can be called as a MultiApp to the MOOSE Master App. BISON is already a MOOSE animal, and hence does not require any wrapping. So, for this coupling scheme, MOOSE is the Master App, and Okapi and BISON are same-level MultiApps (As an aside, to be fully explicit, you cannot have ``MOOSE'' as the Master App, since it just the framework. A Moose App must be the Master App, so when MOOSE is referred to as the Master App, this means that one of the Moose Apps used in the simulation is also used as the Master App, but it does not perform any physics solves, but just exists to pass data. For this implementation, Okapi is both the Master App and a Multi App).
+This section discusses the OpenMC-BISON coupling illustrated through an example that can be found in {\tt okapimcs/tests/FETs/bison-openmc}. This coupling is performed here using MOOSE as the Master App and Okapi and BISON as peer MultiApps, but because BISON is already a MOOSE Animal, this coupling can also be performed using BISON as the Master App and Okapi as the MultiApp (though this would only work for one fuel pin, since there cannot be multiple instances of the Master App). As an aside, to be fully explicit, you cannot have ``MOOSE'' as the Master App, since it just the framework. A Moose App must be the Master App, so when MOOSE is referred to as the Master App, this means that one of the Moose Apps used in the simulation is also used as the Master App, but it does not perform any physics solves, but just exists to pass data. For this implementation, Okapi is both the Master App and a Multi App.
+
+Finally, because the later three-way coupling uses Okapi as the Master App, this coupling can {\it also} be performed with BISON as the MultiApp and Okapi the Master App. The remainder of the discussion in this section assumes a MOOSE Master App, and BISON and Okapi peer MultiApps, and the details would only be slightly modified to discuss these other configurations. OpenMC is wrapped as a MOOSE App so that it can be called as a MultiApp to the BISON Master App. BISON is already a MOOSE animal, and hence does not require any wrapping.
 
 In a coupled solve, the following steps occur. We arbitrarily choose OpenMC to execute before BISON, so we choose to execute OpenMC on {\tt timestep\_begin}, and BISON on {\tt timestep\_end}. 
 
@@ -222,18 +223,11 @@ In a coupled solve, the following steps occur. We arbitrarily choose OpenMC to e
 \item Repeat steps 4-13 for each Picard step until reaching the end of the coupled simulation.
 \end{enumerate}
 
-To summarize the above detailed steps, the following graphic shows the generic data flow for a single Picard step (i.e. the first three steps of initializing the Master App and two MultiApps are assumed to have occurred). Individual steps are numbered in the order in which they occur.
+To summarize the above detailed steps, the following graphic shows the generic data flow for a single Picard step (i.e. the first three steps of initializing the Master App and two MultiApps are assumed to have occurred). Individual steps are numbered in the order in which they occur, where the names of the methods that are called to perform each step are shown.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=15cm]{OpenMC-BISON-simple.png}
-\end{figure}
-
-And, in more detail, the following figure provides the names of the methods that are called to perform each step and shows the deconstruction and reconstruction actions in BISON.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=15cm]{OpenMC-BISON-complicated.png}
+\includegraphics[width=15cm]{figures/OpenMC-BISON-complicated.png}
 \end{figure}
 
 \subsection{Nek and BISON Coupling}
@@ -242,15 +236,16 @@ This section discusses the coupling between Nek and BISON, where Nek is wrapped 
 \subsection{OpenMC, Nek, and BISON Coupling}
 When coupling more than two applications using the MOOSE framework, there are several options for the coupling structure. In order to motivate the structure selected, an understanding of the limitations of the MOOSE coupling framework must be understood. The general coupling framework for a MOOSE simulation consists of a Master App and MultiApps. For each time step, unless sub-cycling is turned on (in which case one of the Apps may run at finer time steps than the others), all of the Apps, including the Master App, will execute. The order in which the execution of the Apps occurs is controlled with the {\tt execute\_on} parameter, which can take several values, most commonly {\tt timestep\_begin} and {\tt timestep\_end}. The MultiApps that execute on the start of a time step and on the end of a time step bound the execution of the Master App. If there are more than two MultiApps to a Master App, then in order to ensure full exchange of information at each time step, a custom routine for transferring data {\it in time} (not a custom {\tt Transfer} class, to be discussed later) is required. This would require developing a custom {\tt MultiApp} class, which is where the execution in time is controlled (note that there are other options for the {\tt execute\_on} parameter, but they are related to the finite element solve, such as {\tt linear\_residual} - with an external code that is not running any MOOSE kernels, these options don't make sense).
 
-To keep the coupling as simple as possible and to avoid the need to develop custom Multi Apps (which is more intensive than developing custom transfers, executioners, and time steppers), the coupling is chosen to be limited to two distinct MultiApps per Master App. Note that this does {\it not} limit a total of two MultiApps per Master App - if the MultiApps are BISON and MOON, there may be many parallel instances of BISON, so long as there are only two distinct MultiApps (BISON and MOON). When selecting the Master App, the Master App can either perform a solve (and hence be one of Okapi, BISON, or MOON) or simply exist to transfer data between the Multi Apps (and hence be one of Okapi, BISON, MOON, PRONGHORN, RATTLESNAKE, etc. - the animal itself doesn't matter because it's only using capabilities in the MOOSE framework, not any physics-specific capabilities). The complication with using a master App for this three-way coupling that does not perform any physics solve is that it becomes much more difficult to control the execution of three peer Apps. There are only two available execution instructions - {\tt timestep\_begin} and {\tt timestep\_end}, which does not offer enough flexibility in specification to define how {\it three} peer Apps should run.
+To keep the coupling as simple as possible and to avoid the need to develop custom Multi Apps (which is more intensive than developing custom transfers, executioners, and time steppers), the coupling is chosen to be limited to two distinct MultiApps per Master App. Note that this does {\it not} limit a total of two MultiApps per Master App - if the MultiApps are BISON and MOON, there may be many parallel instances of BISON, so long as there are only two distinct MultiApps (BISON and MOON). When selecting the Master App, the Master App can either perform a solve (and hence be one of Okapi, BISON, or MOON) or simply exist to transfer data between the Multi Apps (and hence be one of Okapi, BISON, MOON, PRONGHORN, RATTLESNAKE, etc. - the animal itself doesn't matter because it's only using capabilities in the MOOSE framework, not any physics-specific capabilities). The complication with using a master App for this three-way coupling that does not perform any physics solve is that it becomes much more difficult to control the execution of three peer Apps. There are only two available execution instructions that apply for non-MOOSE codes - {\tt timestep\_begin} and {\tt timestep\_end}, which does not offer enough flexibility in specification to define how {\it three} peer Apps should run.
 
 If we restrict ourselves to only using two peer MultiApps per Master App, then the Master App must perform a physical solve. For a Master App that performs a physical solve, either BISON, MOON, or Okapi can be the Master App. Because multiple fuel pins can be simulated entirely in parallel (since a boundary coupling is employed with Nek), it would be inadvisable to have BISON be the Master App. This would restrict the coupling to a single fuel pin because there can only be a single Master App. A non-trivial amount of MPI code {\it could} allow this configuration to work correctly, but it would be much easier for either Okapi or MOON to be the Master App. 
 
-The choice between MOON and Okapi for the Master App is more arbitrary than the choice to not choose BISON as the Master App, but is still based on characteristics of the coupling. Because Okapi is the only App that will solve for the entire domain (MOON solves in the fluid, BISON solves in the fuel), it is logical to choose Okapi as the Master App. So, Okapi is selected as the Master App, which both performs its own solve and transfers data between BISON and MOON. The figure below shows all of the necessary methods to perform a three-way coupled simulation, with numbers indicating the order in which they would occur for a single Picard step. BISON is arbitrarily chosen to run first. 
+The choice between MOON and Okapi for the Master App is more arbitrary than the choice to not choose BISON as the Master App, but is still based on characteristics of the coupling. Because Okapi is the only App that will solve for the entire domain (MOON solves in the fluid, BISON solves in the fuel), it is logical to choose Okapi as the Master App. The Okapi Master App both performs its own solve and transfers data between BISON and MOON. The example in {\tt tests/transfers/okapi-bison-nek} shows a functioning three-way coupling for a single fuel pin using this coupling structure. The figures that follow make references to variables in these files for the purpose of being explicit. The figure below shows all of the necessary methods to perform a three-way coupled simulation, with numbers indicating the order in which they would occur for a single Picard step. MOON is arbitrarily chosen to run first. 
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=17.5cm]{OpenMC-BISON-Nek-complicated.png}
+\includegraphics[width=17.5cm]{figures/OpenMC-BISON-Nek-complicated.png}
+\caption{Sequence of events taken in one Picard iteration with MOON arbitrarily chosen to run first.}
 \end{figure}
 
 With Okapi as the Master App, either BISON can be run before MOON, or MOON run before BISON. Section \ref{sec:ICs} will discuss how boundary conditions are set based on which of the MultiApps executes first. For either choice of App running at the beginning of a time step versus at the end of a time step, the sequence of events is as follows. For MOON executing first:
@@ -290,11 +285,11 @@ And for BISON executing first, the sequence of events are similar, except that s
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=17.5cm]{OpenMC-BISON-Nek-step1.png}
+\includegraphics[width=17.5cm]{figures/OpenMC-BISON-Nek-step1.png}
+\caption{Sequence of events and variables used to store coupling data for the three-way OpenMC, BISON, and Nek coupling. The fonts used for different variables are shown in the box in the lower right.}
 \end{figure}
 
-The example in {\tt tests/transfers/okapi-bison-nek} shows a functioning three-way coupling for a single fuel pin.
-
+\clearpage
 \section{Initial Conditions}
 \label{sec:ICs}
 This section discusses how initial conditions are applied to OpenMC, Nek, and BISON for a coupled solve. There are two generally types of initializations that are performed for a single physics code:
@@ -304,22 +299,38 @@ This section discusses how initial conditions are applied to OpenMC, Nek, and BI
 \item Initial values for solution variables that are needed to begin the finite difference time marching
 \end{itemize}
 
-It becomes increasingly difficult as the number of coupled codes increases to ensure consistency between all of the initial conditions and system specifications. To attempt to achieve consistency, all initial conditions should be set from MOOSE. However, if desired, these MOOSE initial conditions can be omitted, and initial conditions set in the usual manner in the code's input files (OpenMC's XML files or Nek's {\tt rea} file). 
+It becomes increasingly difficult as the number of coupled codes increases to ensure consistency between all of the initial conditions and system specifications. To attempt to achieve consistency, all initial conditions should be set from MOOSE. However, if desired, these MOOSE initial conditions can be omitted, and initial conditions set in the usual manner in the code's input files (OpenMC's XML files or Nek's {\tt rea} and {\tt usr} files). 
 
 Either MOON or Buffalo may execute first, so the required initial conditions depends on this choice. Note that the requirements to set boundary conditions also depends on the extent to which the transfer classes have been completed - if the capability to transfer fluid density has not yet been implemented in Nek, for example, then an initial condition must be specified on the fluid density for OpenMC. 
 
 \subsection{MOON Before BISON}
-When MOON runs before BISON, initial conditions must be specified for fields that are inputs to MOON and for those fields that are inputs to Okapi that would have been determined by BISON. This section discusses how to set these initial conditions.
+When MOON runs before BISON, initial conditions must be specified for fields that are inputs to MOON and for those fields that are inputs to Okapi that would have been determined by BISON. This section discusses how to set these initial conditions. These fields that must have initial conditions are:
+
+\begin{itemize}
+\item Heat flux boundary condition (BISON does not run before Nek)
+\item Fluid-specific boundary conditions that are required by Nek, such as fluid inlet temperature/density, pressure, etc. These type of boundary conditions vary depending on the problem specifics.
+\item Fuel density (BISON does not run before OpenMC)
+\item Fuel temperature (BISON does not run before OpenMC)
+\end{itemize}
 
 \subsubsection{Fuel Wall Heat Flux and Temperature}
-Because BISON does not run before MOON for the very first time step, an initial condition must be set on the fuel wall heat flux. Because this is a MOOSE variable (represented as a scalar auxvariable), it is most sensible to define this parameter directly in the master input file. The fuel wall heat flux is directly related to the fuel temperature, since the wall heat flux is simply \(-k\nabla\cdot T\hat{n}\), where \(T\) is the fuel temperature. So, if the user is going to specify the wall heat flux, it would be good to ensure consistency with the initial condition specified on fuel temperature. 
+Because BISON does not run before MOON for the very first time step, an initial condition must be set on the fuel wall heat flux. Because this is a MOOSE variable (represented as a scalar auxvariable), it is most sensible to define this parameter directly in the master MOOSE input file. The fuel wall heat flux is directly related to the fuel temperature, so if the user is going to specify the wall heat flux, it would be good to ensure consistency with the initial condition specified on fuel temperature. 
 
 The initial condition on fuel temperature is required because BISON does not run before Okapi for the very first time step. An initial condition on fuel temperature can be set either in OpenMC XML input files or through an initial condition class in the MOOSE master input file. Because it is logical to specify the wall heat flux initial condition directly in the master input file, for consistency the fuel temperature initial condition is also specified in the master input file. 
 
 For simple cases, all temperature initial conditions needed by OpenMC can be specified in the OpenMC XML files, and the heat flux BC determined by hand. 
 
 \subsection{BISON Before MOON}
+When BISON runs before MOON, initial conditions must be specified for fields that are inputs to BISON and for those fields that are inputs to Okapi that would have been determined by Nek. This section discusses how to set these initial conditions. These fields that must have initial conditions are:
 
+\begin{itemize}
+\item Kappa-fission distribution (OpenMC does not run before BISON)
+\item Temperature boundary condition (Nek does not run before BISON)
+\item Fluid density (Nek does not run before OpenMC)
+\item Fluid temperature (Nek does not run before OpenMC)
+\end{itemize}
+
+\clearpage
 \section{Data Transfer}
 This section first discusses the general requirements needed to transfer information between two physics codes. Then, subsections focusing on MOOSE, OpenMC, and Nek will individually describe the data transfer capabilities introduced in order to transfer information between all three codes. When coupling two codes, there are two general ways in which the data can be transferred:
 
@@ -648,108 +659,6 @@ When transferring data from MOOSE to Nek, the expansion coefficients are stored 
 
 The {\tt userchk} subroutine is used to interrogate the solution, and is where the maximum Legendre and Fourier expansion orders are defined ({\tt nl\_max} and {\tt nf\_max}, respectively). Because FORTRAN 77 does not allow dynamic allocation, these are defined as a maximum values of 100 (likely to be sufficiently large for all coupling problems). The {\tt userchk} subroutine is called once during the {\tt nek\_init} subroutine (at the very start of the simulation) and once for each time step during the {\tt nek\_solve} subroutine following the {\tt nek\_\_multi\_advance} subroutine (where an actual solve is performed?).
 
-\begin{lstlisting}[language=Fortran]
-subroutine userchk
-include 'SIZE'
-include 'TOTAL'
-
-! maximum Legendre and Fourier expansion orders
-parameter (nl_max=100)
-parameter (nf_max=100)
-
-common/expansion_tdata/n_legendre, m_fourier
-common/expansion_tcoef/coeff_tij(nl_max,nf_max)
-common/expansion_fcoef/coeff_fij(nl_max,nf_max)
-common/expansion_recon/flux_recon(lx1,ly1,lz1,lelt)
-common/test_passing/ flux_moose, temp_nek
-real sint, sint1, sarea, sarea1, wtmp
-integer e, f
-
-n1=nelt*lx1*ly1*lz1
-n2=nelt*lx2*ly2*lz2
-
-pmin=glmin(pr,n2)
-pmax=glmax(pr,n2)
-wmin=glmin(vz,n1)
-wmax=glmax(vz,n1)
-tmin=glmin(t,n1)
-tmax=glmax(t,n1)
-
-      ifflow=.false.
-
-c      if (istep.eq.0) then
-c         call rzero(t,n1)
-c      endif
-
-      sint1=0.0
-      sarea1=0.0
-
-      do e=1,lelt
-        do f=1,6
-          call surface_int(sint,sarea,t,e,f)
-          if (cbc(f,e,1).eq.'W  ') then
-           sint1=sint1+sint
-           sarea1=sarea1+sarea
-          endif
-         enddo
-      enddo
-
-      call  gop(sint1,wtmp,'+  ',1)
-      call  gop(sarea1,wtmp,'+  ',1)
-
-      temp_nek=sint1/sarea1
-
-      sint1=0.0
-      sarea1=0.0
-
-      do e=1,lelt
-        do f=1,6
-          call surface_int(sint,sarea,flux_recon,e,f)
-          if (cbc(f,e,1).eq.'W  ') then
-           sint1=sint1+sint
-           sarea1=sarea1+sarea
-          endif
-         enddo
-      enddo
-
-      call  gop(sint1,wtmp,'+  ',1)
-      call  gop(sarea1,wtmp,'+  ',1)
-
-      flux_moose=sint1/sarea1
-
-      call heat_balance(flux_moose)
-
-      if (nid.eq.0) then
-         write(6,*)"*** Temperature: ",tmin," - ",tmax
-         write(6,*)"*** Average Temperature: ",temp_nek,coeff_tij(1,1)
-         write(6,*)"*** Average Flux: ",flux_moose,coeff_fij(1,1)
-      endif
-
-! Set the orders of the expansion that will be used. This should match the orders used in the MOOSE input files.
-      n_legendre=10
-      m_fourier=5
-c-----------------------------------------------
-
-c This is for testing -----------
-c      call flux_reconstruction()
-c      call nek_expansion()
-c      call nek_diag()
-c      if (nid.eq.0) write(6,*)" *** Expansion done"
-c      call nek_testp()
-c      call exitt()
-c--------------------------------
-
-c This is to test coefficients with MOOSE --
-c      do i0=1,n_legendre
-c        do j0=1,m_fourier
-c        if (nid.eq.0) write(6,*)"C(",i0,",",j0,")=",
-c     &      coeff_fij(i0,j0)
-c        enddo
-c      enddo
-c------------------------------------------
-      return
-      end
-\end{lstlisting}
 
 After writing to the flux expansion coefficient array, the {\tt flux\_reconstruction} subroutine is called. 
 
