@@ -12,7 +12,7 @@
 /*            See COPYRIGHT for full restrictions               */
 /****************************************************************/
 
-#include "OkapiMCSApp.h"
+#include "OkapiApp.h"
 #include "gtest/gtest.h"
 
 // Moose includes
@@ -32,7 +32,7 @@ main(int argc, char ** argv)
   testing::InitGoogleTest(&argc, argv);
 
   MooseInit init(argc, argv);
-  registerApp(OkapiMCSApp);
+  registerApp(OkapiApp);
   Moose::_throw_on_error = true;
 
   return RUN_ALL_TESTS();
