@@ -46,20 +46,20 @@ ADDITIONAL_LIBS 	:= $(FRAMEWORK_DIR)/contrib/gtest/libgtest.la
 # dep apps
 CURRENT_DIR        := $(shell pwd)
 APPLICATION_DIR    := $(CURRENT_DIR)/..
-APPLICATION_NAME   := okapimcs
+APPLICATION_NAME   := okapi
 include            $(FRAMEWORK_DIR)/app.mk
 
 APPLICATION_DIR    := $(CURRENT_DIR)
-APPLICATION_NAME   := okapimcs-unit
+APPLICATION_NAME   := okapi-unit
 BUILD_EXEC         := yes
 
 DEP_APPS    ?= $(shell $(FRAMEWORK_DIR)/scripts/find_dep_apps.py $(APPLICATION_NAME))
 include $(FRAMEWORK_DIR)/app.mk
 
 # Find all the OkapiMCS unit test source files and include their dependencies.
-okapimcs_unit_srcfiles := $(shell find $(MOOSE_DIR)/unit/src -name "*.C")
-okapimcs_unit_deps := $(patsubst %.C, %.$(obj-suffix).d, $(okapimcs_unit_srcfiles))
--include $(okapimcs_unit_deps)
+okapi_unit_srcfiles := $(shell find $(MOOSE_DIR)/unit/src -name "*.C")
+okapi_unit_deps := $(patsubst %.C, %.$(obj-suffix).d, $(okapi_unit_srcfiles))
+-include $(okapi_unit_deps)
 
 ###############################################################################
 # Additional special case targets should be added here

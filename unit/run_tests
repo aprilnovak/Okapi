@@ -1,6 +1,6 @@
 #!/bin/bash
 
-APPLICATION_NAME=okapimcs
+APPLICATION_NAME=okapi
 # If $METHOD is not set, use opt
 if [ -z $METHOD ]; then
   export METHOD=opt

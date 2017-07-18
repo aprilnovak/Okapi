@@ -1,3 +1,5 @@
+*.sch
+*.fld*
 .libs
 *.exo
 *.la
