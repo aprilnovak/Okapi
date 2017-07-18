@@ -99,7 +99,11 @@ MultiAppMoonOkapiTransfer::execute()
     // the temperature BC is passed.
     case FROM_MULTIAPP:
     {
+      // expand the surface heat flux into coefficients
       FORTRAN_CALL(Nek5000::nek_expansion)();
+
+      // compute the bins of axially-averaged fluid temperature
+      FORTRAN_CALL(Nek5000::axially_binned_integration)();
 
       std::vector<MooseVariableScalar *> to_variables(num_vars_to_write);
       for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)

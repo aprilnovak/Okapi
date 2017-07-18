@@ -58,12 +58,12 @@ namespace Nek5000
     // holds temperature expansion coefficients created by Nek that are passed
     // to MOOSE
     extern struct {
-      double coeff_tij[];
+      double coeff_tij [];
     } expansion_tcoef_;
 
     // holds flux expansion coefficients created by MOOSE that are passed to Nek
     extern struct {
-      double coeff_fij[];
+      double coeff_fij [];
     } expansion_fcoef_;
 
     // holds expansion orders for temperature BC expansion
@@ -71,6 +71,13 @@ namespace Nek5000
       int n_legendre;
       int m_fourier;
    } expansion_tdata_;
+
+    // holds binned axially-averaged fluid temperatures and densities created
+    // by Nek that are passed to Okapi
+    extern struct {
+      double fluid_temp_bins [];
+      int n_layer;
+    } axial_averages_;
 
     // routines to run Nek
     void FORTRAN_CALL(nek_init)(const int&);
@@ -85,6 +92,10 @@ namespace Nek5000
     // reconstruct a continuous field in Nek using expansion coefficients
     // from MOOSE
     void FORTRAN_CALL(flux_reconstruction)();
+
+   // deconstruct a continuous variable in Nek into a set of axially
+   // averaged values using binned volume integration
+   void FORTRAN_CALL(axially_binned_integration)();
   }
 }
 
