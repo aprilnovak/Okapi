@@ -4,9 +4,6 @@
 #include "ModulesApp.h"
 #include "MooseSyntax.h"
 
-// ics
-#include "OpenMCTempScalarComponentIC.h"
-
 // executioner and timestepper
 #include "OpenMCExecutioner.h"
 #include "OpenMCTimeStepper.h"
@@ -58,7 +55,6 @@ OkapiApp__registerObjects(Factory & factory)
 void
 OkapiApp::registerObjects(Factory & factory)
 {
-  registerInitialCondition(OpenMCTempScalarComponentIC);
   registerExecutioner(OpenMCExecutioner);
   registerTimeStepper(OpenMCTimeStepper);
   registerTransfer(MultiAppOkapiMooseTransfer);
