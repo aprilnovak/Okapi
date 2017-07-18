@@ -151,6 +151,8 @@
 
 [Executioner]
   type = Transient
+  nl_rel_tol = 1e-6
+  l_tol = 1e-6
 []
 
 [Postprocessors]
