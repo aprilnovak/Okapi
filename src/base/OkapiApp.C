@@ -7,9 +7,6 @@
 // ics
 #include "OpenMCTempScalarComponentIC.h"
 
-// test kernels (not used)
-#include "MomFrictionForce.h"
-
 // executioner and timestepper
 #include "OpenMCExecutioner.h"
 #include "OpenMCTimeStepper.h"
@@ -18,9 +15,6 @@
 #include "MultiAppOkapiMooseTransfer.h"
 #include "MultiAppMooseOkapiTransfer.h"
 #include "MultiAppMoonOkapiTransfer.h"
-
-// user objects
-#include "ZLDeconstruction.h"
 
 template <>
 InputParameters
@@ -65,13 +59,11 @@ void
 OkapiApp::registerObjects(Factory & factory)
 {
   registerInitialCondition(OpenMCTempScalarComponentIC);
-  registerKernel(MomFrictionForce);
   registerExecutioner(OpenMCExecutioner);
   registerTimeStepper(OpenMCTimeStepper);
   registerTransfer(MultiAppOkapiMooseTransfer);
   registerTransfer(MultiAppMooseOkapiTransfer);
   registerTransfer(MultiAppMoonOkapiTransfer);
-  registerUserObject(ZLDeconstruction);
 }
 
 // External entry point for dynamic syntax association
