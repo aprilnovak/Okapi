@@ -16,45 +16,6 @@ namespace Nek5000
 {
   extern "C" {
 
-    // CFILES common block
-    extern struct {
-      char \
-        reafle[PATHLEN], \
-        fldfle[PATHLEN], \
-        dmpfle[PATHLEN], \
-        hisfle[PATHLEN], \
-        schfle[PATHLEN], \
-        orefle[PATHLEN], \
-        nrefle[PATHLEN];
-    } cfiles_;
-
-    // DIMN common block
-    extern struct {
-      int \
-        nelv,  \
-        nelt,  \
-        nx1,   \
-        ny1,   \
-        nz1,   \
-        nx2,   \
-        ny2,   \
-        nz2,   \
-        nx3,   \
-        ny3,   \
-        nz3,   \
-        ndim,  \
-        nfield,\
-        npert, \
-        nid,   \
-        nxd,   \
-        nyd,   \
-        nzd;
-    } dimn_;
-
-    extern struct {
-      double flux_moose, temp_nek;
-    } test_passing_;
-
     // holds temperature expansion coefficients created by Nek that are passed
     // to MOOSE
     extern struct {
@@ -72,18 +33,16 @@ namespace Nek5000
       int m_fourier;
    } expansion_tdata_;
 
-    // holds binned axially-averaged fluid temperatures and densities created
-    // by Nek that are passed to Okapi
+    // holds number of axial bins for axial fluid temperature and denisty
+    // integration
     extern struct {
-      double fluid_temp_bins [];
       int n_layer;
-    } axial_averages_;
+    } layer_data_;
 
-    // routines to run Nek
-    void FORTRAN_CALL(nek_init)(const int&);
-    void FORTRAN_CALL(nek_init_step)();
-    void FORTRAN_CALL(nek_step)();
-    void FORTRAN_CALL(nek_finalize_step)();
+    // holds axially-averaged fluid temperature
+    extern struct {
+      double fluid_temp_bins[];
+    } fluid_bins_;
 
     // deconstructs a continuous variable in Nek into a set of expansion
     // coefficients using a Fourier-Legendre expansion

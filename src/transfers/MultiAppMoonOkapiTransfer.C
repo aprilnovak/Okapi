@@ -96,7 +96,7 @@ MultiAppMoonOkapiTransfer::execute()
 
     // MOON -> Okapi. This direction is used to transfer coefficients for a
     // temperature BC, fluid density, and fluid temperature. Currently only
-    // the temperature BC is passed.
+    // the temperature BC and fluid temperature as passed.
     case FROM_MULTIAPP:
     {
       // expand the surface heat flux into coefficients
@@ -105,6 +105,7 @@ MultiAppMoonOkapiTransfer::execute()
       // compute the bins of axially-averaged fluid temperature
       FORTRAN_CALL(Nek5000::axially_binned_integration)();
 
+      // Initialize all of the variables we'll write to store the temp BC
       std::vector<MooseVariableScalar *> to_variables(num_vars_to_write);
       for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
       {
@@ -113,7 +114,8 @@ MultiAppMoonOkapiTransfer::execute()
         to_variables[i]->reinit();
       }
 
-      // Check that all of the variables to write are of the same order.
+      // Check that all of the variables to write are of the same order for
+      // the temp BC
       int write_var_size = to_variables[beginIndex(_to_aux_names)]->sln().size();
       for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
       {
@@ -122,6 +124,7 @@ MultiAppMoonOkapiTransfer::execute()
             " are not all the same!");
       }
 
+      // Write temp BC coefficients from MOON to Okapi
       if(_dbg)
         _console << "Writing temp BC coeffs from MOON to Okapi..." << std::endl;
       for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
@@ -138,6 +141,19 @@ MultiAppMoonOkapiTransfer::execute()
         if (_dbg) _console << '\n';
         to_variables[i]->sys().solution().close();
       }
+
+      // Write axially-binned fluid average temperatures from MOON to Okapi
+      if(_dbg)
+        _console << "Writing axially-binned fluid temperature from MOON to Okapi..."
+          << "(" << Nek5000::layer_data_.n_layer << " bins)" << std::endl
+          << "Temperatures: " << std::endl;
+      for (int i = 0; i < Nek5000::layer_data_.n_layer; ++i)
+      {
+        if (_dbg) _console << Nek5000::fluid_bins_.fluid_temp_bins[i]
+          << ' ';
+        // TODO: use the axial averages in OpenMC by calling some OpenMC routine
+      }
+      if (_dbg) _console << std::endl;
 
       break;
     }
