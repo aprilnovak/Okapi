@@ -35,14 +35,19 @@
     poly_coeffs = 'l_0_coeffs_kappa_fission'
     dbg = false
   [../]
+
+  # ---- Reconstruction of the surface temperature BC from Nek ---- #
+  #      Note that the l_order and f_order are interpreted          #
+  #      as the order, and should be each one smaller than          #
+  #      the number of polynomials.                                 #
   [./temp_BC_reconstruction]
     type = FourierLegendreReconstruction
-    l_order = 9
-    f_order = 0
+    l_order = 10
+    f_order = 5
     l_direction = 2
     legendre_function = legendre
     fourier_function = fourier
-    poly_coeffs = 'f_0_coeffs_temp_BC_bison'
+    poly_coeffs = 'f_0_coeffs_temp_BC_bison f_1_coeffs_temp_BC_bison f_2_coeffs_temp_BC_bison f_3_coeffs_temp_BC_bison f_4_coeffs_temp_BC_bison f_5_coeffs_temp_BC_bison '
   [../]
 []
 
@@ -56,14 +61,59 @@
     family = SCALAR
     order = THIRD
   [../]
-  [./f_0_coeffs_temp_BC_bison] # where temp BC coefficients are copied
+
+  # ---- where temp BC coefficients are received from Okapi ---- #
+  [./f_0_coeffs_temp_BC_bison]
     family = SCALAR
-    order = TENTH
+    order = ELEVENTH
   [../]
-  [./f_0_coeffs_flux_BC_bison] # where flux BC coefficients are placed
+  [./f_1_coeffs_temp_BC_bison]
     family = SCALAR
-    order = TENTH
+    order = ELEVENTH
   [../]
+  [./f_2_coeffs_temp_BC_bison]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_3_coeffs_temp_BC_bison]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_4_coeffs_temp_BC_bison]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_5_coeffs_temp_BC_bison]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+
+  # ---- where heat flux BC coefficients are placed ---- #
+  [./f_0_coeffs_flux_BC_bison]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_1_coeffs_flux_BC_bison]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_2_coeffs_flux_BC_bison]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_3_coeffs_flux_BC_bison]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_4_coeffs_flux_BC_bison]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_5_coeffs_flux_BC_bison]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+
   [./l_0_coeffs_temp] # where temperature coefficients are placed
     family = SCALAR
     order = THIRD
@@ -126,6 +176,8 @@
     aux_scalar_name = 'l_0_coeffs_temp'
     volume_pp = 'volume'
   [../]
+
+  # ---- Compute heat flux BC coefficients --- #
   [./f_0_coeffs_flux_BC]
     type = FLDeconstruction
     flux_integral = true

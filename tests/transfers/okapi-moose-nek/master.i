@@ -18,21 +18,66 @@
 []
 
 [AuxVariables]
-  [./f_0_coeffs_temp_BC] # middle-man storage for temp BC
+  # ---- middle-man storage for the temp BC computed by Nek ---- #
+  [./f_0_coeffs_temp_BC]
     family = SCALAR
-    order = TENTH
+    order = ELEVENTH
   [../]
-  [./f_0_coeffs_flux_BC] # middle-man storage for flux BC
+  [./f_1_coeffs_temp_BC]
     family = SCALAR
-    order = TENTH
+    order = ELEVENTH
+  [../]
+  [./f_2_coeffs_temp_BC]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_3_coeffs_temp_BC]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_4_coeffs_temp_BC]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_5_coeffs_temp_BC]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+
+  # ---- middle-man storage for the flux BC computed by Nek ---- #
+  [./f_0_coeffs_flux_BC]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_1_coeffs_flux_BC]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_2_coeffs_flux_BC]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_3_coeffs_flux_BC]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_4_coeffs_flux_BC]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_5_coeffs_flux_BC]
+    family = SCALAR
+    order = ELEVENTH
   [../]
 []
 
 [ICs]
-  [./f_0_coeffs_flux_BC] # initial condition on the wall heat flux, used by Nek
+  # ---- IC on the wall heat flux used by Nek because BISON runs ---- #
+  #      before MOON.                                                 #
+  [./f_0_coeffs_flux_BC]
     type = ScalarComponentIC
     variable = 'f_0_coeffs_flux_BC'
-    values = '1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0'
+    values = '1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0'
   [../]
 []
 
@@ -68,7 +113,7 @@
     type = MultiAppMoonOkapiTransfer
     direction = to_multiapp
     multi_app = nek
-    source_variable = 'f_0_coeffs_flux_BC'
+    source_variable = 'f_0_coeffs_flux_BC f_1_coeffs_flux_BC f_2_coeffs_flux_BC f_3_coeffs_flux_BC f_4_coeffs_flux_BC f_5_coeffs_flux_BC'
     to_aux_scalar = 'foo'
     execute_on = timestep_begin
   [../]
@@ -77,7 +122,7 @@
     direction = from_multiapp
     multi_app = nek
     source_variable = 'foo'
-    to_aux_scalar = 'f_0_coeffs_temp_BC'
+    to_aux_scalar = 'f_0_coeffs_temp_BC f_1_coeffs_temp_BC f_2_coeffs_temp_BC f_3_coeffs_temp_BC f_4_coeffs_temp_BC f_5_coeffs_temp_BC'
     execute_on = timestep_begin
   [../]
 
@@ -90,7 +135,11 @@
     openmc_cell = 1
     execute_on = timestep_end
   [../]
-  [./to_bison_temp]
+
+  # --- Transfer SCALAR aux variables from Okapi to BISON ---- #
+  #     Due to the nature of the MultiAppScalarToAuxScalar     #
+  #     transfer, this needs to occur one at a time            #
+  [./to_bison_temp_f0]
     type = MultiAppScalarToAuxScalarTransfer
     direction = to_multiapp
     multi_app = bison
@@ -98,6 +147,49 @@
     to_aux_scalar = 'f_0_coeffs_temp_BC_bison'
     execute_on = timestep_end
   [../]
+  [./to_bison_temp_f1]
+    type = MultiAppScalarToAuxScalarTransfer
+    direction = to_multiapp
+    multi_app = bison
+    source_variable = 'f_1_coeffs_temp_BC'
+    to_aux_scalar = 'f_1_coeffs_temp_BC_bison'
+    execute_on = timestep_end
+  [../]
+  [./to_bison_temp_f2]
+    type = MultiAppScalarToAuxScalarTransfer
+    direction = to_multiapp
+    multi_app = bison
+    source_variable = 'f_2_coeffs_temp_BC'
+    to_aux_scalar = 'f_2_coeffs_temp_BC_bison'
+    execute_on = timestep_end
+  [../]
+  [./to_bison_temp_f3]
+    type = MultiAppScalarToAuxScalarTransfer
+    direction = to_multiapp
+    multi_app = bison
+    source_variable = 'f_3_coeffs_temp_BC'
+    to_aux_scalar = 'f_3_coeffs_temp_BC_bison'
+    execute_on = timestep_end
+  [../]
+  [./to_bison_temp_f4]
+    type = MultiAppScalarToAuxScalarTransfer
+    direction = to_multiapp
+    multi_app = bison
+    source_variable = 'f_4_coeffs_temp_BC'
+    to_aux_scalar = 'f_4_coeffs_temp_BC_bison'
+    execute_on = timestep_end
+  [../]
+  [./to_bison_temp_f5]
+    type = MultiAppScalarToAuxScalarTransfer
+    direction = to_multiapp
+    multi_app = bison
+    source_variable = 'f_5_coeffs_temp_BC'
+    to_aux_scalar = 'f_5_coeffs_temp_BC_bison'
+    execute_on = timestep_end
+  [../]
+
+
+
   [./from_bison]
     type = MultiAppMooseOkapiTransfer
     direction = from_multiapp
