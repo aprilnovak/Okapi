@@ -75,11 +75,9 @@ MultiAppMooseOkapiTransfer::execute()
           int source_var_size =
             source_variables[beginIndex(_source_var_names)]->sln().size();
           for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
-          {
             if (source_variables[i]->sln().size() != source_var_size)
               mooseError("Order of source variables for "
                 "MultiAppMooseOkapiTranfser are not all the same!");
-          }
 
           // Initialize the moose_coeffs array and then populate by looping over
           // the source variables.
@@ -90,20 +88,16 @@ MultiAppMooseOkapiTransfer::execute()
           {
             auto & soln_values = source_variables[i]->sln();
             for (auto j = beginIndex(soln_values); j < soln_values.size(); ++j)
-            {
               moose_coeffs[i * num_vars_to_read + j] = soln_values[j];
-            }
           }
 
           if (_dbg)
           {
             _console << "Transferring " << num_coeffs_from_moose <<
-              " coefficients from MOOSE to OpenMC..." << std::endl;
-            _console << "For cell " << _cell << ":" << std::endl;
+              " coefficients from MOOSE to OpenMC for cell " << _cell << std::endl;
 
             for (int i = 0; i < num_coeffs_from_moose; ++i)
               _console << moose_coeffs[i] << " ";
-
             _console << std::endl;
           }
 
@@ -121,9 +115,8 @@ MultiAppMooseOkapiTransfer::execute()
         // to apply the scaling factors for a zero-th order Legendre and zero-th
         // order Zernike expansion.
         Real l0_temp_exp = (source_variables[0]->sln())[0] / sqrt(2.0 * M_PI);
-        if (_dbg)
-          _console << "Setting cell " << _cell << " temperature to " <<
-            l0_temp_exp << std::endl;
+        if (_dbg) _console << "Setting cell " << _cell << " temperature to " <<
+          l0_temp_exp << std::endl;
         OpenMC::openmc_cell_set_temperature(_cell, l0_temp_exp);
         }
       }
@@ -154,16 +147,15 @@ MultiAppMooseOkapiTransfer::execute()
          }
 
          // Check that all of the variables to write are the same size
-         int write_var_size = to_variables[beginIndex(_to_aux_names)]->sln().size();
+         int write_var_size =
+           to_variables[beginIndex(_to_aux_names)]->sln().size();
          for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
-         {
            if (to_variables[i]->sln().size() != write_var_size)
              mooseError("The order of the variables to write for the "
                " MultiAppMooseOkapiTransfer are not all the same!");
-         }
 
          // Initialize an array to hold the expansion coefficients we'll receive
-         // from OpenMC. This array holds _all_ of the expansion coefficients
+         // from OpenMC. This array holds all of the expansion coefficients
          // for the cell we specify. For a generic Zernike-Legendre expansion,
          // the order used by OpenMC is specified in the tallies XML file. It is
          // assumed that this XML order matches the available slots to write in
@@ -182,15 +174,12 @@ MultiAppMooseOkapiTransfer::execute()
            omc_coeffs, num_coeffs_from_openmc);
          ErrorHandling::get_coeffs_from_cell(err);
 
+         if (_dbg) _console << "Transferring " << num_coeffs_from_openmc <<
+           " coefficients from OpenMC to MOOSE for cell " << _cell << std::endl;
          if (_dbg)
          {
-            _console << "Transferring " << num_coeffs_from_openmc << " coefficients"
-              " from OpenMC to MOOSE..." << std::endl;
-            _console << "For cell " << _cell << ":" << std::endl;
-
             for (int i = 0; i < num_coeffs_from_openmc; ++i)
               _console << omc_coeffs[i] << " ";
-
             _console << std::endl;
          }
 
@@ -200,7 +189,8 @@ MultiAppMooseOkapiTransfer::execute()
            std::vector<dof_id_type> & dof = to_variables[i]->dofIndices();
            auto & soln_values = to_variables[i]->sln();
            for (auto j = beginIndex(soln_values); j < write_var_size; ++j)
-             to_variables[i]->sys().solution().set(dof[j], omc_coeffs[i * write_var_size + j]);
+             to_variables[i]->sys().solution().set(
+               dof[j], omc_coeffs[i * write_var_size + j]);
 
            to_variables[i]->sys().solution().close();
          }

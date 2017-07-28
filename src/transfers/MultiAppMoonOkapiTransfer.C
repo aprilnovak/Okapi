@@ -19,9 +19,9 @@ InputParameters validParams<MultiAppMoonOkapiTransfer>()
      MOON when MOON is the sub App to an Okapi Master App. */
   InputParameters params = validParams<MultiAppTransfer>();
   params.addRequiredParam<std::vector<VariableName> >("source_variable",
-    "The auxiliary scalar variable to read values from");
+    "The auxiliary scalar variable(s) to read values from");
   params.addRequiredParam<std::vector<VariableName> >("to_aux_scalar",
-    "The name of the scalar Aux variable in the MultiApp to transfer"
+    "The name of the scalar Aux variable(s) in the MultiApp to transfer"
     " the value to.");
   params.addParam<bool>("dbg", false, "Whether to turn on debugging information.");
   return params;
@@ -47,7 +47,7 @@ MultiAppMoonOkapiTransfer::execute()
   switch (_direction)
   {
     // Okapi -> MOON. This direction transfers coefficients for a heat flux
-    // boundary condition.
+    // boundary condition that is computed by BISON (Okapi acts as the middle-man).
     case TO_MULTIAPP:
     {
       // Get the source variables from the Okapi master App
@@ -65,11 +65,22 @@ MultiAppMoonOkapiTransfer::execute()
       int source_var_size =
         source_variables[beginIndex(_source_var_names)]->sln().size();
       for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
-      {
         if (source_variables[i]->sln().size() != source_var_size)
-          mooseError("The order of the source variables for the "
+          mooseError("The order of the heat flux BC source variables for the "
             "MultiAppMoonOkapiTransfer are not all the same!");
-      }
+
+      // Check that the number of variables matches the number of Fourier
+      // terms used in Nek, and that the length of each variable matches the
+      // number of Legendre terms in Nek. In general, m_fourier and n_legendre
+      // could be set in an external code to reduce redunant information
+      // specification by the user, but care has to be taken that the values are
+      // set before they are needed.
+      if (num_vars_to_read != Nek5000::expansion_tdata_.m_fourier)
+        mooseError("Number of Fourier polynomials in Okapi does not agree "
+          "with number expected from Nek! Change m_fourier in the Nek usr file!");
+      if (source_var_size != Nek5000::expansion_tdata_.n_legendre)
+        mooseError("Number of Legendre polynomials in Okapi does not agree "
+          "with number expected fron Nek! Change n_legendre in the Nek usr file!");
 
       for (unsigned int i = 0; i < num_apps; i++)
         if (_multi_app->hasLocalApp(i))
@@ -80,26 +91,27 @@ MultiAppMoonOkapiTransfer::execute()
           for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
           {
             auto & soln_values = source_variables[i]->sln();
-            if (_dbg) _console << "Source var " << i << ": ";
+            if (_dbg) _console << "Fourier order " << i << ": ";
             for (auto j = beginIndex(soln_values); j < source_var_size; ++j)
             {
               if (_dbg) _console << soln_values[j] << ' ';
-              // store the coefficients in Nek5000 arrays
+              // store the coefficients in Nek5000 arrays.
               Nek5000::expansion_fcoef_.coeff_fij[i*100+j] = soln_values[j];
             }
             if (_dbg) _console << '\n';
           }
         }
+      // recosntruct a continuous heat flux on the wall boundary
       FORTRAN_CALL(Nek5000::flux_reconstruction)();
       break;
     }
 
     // MOON -> Okapi. This direction is used to transfer coefficients for a
     // temperature BC, fluid density, and fluid temperature. Currently only
-    // the temperature BC and fluid temperature as passed.
+    // the temperature BC and fluid temperature are passed.
     case FROM_MULTIAPP:
     {
-      // expand the surface heat flux into coefficients
+      // expand the surface heat flux into coefficients.
       FORTRAN_CALL(Nek5000::nek_expansion)();
 
       // compute the bins of axially-averaged fluid temperature
@@ -114,15 +126,27 @@ MultiAppMoonOkapiTransfer::execute()
         to_variables[i]->reinit();
       }
 
-      // Check that all of the variables to write are of the same order for
-      // the temp BC
+      // Check that all of the variables to write are of the same order
       int write_var_size = to_variables[beginIndex(_to_aux_names)]->sln().size();
       for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
       {
         if (to_variables[i]->sln().size() != write_var_size)
-          mooseError("Order of variables to write with MultiAppMoonOkapiTransfer"
-            " are not all the same!");
+          mooseError("The order of the temperature BC variables to write are not"
+            " all the same!");
       }
+
+      // Check that the number of variables matches the number of Fourier
+      // terms used in Nek, and that the length of each variable matches the
+      // number of Legendre terms in Nek. In general, m_fourier and n_legendre
+      // could be set in an external code to reduce redunant information
+      // specification by the user, but care has to be taken that the values are
+      // set before they are needed.
+      if (num_vars_to_write != Nek5000::expansion_tdata_.m_fourier)
+        mooseError("Number of Fourier polynomials in Okapi does not agree "
+          "with number expected from Nek! Change m_fourier in the Nek usr file!");
+      if (write_var_size != Nek5000::expansion_tdata_.n_legendre)
+        mooseError("Number of Legendre polynomials in Okapi does not agree "
+          "with number expected fron Nek! Change n_legendre in the Nek usr file!");
 
       // Write temp BC coefficients from MOON to Okapi
       if(_dbg)
@@ -131,7 +155,7 @@ MultiAppMoonOkapiTransfer::execute()
       {
         std::vector<dof_id_type> & dof = to_variables[i]->dofIndices();
         auto & soln_values = to_variables[i]->sln();
-        if (_dbg) _console << "Write variable " << i << ": ";
+        if (_dbg) _console << "Fourier order " << i << ": ";
         for (auto j = beginIndex(soln_values); j < write_var_size; ++j)
         {
           if (_dbg) _console << Nek5000::expansion_tcoef_.coeff_tij[i*100+j] << ' ';
