@@ -1,0 +1,9 @@
+[Tests]
+  # user specifies a cell ID that does not exist in the OpenMC
+  # geometry XML file.
+  [./invalid_cell_id]
+    type = 'RunException'
+    input = master.i
+    expect_err = "Invalid cell ID used in call to 'openmc_get_cell' routine! Check that the cell ID used for the MultiAppMooseOkapiTransfer transfer exists in the geometry XML file." 
+  [../]
+[]
