@@ -105,11 +105,10 @@ MultiAppMooseOkapiTransfer::execute()
             _console << std::endl;
           }
 
-          // send all expansion coefficients for a cell to OpenMC at one time and
-          // perform error handling
-          int err  = OpenMC::receive_coeffs_for_cell(_cell,
+          // send all expansion coefficients for a cell to OpenMC
+          int err_recv  = OpenMC::receive_coeffs_for_cell(_index,
             moose_coeffs, num_coeffs_from_moose);
-          ErrorHandling::receive_coeffs_for_cell(err);
+          ErrorHandling::receive_coeffs_for_cell(err_recv);
 
         // Change a temperature in OpenMC. For now, only use a single coefficient,
         // since there's no continuous material tracking yet. Note that changing
@@ -128,7 +127,7 @@ MultiAppMooseOkapiTransfer::execute()
       break;
     }
 
-    // Okapi -> MOON. This transfer is used to transfer coefficients for the kappa
+    // Okapi -> MOOSE. This transfer is used to transfer coefficients for the kappa
     // fission distribution from OpenMC to MOOSE.
     case TO_MULTIAPP:
     {
