@@ -20,8 +20,9 @@ public:
 protected:
   std::vector<VariableName> _source_var_names;
   std::vector<VariableName> _to_aux_names;
-  int _cell;
+  int32_t _cell;
   bool _dbg;
+  int32_t _index;
 };
 
 #endif /* MULTIAPPMOOSEOKAPITRANSFER_H */

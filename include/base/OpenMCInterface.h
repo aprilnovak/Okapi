@@ -26,15 +26,36 @@ namespace OpenMC {
        assume that "MPI" is defined in OpenMC, such that openmc_init must be
        called with an intracommunicator. */
 
-    // Routines that are used to run OpenMC.
+    // OPENMC_INIT takes care of all initialization tasks, i.e. reading
+    // from command line, reading xml input files, initializing random
+    // number seeds, reading cross sections, initializing starting source,
+    // setting up timers, etc.
     void openmc_init(const int &);
+
+    // OPENMC_RESET resets tallies and timers
     void openmc_reset();
+
+    // OPENMC_RUN encompasses all the main logic where iterations are performed
+    // over the batches, generations, and histories in a fixed source or
+    // k-eigenvalue calculation.
     void openmc_run();
+
+    // OPENMC_FINALIZE frees up memory by deallocating arrays and resetting
+    // global variables.
     void openmc_finalize();
 
+    // OPENMC_GET_CELL returns the index in the cells array of a cell with
+    // a given ID (defined in the XML file). This is used to avoid repeated
+    // lookups in the hash table when multiple operations will be performed
+    // on a cell.
+    int openmc_get_cell(int32_t id, int32_t * index);
+
     // set a cell temperature given a temperature. This is used for transferring
-    // data from MOOSE to OpenMC.
-    int openmc_cell_set_temperature(int, double);
+    // data from MOOSE to OpenMC. Because the instance is optional, it is not
+    // received by value on the Fortran side, so we use a pointer here. The
+    // cell index can be determined with a call to 'openmc_get_cell'.
+    int openmc_cell_set_temperature(int32_t index, double temperature,
+      int32_t * instance);
 
     // store expansion coefficients by cell. This is used for transferring data
     // from OpenMC to MOOSE.
@@ -42,11 +63,12 @@ namespace OpenMC {
 
     // obtain coefficients given cell ID. This is used for transferring data
     // from OpenMC to MOOSE. This returns an error code.
-    int get_coeffs_from_cell(int, double [], int);
+    int get_coeffs_from_cell(int32_t id, double [], int n);
 
     // set coefficients in OpenMC given a cell ID. This is used for
-   // transferring data from MOOSE to OpenMC. This returns an error code.
-   int receive_coeffs_for_cell(int, double [], int);
+    // transferring data from MOOSE to OpenMC. This returns an error code.
+    int receive_coeffs_for_cell(int32_t id, double [], int n);
+
   }
 }
 

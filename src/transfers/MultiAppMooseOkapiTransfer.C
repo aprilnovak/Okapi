@@ -26,7 +26,7 @@ InputParameters validParams<MultiAppMooseOkapiTransfer>()
   params.addRequiredParam<std::vector<VariableName> >("to_aux_scalar",
     "The name of the SCALAR auxvariable in the MultiApp to transfer the "
     "value to.");
-  params.addRequiredParam<int>("openmc_cell", "OpenMC cell ID (defined in "
+  params.addRequiredParam<int32_t>("openmc_cell", "OpenMC cell ID (defined in "
     "input file) for this transfer to be associated with.");
   params.addParam<bool>("dbg", false, "Whether to turn on debugging information");
   return params;
@@ -36,7 +36,7 @@ MultiAppMooseOkapiTransfer::MultiAppMooseOkapiTransfer(const InputParameters & p
     MultiAppTransfer(parameters),
     _source_var_names(getParam<std::vector<VariableName>>("source_variable")),
     _to_aux_names(getParam<std::vector<VariableName>>("to_aux_scalar")),
-    _cell(parameters.get<int>("openmc_cell")),
+    _cell(parameters.get<int32_t>("openmc_cell")),
     _dbg(parameters.get<bool>("dbg"))
 {
 }
@@ -50,6 +50,11 @@ MultiAppMooseOkapiTransfer::execute()
   int num_apps = _multi_app->numGlobalApps();
   int num_vars_to_read = _source_var_names.size();
   int num_vars_to_write = _to_aux_names.size();
+
+  // get the index of the cell in the cells(:) OpenMC array to be used
+  // for later calls to cell-dependent OpenMC routines
+  int err_index = OpenMC::openmc_get_cell(_cell, &_index);
+  ErrorHandling::openmc_get_cell(err_index, "MultiAppMooseOkapiTransfer");
 
   switch (_direction)
   {
@@ -83,7 +88,6 @@ MultiAppMooseOkapiTransfer::execute()
           // the source variables.
           int num_coeffs_from_moose = num_vars_to_read * source_var_size;
           double moose_coeffs[num_coeffs_from_moose];
-
           for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
           {
             auto & soln_values = source_variables[i]->sln();

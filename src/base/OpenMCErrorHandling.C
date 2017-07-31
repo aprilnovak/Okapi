@@ -29,3 +29,14 @@ void ErrorHandling::get_coeffs_from_cell(int err)
     mooseError("Cannot get expansion coefficients from cell because no"
       " kappa-fission-zn tallies are defined in OpenMC!");
 }
+void ErrorHandling::openmc_get_cell(int err, const std::string & desc)
+{
+  if (err == e_cell_invalid_id)
+    mooseError("Invalid cell ID used in call to 'openmc_get_cell' routine!"
+      " Check that the cell ID used for the " + desc + " transfer exists in"
+      " the geometry XML file.");
+  if (err == e_cell_not_allocated)
+    mooseError("Cell is not allocated in call to 'openmc_get_cell' routine!"
+      " Check that the call to this routine occurs after the cells array has"
+      " been allocated.");
+}
