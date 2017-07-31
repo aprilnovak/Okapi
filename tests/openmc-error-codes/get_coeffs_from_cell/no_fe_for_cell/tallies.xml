@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<tallies>
+
+  <filter id="25">
+    <type> cell</type>
+    <bins> 2</bins>
+  </filter>
+
+  <tally id="1">
+    <filters> 25</filters>
+    <scores>kappa-fission-z5</scores>
+  </tally>
+
+</tallies>
