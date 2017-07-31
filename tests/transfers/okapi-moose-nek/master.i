@@ -83,9 +83,10 @@
 
 [Executioner]
   type = OpenMCExecutioner
-  num_steps = 5
+  num_steps = 100
   [./TimeStepper]
     type = OpenMCTimeStepper
+    dt = 0.01
   [../]
 []
 
@@ -97,6 +98,7 @@
     input_files = nek.i
     library_path = /homes/anovak/projects/moon/lib
     execute_on = timestep_begin
+    sub_cycling = true
   [../]
   [./bison]
     type = TransientMultiApp
@@ -109,6 +111,9 @@
 []
 
 [Transfers]
+  # ---- Transfer heat flux BC from Nek to Okapi (middle-man storage ---- #
+  #      before being passed to BISON)                                    #
+
   [./to_nek] # transfers heat flux BC
     type = MultiAppMoonOkapiTransfer
     direction = to_multiapp
@@ -117,6 +122,11 @@
     to_aux_scalar = 'foo'
     execute_on = timestep_begin
   [../]
+
+  # --------------------------------------------------------------------- #
+  #      Transfer temperature BC from Nek to OKapi (middle-man            #
+  #      storage before being passed to BISON)                            #
+
   [./from_nek] # writes temperature BC
     type = MultiAppMoonOkapiTransfer
     direction = from_multiapp
@@ -125,6 +135,10 @@
     to_aux_scalar = 'f_0_coeffs_temp_BC f_1_coeffs_temp_BC f_2_coeffs_temp_BC f_3_coeffs_temp_BC f_4_coeffs_temp_BC f_5_coeffs_temp_BC'
     execute_on = timestep_begin
   [../]
+
+
+
+  # ---- Transfer kappa fission coefficients from Okapi to BISON ---- #
 
   [./to_bison]
     type = MultiAppMooseOkapiTransfer
@@ -136,9 +150,12 @@
     execute_on = timestep_end
   [../]
 
+
+
   # --- Transfer SCALAR aux variables from Okapi to BISON ---- #
   #     Due to the nature of the MultiAppScalarToAuxScalar     #
   #     transfer, this needs to occur one at a time            #
+
   [./to_bison_temp_f0]
     type = MultiAppScalarToAuxScalarTransfer
     direction = to_multiapp
@@ -199,12 +216,59 @@
     openmc_cell = 1
     execute_on = timestep_end
   [../]
-  [./from_bison_flux]
+
+
+
+  # --- Transfer SCALAR aux variables from BISON to Okapi ---- #
+  #     Due to the nature of the MultiAppScalarToAuxScalar     #
+  #     transfer, this needs to occur one at a time            #
+
+  [./from_bison_flux_0]
     type = MultiAppScalarToAuxScalarTransfer
     direction = from_multiapp
     multi_app = bison
     source_variable = 'f_0_coeffs_flux_BC_bison'
     to_aux_scalar = 'f_0_coeffs_flux_BC'
+    execute_on = timestep_end
+  [../]
+  [./from_bison_flux_1]
+    type = MultiAppScalarToAuxScalarTransfer
+    direction = from_multiapp
+    multi_app = bison
+    source_variable = 'f_1_coeffs_flux_BC_bison'
+    to_aux_scalar = 'f_1_coeffs_flux_BC'
+    execute_on = timestep_end
+  [../]
+  [./from_bison_flux_2]
+    type = MultiAppScalarToAuxScalarTransfer
+    direction = from_multiapp
+    multi_app = bison
+    source_variable = 'f_2_coeffs_flux_BC_bison'
+    to_aux_scalar = 'f_2_coeffs_flux_BC'
+    execute_on = timestep_end
+  [../]
+  [./from_bison_flux_3]
+    type = MultiAppScalarToAuxScalarTransfer
+    direction = from_multiapp
+    multi_app = bison
+    source_variable = 'f_3_coeffs_flux_BC_bison'
+    to_aux_scalar = 'f_3_coeffs_flux_BC'
+    execute_on = timestep_end
+  [../]
+  [./from_bison_flux_4]
+    type = MultiAppScalarToAuxScalarTransfer
+    direction = from_multiapp
+    multi_app = bison
+    source_variable = 'f_4_coeffs_flux_BC_bison'
+    to_aux_scalar = 'f_4_coeffs_flux_BC'
+    execute_on = timestep_end
+  [../]
+  [./from_bison_flux_5]
+    type = MultiAppScalarToAuxScalarTransfer
+    direction = from_multiapp
+    multi_app = bison
+    source_variable = 'f_5_coeffs_flux_BC_bison'
+    to_aux_scalar = 'f_5_coeffs_flux_BC'
     execute_on = timestep_end
   [../]
 []

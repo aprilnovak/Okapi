@@ -17,6 +17,7 @@
   type = NekExecutioner
   [./TimeStepper]
     type = NekTimeStepper
+    dt = 0.0025
   [../]
 []
 

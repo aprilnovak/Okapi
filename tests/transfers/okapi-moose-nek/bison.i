@@ -1,5 +1,16 @@
 # This input file performs a BISON solve over the fuel pin.
 
+[GlobalParams]
+  legendre_function = legendre
+  fourier_function = fourier
+  zernike_function = zernike
+  l_direction = 2
+  surface_area_pp = 'surface_area'
+  diffusion_coefficient_name = 'thermal_conductivity'
+  volume_pp = 'volume'
+  dbg = false
+[]
+
 [Mesh]
   file = 3D_sideset.exo
   block_id = '1'
@@ -12,41 +23,39 @@
   [./fourier]
     type = FourierPolynomial
     center = '0.0 0.0'
-    dbg = false
   [../]
   [./legendre]
     type = LegendrePolynomial
     l_geom_norm = '0.0 1.0'
-    dbg = false
   [../]
   [./zernike]
     type = ZernikePolynomial
     radius = 0.5
     center = '0.0 0.0'
-    dbg = false
   [../]
+
+
+
+  # ---- Reconstruction of the continuous kappa fission distribution ---- #
+
   [./kappa_fission_reconstruction]
     type = ZernikeLegendreReconstruction
     l_order = 0
-    n_order = 1
-    l_direction = 2
-    legendre_function = legendre
-    zernike_function = zernike
+    n_order = 5
     poly_coeffs = 'l_0_coeffs_kappa_fission'
-    dbg = false
   [../]
+
+
 
   # ---- Reconstruction of the surface temperature BC from Nek ---- #
   #      Note that the l_order and f_order are interpreted          #
   #      as the order, and should be each one smaller than          #
   #      the number of polynomials.                                 #
+
   [./temp_BC_reconstruction]
     type = FourierLegendreReconstruction
     l_order = 10
     f_order = 5
-    l_direction = 2
-    legendre_function = legendre
-    fourier_function = fourier
     poly_coeffs = 'f_0_coeffs_temp_BC_bison f_1_coeffs_temp_BC_bison f_2_coeffs_temp_BC_bison f_3_coeffs_temp_BC_bison f_4_coeffs_temp_BC_bison f_5_coeffs_temp_BC_bison '
   [../]
 []
@@ -59,7 +68,7 @@
 [AuxVariables]
   [./l_0_coeffs_kappa_fission] # where kappa-fission coefficients are received
     family = SCALAR
-    order = THIRD
+    order = TWENTYFIRST
   [../]
 
   # ---- where temp BC coefficients are received from Okapi ---- #
@@ -114,12 +123,18 @@
     order = ELEVENTH
   [../]
 
+
+  # ---- Fuel temperature coefficients. Until Z-L expansion are ----#
+  #      available in OpenMC, no higher Legendre orders should      #
+  #      be used.                                                   #
   [./l_0_coeffs_temp] # where temperature coefficients are placed
     family = SCALAR
     order = THIRD
   [../]
+
   [./kappa_fission] # holds eV/particle field from OpenMC
   [../]
+
   [./fission_heat] # holds the fission heat source
   [../]
 []
@@ -135,7 +150,6 @@
     variable = fission_heat
     kappa_fission_source = kappa_fission
     power = 20
-    volume_pp = 'volume'
   [../]
 []
 
@@ -156,6 +170,7 @@
 []
 
 [BCs]
+  # ---- Apply the temperature BC received from Nek ---- #
   [./temp]
     type = FunctionDirichletBC
     variable = temp
@@ -170,26 +185,65 @@
     variable = temp
     l_order = 0
     n_order = 1
-    legendre_function = legendre
-    zernike_function = zernike
-    l_direction = 2
     aux_scalar_name = 'l_0_coeffs_temp'
-    volume_pp = 'volume'
   [../]
 
-  # ---- Compute heat flux BC coefficients --- #
+  # ---- Compute heat flux BC coefficients for each Fourier order ---- #
+  #      one at a time                                                 #
   [./f_0_coeffs_flux_BC]
     type = FLDeconstruction
     flux_integral = true
     variable = temp
-    l_order = 9
+    l_order = 10
+    f_order = 0
+    aux_scalar_name = 'f_0_coeffs_flux_BC_bison'
+    boundary = 'wall'
+  [../]
+  [./f_1_coeffs_flux_BC]
+    type = FLDeconstruction
+    flux_integral = true
+    variable = temp
+    l_order = 10
+    f_order = 1
+    aux_scalar_name = 'f_1_coeffs_flux_BC_bison'
+    boundary = 'wall'
+  [../]
+  [./f_2_coeffs_flux_BC]
+    type = FLDeconstruction
+    flux_integral = true
+    variable = temp
+    l_order = 10
+    f_order = 2
+    aux_scalar_name = 'f_2_coeffs_flux_BC_bison'
+    boundary = 'wall'
+  [../]
+  [./f_3_coeffs_flux_BC]
+    type = FLDeconstruction
+    flux_integral = true
+    variable = temp
+    l_order = 10
+    f_order = 3
+    aux_scalar_name = 'f_3_coeffs_flux_BC_bison'
+    boundary = 'wall'
+  [../]
+  [./f_4_coeffs_flux_BC]
+    type = FLDeconstruction
+    flux_integral = true
+    variable = temp
+    l_order = 10
+    f_order = 4
+    aux_scalar_name = 'f_4_coeffs_flux_BC_bison'
+    boundary = 'wall'
+  [../]
+  [./f_5_coeffs_flux_BC]
+    type = FLDeconstruction
+    flux_integral = true
+    variable = temp
+    l_order = 10
     f_order = 0
     legendre_function = legendre
     fourier_function = fourier
-    l_direction = 2
-    aux_scalar_name = 'f_0_coeffs_flux_BC_bison'
-    surface_area_pp = 'surface_area'
-    diffusion_coefficient_name = 'thermal_conductivity'
+    aux_scalar_name = 'f_5_coeffs_flux_BC_bison'
     boundary = 'wall'
   [../]
 []
@@ -205,6 +259,8 @@
   type = Transient
   nl_rel_tol = 1e-6
   l_tol = 1e-6
+  dt = 0.01
+  max_l_its = 5
 []
 
 [Postprocessors]
