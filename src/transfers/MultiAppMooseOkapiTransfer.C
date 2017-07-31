@@ -118,9 +118,18 @@ MultiAppMooseOkapiTransfer::execute()
         // to apply the scaling factors for a zero-th order Legendre and zero-th
         // order Zernike expansion.
         Real l0_temp_exp = (source_variables[0]->sln())[0] / sqrt(2.0 * M_PI);
-        if (_dbg) _console << "Setting cell " << _cell << " temperature to " <<
-          l0_temp_exp << std::endl;
-        OpenMC::openmc_cell_set_temperature(_cell, l0_temp_exp);
+        if (_dbg) _console << "Setting OpenMC cell " << _cell <<
+          " temperature to " << l0_temp_exp << std::endl;
+
+        // for the first iterations until we reach a converged solution, the
+        // temperature computed by BISON might be very low, but we don't want
+        // to set the temperature in OpenMC to a value lower than we have data
+        // for, so only change temperatures if we're above the valid range. We
+        // pass a NULL pointer because we're not passing the optional instance
+        // parameter.
+        int err_temp =
+          OpenMC::openmc_cell_set_temperature(_index, l0_temp_exp, NULL);
+        ErrorHandling::openmc_cell_set_temperature(err_temp);
         }
       }
 

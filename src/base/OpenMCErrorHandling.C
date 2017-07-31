@@ -39,17 +39,25 @@ void ErrorHandling::get_coeffs_from_cell(int err)
       " does not equal its allocated size! Check that the order of the FE"
       " matches the order of the scalar aux variables in the MOOSE input files.");
 }
-  if (err == -1)
-    mooseError("Invalid cell ID specified for retrieving expansion"
-      " coefficients for kappa-fission-zn tally!");
-  if (err == -2)
-    mooseError("Length of array to receive coefficients does not match"
-      " number of coefficients! Check that the array to hold coefficients"
-      " has been allocated with the proper size.");
-  if (err == -3)
-    mooseError("Cannot get expansion coefficients from cell because no"
-      " kappa-fission-zn tallies are defined in OpenMC!");
+
+void ErrorHandling::openmc_cell_set_temperature(int err)
+{
+  if (err == e_below_min_bound)
+    mooseWarning("Cross sections not available for specified temperature, "
+      "setting temperature to lowest available data point!");
+
+  if (err == e_above_max_bound)
+    mooseWarning("Cross sections not available for specified temperature, "
+      "setting temperature to highest available data point!");
+
+  if (err == e_invalid_fill)
+    mooseError("Cannot specify cell filled with a universe for "
+      "'openmc_cell_set_temperature' routine!");
+
+  if (err == e_out_of_bounds)
+    mooseError("Cell instance specified for setting temperature is out of bounds!");
 }
+
 void ErrorHandling::openmc_get_cell(int err, const std::string & desc)
 {
   if (err == e_cell_invalid_id)
