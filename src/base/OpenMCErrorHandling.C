@@ -18,6 +18,20 @@ void ErrorHandling::receive_coeffs_for_cell(int err)
 
 void ErrorHandling::get_coeffs_from_cell(int err)
 {
+  if (err == e_tally_not_allocated)
+    mooseError("Cannot receive expansion coefficients for cell because"
+      " no FE tallies are defined in OpenMC! Check that an FET"
+      " has been defined in the tallies.xml file.");
+
+  if (err == e_cell_not_found)
+    mooseError("Invalid cell ID specified for receiving expansion coefficients"
+      " for FE tally! Check that there is an FET defined for"
+      " the requested cell ID.");
+
+  if (err == e_invalid_size)
+    mooseError("Number of expansion coefficients passed for cell"
+      " does not equal its allocated size!");
+}
   if (err == -1)
     mooseError("Invalid cell ID specified for retrieving expansion"
       " coefficients for kappa-fission-zn tally!");

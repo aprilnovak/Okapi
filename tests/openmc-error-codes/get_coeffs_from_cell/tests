@@ -1,0 +1,9 @@
+[Tests]
+  # user does not specify any FETs in the tallies XML file, so tallies % coeffs
+  # is not allocated
+  [./no_FETs_in_XML]
+    type = 'RunException'
+    input = master.i
+    expect_err = "Cannot receive expansion coefficients for cell because no FE tallies are defined in OpenMC! Check that an FET has been defined in the tallies.xml file."
+  [../]
+[]

@@ -174,9 +174,9 @@ MultiAppMooseOkapiTransfer::execute()
 
          // store coefficients from OpenMC into the omc_coeffs array and perform
          // error handling.
-         int err = OpenMC::get_coeffs_from_cell(_cell,
-           omc_coeffs, num_coeffs_from_openmc);
-         ErrorHandling::get_coeffs_from_cell(err);
+         int err_get =
+           OpenMC::get_coeffs_from_cell(_index, omc_coeffs, num_coeffs_from_openmc);
+         ErrorHandling::get_coeffs_from_cell(err_get);
 
          if (_dbg) _console << "Transferring " << num_coeffs_from_openmc <<
            " coefficients from OpenMC to MOOSE for cell " << _cell << std::endl;
