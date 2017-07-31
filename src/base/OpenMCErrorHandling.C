@@ -3,7 +3,8 @@
 
 /* This file contains functions for handling error codes returned from OpenMC
    routines. Specific error messages are defined for each of the OpenMC routines
-   to assist in debugging errors. */
+   to assist in debugging errors. Note that any changes made to these error
+   messages will require you to modify all of the tests files. */
 void ErrorHandling::receive_coeffs_for_cell(int err)
 {
   if (err == e_tally_not_allocated)
@@ -17,8 +18,8 @@ void ErrorHandling::receive_coeffs_for_cell(int err)
       " the requested cell ID.");
 
   if (err == e_invalid_size)
-    mooseError("Number of expansion coefficients passed for cell"
-      " does not equal its allocated size!");
+    mooseError("Number of expansion coefficients to store in cell does not"
+      " match previously allocated size!");
 }
 
 void ErrorHandling::get_coeffs_from_cell(int err)
