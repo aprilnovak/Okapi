@@ -1,0 +1,8 @@
+[Tests]
+  # user has an FE, but not for the requested cell
+  [./no_FET_for_cell]
+    type = 'RunException'
+    input = master.i
+    expect_err = "Invalid cell ID specified for storing expansion coefficients for FE tally! Check that there is an FET defined for the requested cell ID."
+  [../]
+[]
