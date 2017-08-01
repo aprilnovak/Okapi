@@ -66,6 +66,10 @@ MultiAppMooseOkapiTransfer::execute()
       {
         if (_multi_app->hasLocalApp(i) && _multi_app->isRootProcessor())
         {
+          _console << "My position: " << _multi_app->position(i)(0)
+            << ' ' << _multi_app->position(i)(1) << ' '
+            << _multi_app->position(i)(2) << std::endl;
+
           // get the variables to read from the sub App
           FEProblemBase & from_problem = _multi_app->appProblemBase(i);
           std::vector<MooseVariableScalar *> source_variables(num_vars_to_read);
@@ -81,8 +85,8 @@ MultiAppMooseOkapiTransfer::execute()
             source_variables[beginIndex(_source_var_names)]->sln().size();
           for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
             if (source_variables[i]->sln().size() != source_var_size)
-              mooseError("Order of source variables for "
-                "MultiAppMooseOkapiTranfser are not all the same!");
+                mooseError("Order of source variables for "
+                  "MultiAppMooseOkapiTransfer FROM_MULTIAPP are not all the same!");
 
           // Initialize the moose_coeffs array and then populate by looping over
           // the source variables.

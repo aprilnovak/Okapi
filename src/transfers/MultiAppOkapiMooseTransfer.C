@@ -163,7 +163,7 @@ MultiAppOkapiMooseTransfer::execute()
            to apply the scaling factors for a zero-th order Legendre and zero-th
            order Zernike expansion. */
         OpenMC::openmc_cell_set_temperature(_cell, \
-          (source_variables[0]->sln())[0] / sqrt(2.0 * M_PI));
+          (source_variables[0]->sln())[0] / sqrt(2.0 * M_PI), NULL);
       }
       break;
     }
