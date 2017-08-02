@@ -1,0 +1,12 @@
+[Tests]
+  # order of source variables to be sent to MOON are not all the same size
+  # Note that this test relies on using a very specific version of libmoon,
+  # which has the Legendre and Fourier orders hard-coded into it. If we
+  # end up passing these orders into Nek based on info from the MOOSE input file,
+  # this test will need to be updated.
+  [./incorrect_var_size]
+    type = 'RunException'
+    input = master.i
+    expect_err = "The order of the source variables for the MultiAppMoonOkapiTransfer direction TO_MULTIAPP are not all the same!"
+  [../]
+[]
