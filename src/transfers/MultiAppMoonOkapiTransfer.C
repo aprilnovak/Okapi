@@ -66,8 +66,9 @@ MultiAppMoonOkapiTransfer::execute()
         source_variables[beginIndex(_source_var_names)]->sln().size();
       for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
         if (source_variables[i]->sln().size() != source_var_size)
-          mooseError("The order of the heat flux BC source variables for the "
-            "MultiAppMoonOkapiTransfer are not all the same!");
+          mooseError("The order of the source variables for the "
+            "MultiAppMoonOkapiTransfer direction TO_MULTIAPP are "
+            "not all the same!");
 
       // Check that the number of variables matches the number of Fourier
       // terms used in Nek, and that the length of each variable matches the
@@ -77,10 +78,12 @@ MultiAppMoonOkapiTransfer::execute()
       // set before they are needed.
       if (num_vars_to_read != Nek5000::expansion_tdata_.m_fourier)
         mooseError("Number of Fourier polynomials in Okapi does not agree "
-          "with number expected from Nek! Change m_fourier in the Nek usr file!");
+          "with number expected from Nek! Change m_fourier in the Nek usr file "
+          "or the number of source variables in MultiAppMoonOkapiTransfer!");
       if (source_var_size != Nek5000::expansion_tdata_.n_legendre)
         mooseError("Number of Legendre polynomials in Okapi does not agree "
-          "with number expected fron Nek! Change n_legendre in the Nek usr file!");
+          "with number expected fron Nek! Change n_legendre in the Nek usr file "
+          "or the order of each source variable in MultiAppMoonOkapiTransfer!");
 
       for (unsigned int i = 0; i < num_apps; i++)
         if (_multi_app->hasLocalApp(i))
@@ -131,8 +134,8 @@ MultiAppMoonOkapiTransfer::execute()
       for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
       {
         if (to_variables[i]->sln().size() != write_var_size)
-          mooseError("The order of the temperature BC variables to write are not"
-            " all the same!");
+          mooseError("The order of the variables to be written for the "
+            "MultiAppMoonOkapiTransfer are not all the same!");
       }
 
       // Check that the number of variables matches the number of Fourier
@@ -143,10 +146,12 @@ MultiAppMoonOkapiTransfer::execute()
       // set before they are needed.
       if (num_vars_to_write != Nek5000::expansion_tdata_.m_fourier)
         mooseError("Number of Fourier polynomials in Okapi does not agree "
-          "with number expected from Nek! Change m_fourier in the Nek usr file!");
+          "with number expected from Nek! Change m_fourier in the Nek usr file "
+          "or the number of write variables in MultiAppMoonOkapiTransfer!");
       if (write_var_size != Nek5000::expansion_tdata_.n_legendre)
         mooseError("Number of Legendre polynomials in Okapi does not agree "
-          "with number expected fron Nek! Change n_legendre in the Nek usr file!");
+          "with number expected fron Nek! Change n_legendre in the Nek usr file "
+          "or the order of every write variable in MultiAppMoonOkapiTransfer!");
 
       // Write temp BC coefficients from MOON to Okapi
       if(_dbg)
