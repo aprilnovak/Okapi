@@ -1,0 +1,8 @@
+[Tests]
+  # order of variables to be written by MOON are not all the same size
+  [./incorrect_var_size]
+    type = 'RunException'
+    input = master.i
+    expect_err = "The order of the variables to be written for the MultiAppMoonOkapiTransfer are not all the same!"
+  [../]
+[]
