@@ -42,15 +42,15 @@ void ErrorHandling::get_coeffs_from_cell(int err)
 
 void ErrorHandling::openmc_cell_set_temperature(int err)
 {
-  if (err == e_below_min_bound)
+  if (err == w_below_min_bound)
     mooseWarning("Cross sections not available for specified temperature, "
       "setting temperature to lowest available data point!");
 
-  if (err == e_above_max_bound)
+  if (err == w_above_max_bound)
     mooseWarning("Cross sections not available for specified temperature, "
       "setting temperature to highest available data point!");
 
-  if (err == e_invalid_fill)
+  if (err == e_cell_no_material)
     mooseError("Cannot specify cell filled with a universe for "
       "'openmc_cell_set_temperature' routine!");
 

@@ -1,5 +1,6 @@
 #include <string>
 
+// all error codes from OpenMC that are to be handled
 extern int e_unassigned;
 extern int e_out_of_bounds;
 extern int e_cell_not_allocated;
@@ -13,9 +14,11 @@ extern int e_material_invalid_id;
 extern int e_tally_not_allocated;
 extern int e_tally_invalid_id;
 extern int e_invalid_size;
-extern int e_invalid_fill;
-extern int e_below_min_bound;
-extern int e_above_max_bound;
+extern int e_cell_no_material;
+
+// all warning codes from OpenMC that are to be handled
+extern int w_below_min_bound;
+extern int w_above_max_bound;
 
 namespace ErrorHandling{
 
