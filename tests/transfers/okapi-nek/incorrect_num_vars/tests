@@ -1,0 +1,12 @@
+[Tests]
+  # Number of source variables does not match number expected from Nek.
+  # Note that this test relies on using a very specific version of libmoon,
+  # which has the Legendre and Fourier orders hard-coded into it. If we
+  # end up passing these orders into Nek based on info from the MOOSE input file,
+  # this test will need to be updated.
+  [./incorrect_num_vars]
+    type = 'RunException'
+    input = master.i
+    expect_err = "Number of Fourier polynomials in Okapi does not agree with number expected from Nek! Change m_fourier in the Nek usr file or the number of source variables in MultiAppMoonOkapiTransfer!"
+  [../]
+[]
