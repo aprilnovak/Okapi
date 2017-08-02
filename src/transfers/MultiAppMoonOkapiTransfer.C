@@ -1,5 +1,7 @@
 #include "MultiAppMoonOkapiTransfer.h"
 #include "NekInterface.h"
+#include "OpenMCInterface.h"
+#include "OpenMCErrorHandling.h"
 
 // MOOSE includes
 #include "MooseTypes.h"
@@ -23,6 +25,8 @@ InputParameters validParams<MultiAppMoonOkapiTransfer>()
   params.addRequiredParam<std::vector<VariableName> >("to_aux_scalar",
     "The name of the scalar Aux variable(s) in the MultiApp to transfer"
     " the value to.");
+  params.addRequiredParam<int32_t>("openmc_cell", "Cell ID in OpenMC to transfer "
+    "axially-binned fluid temperatures to.");
   params.addParam<bool>("dbg", false, "Whether to turn on debugging information.");
   return params;
 }
@@ -31,6 +35,7 @@ MultiAppMoonOkapiTransfer::MultiAppMoonOkapiTransfer(const InputParameters & par
     MultiAppTransfer(parameters),
     _source_var_names(getParam<std::vector<VariableName>>("source_variable")),
     _to_aux_names(getParam<std::vector<VariableName>>("to_aux_scalar")),
+    _cell(getParam<int32_t>("openmc_cell")),
     _dbg(parameters.get<bool>("dbg"))
 {
 }
@@ -43,6 +48,11 @@ MultiAppMoonOkapiTransfer::execute()
   int num_apps = _multi_app->numGlobalApps();
   int num_vars_to_read = _source_var_names.size();
   int num_vars_to_write = _to_aux_names.size();
+
+  // get the index of the cell in the cells(:) OpenMC array to be used
+  // for later calls to cell-dependent OpenMC routines
+  int err_index = OpenMC::openmc_get_cell(_cell, &_index);
+  ErrorHandling::openmc_get_cell(err_index, "MultiAppMoonOkapiTransfer");
 
   switch (_direction)
   {
@@ -173,16 +183,20 @@ MultiAppMoonOkapiTransfer::execute()
 
       // Write axially-binned fluid average temperatures from MOON to Okapi
       if(_dbg)
-        _console << "Writing axially-binned fluid temperature from MOON to Okapi..."
+        _console << "Writing axially-binned fluid temp from MOON to Okapi..."
           << "(" << Nek5000::layer_data_.n_layer << " bins)" << std::endl
           << "Temperatures: " << std::endl;
+
+      double layer_temps[4];
       for (int i = 0; i < Nek5000::layer_data_.n_layer; ++i)
       {
-        if (_dbg) _console << Nek5000::fluid_bins_.fluid_temp_bins[i]
-          << ' ';
+        if (_dbg) _console << Nek5000::fluid_bins_.fluid_temp_bins[i] << ' ';
         // TODO: use the axial averages in OpenMC by calling some OpenMC routine
+        layer_temps[i] = Nek5000::fluid_bins_.fluid_temp_bins[i];
       }
       if (_dbg) _console << std::endl;
+
+//      OpenMC::assign_layer_temps(_index, layer_temps, 4, NULL);
 
       break;
     }
