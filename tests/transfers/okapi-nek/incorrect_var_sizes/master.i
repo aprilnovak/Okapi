@@ -1,5 +1,6 @@
 [GlobalParams]
   dbg = true
+  openmc_cell = 4
 []
 
 [Problem]
