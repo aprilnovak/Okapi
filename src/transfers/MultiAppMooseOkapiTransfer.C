@@ -1,5 +1,4 @@
 #include "MultiAppMooseOkapiTransfer.h"
-#include "ExtraFunctions.h"
 #include "OpenMCErrorHandling.h"
 #include "OpenMCInterface.h"
 #include "math.h"
@@ -86,7 +85,8 @@ MultiAppMooseOkapiTransfer::execute()
           for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
             if (source_variables[i]->sln().size() != source_var_size)
                 mooseError("Order of source variables for "
-                  "MultiAppMooseOkapiTransfer FROM_MULTIAPP are not all the same!");
+                  "MultiAppMooseOkapiTransfer FROM_MULTIAPP "
+                  "are not all the same!");
 
           // Initialize the moose_coeffs array and then populate by looping over
           // the source variables.
