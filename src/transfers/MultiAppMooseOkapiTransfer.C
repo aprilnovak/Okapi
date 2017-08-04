@@ -16,17 +16,16 @@
 template<>
 InputParameters validParams<MultiAppMooseOkapiTransfer>()
 {
-  /* This transfer is used to transfer data between Okapi and a generic
-     MOOSE application when the MOOSE application is the sub App and Okapi
+  /* This is used to transfer data between Okapi and a generic MOOSE
+     application when the MOOSE application is the sub App and Okapi
      the Master App. */
   InputParameters params = validParams<MultiAppTransfer>();
   params.addRequiredParam<std::vector<VariableName>>("source_variable",
-    "The auxiliary SCALAR variable to read values from");
+    "The auxiliary SCALAR variable to read values from.");
   params.addRequiredParam<std::vector<VariableName> >("to_aux_scalar",
-    "The name of the SCALAR auxvariable in the MultiApp to transfer the "
-    "value to.");
+    "The name of the SCALAR auxvariable to transfer the value to.");
   params.addRequiredParam<int32_t>("openmc_cell", "OpenMC cell ID (defined in "
-    "input file) for this transfer to be associated with.");
+    "XML input file) for this transfer to be associated with.");
   params.addParam<bool>("dbg", false, "Whether to turn on debugging information");
   return params;
 }
@@ -61,29 +60,25 @@ MultiAppMooseOkapiTransfer::execute()
     // temperature and fuel density to Okapi.
     case FROM_MULTIAPP:
     {
-      for (unsigned int i = 0; i < num_apps; ++i)
+      for (unsigned int I = 0; I < num_apps; ++I)
       {
-        if (_multi_app->hasLocalApp(i) && _multi_app->isRootProcessor())
+        if (_multi_app->hasLocalApp(I) && _multi_app->isRootProcessor())
         {
-          _console << "My position: " << _multi_app->position(i)(0)
-            << ' ' << _multi_app->position(i)(1) << ' '
-            << _multi_app->position(i)(2) << std::endl;
-
           // get the variables to read from the sub App
-          FEProblemBase & from_problem = _multi_app->appProblemBase(i);
-          std::vector<MooseVariableScalar *> source_variables(num_vars_to_read);
+          FEProblemBase & from_problem = _multi_app->appProblemBase(I);
+          std::vector<MooseVariableScalar *> source_vars(num_vars_to_read);
           for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
           {
-            source_variables[i] = &from_problem.getScalarVariable(_tid,
+            source_vars[i] = &from_problem.getScalarVariable(_tid,
               _source_var_names[i]);
-            source_variables[i]->reinit();
+            source_vars[i]->reinit();
           }
 
           // Check that all of the source variables are of the same order
           int source_var_size =
-            source_variables[beginIndex(_source_var_names)]->sln().size();
+            source_vars[beginIndex(_source_var_names)]->sln().size();
           for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
-            if (source_variables[i]->sln().size() != source_var_size)
+            if (source_vars[i]->sln().size() != source_var_size)
                 mooseError("Order of source variables for "
                   "MultiAppMooseOkapiTransfer FROM_MULTIAPP "
                   "are not all the same!");
@@ -94,7 +89,7 @@ MultiAppMooseOkapiTransfer::execute()
           double moose_coeffs[num_coeffs_from_moose];
           for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
           {
-            auto & soln_values = source_variables[i]->sln();
+            auto & soln_values = source_vars[i]->sln();
             for (auto j = beginIndex(soln_values); j < soln_values.size(); ++j)
               moose_coeffs[i * num_vars_to_read + j] = soln_values[j];
           }
@@ -121,7 +116,7 @@ MultiAppMooseOkapiTransfer::execute()
         // settings XML file. Because this isn't expanded in OpenMC, here we have
         // to apply the scaling factors for a zero-th order Legendre and zero-th
         // order Zernike expansion.
-        Real l0_temp_exp = (source_variables[0]->sln())[0] / sqrt(2.0 * M_PI);
+        Real l0_temp_exp = (source_vars[0]->sln())[0] / sqrt(2.0 * M_PI);
         if (_dbg) _console << "Setting OpenMC cell " << _cell <<
           " temperature to " << l0_temp_exp << std::endl;
 
@@ -149,24 +144,23 @@ MultiAppMooseOkapiTransfer::execute()
       // OpenMC cell index.
       OpenMC::fet_deconstruction();
 
-     for (unsigned int i = 0; i < num_apps; ++i)
-       if (_multi_app->hasLocalApp(i))
+     for (unsigned int I = 0; I < num_apps; ++I)
+       if (_multi_app->hasLocalApp(I))
        {
          // initialize variables we're going to write
-         std::vector<MooseVariableScalar *> to_variables(num_vars_to_write);
+         std::vector<MooseVariableScalar *> to_vars(num_vars_to_write);
 
          for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
          {
-           to_variables[i] = &_multi_app->appProblemBase(i).getScalarVariable(
+           to_vars[i] = &_multi_app->appProblemBase(I).getScalarVariable(
              _tid, _to_aux_names[i]);
-           to_variables[i]->reinit();
+           to_vars[i]->reinit();
          }
 
          // Check that all of the variables to write are the same size
-         int write_var_size =
-           to_variables[beginIndex(_to_aux_names)]->sln().size();
+         int write_var_size = to_vars[beginIndex(_to_aux_names)]->sln().size();
          for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
-           if (to_variables[i]->sln().size() != write_var_size)
+           if (to_vars[i]->sln().size() != write_var_size)
              mooseError("The order of the variables to write for the "
                " MultiAppMooseOkapiTransfer are not all the same!");
 
@@ -186,14 +180,14 @@ MultiAppMooseOkapiTransfer::execute()
 
          // store coefficients from OpenMC into the omc_coeffs array and perform
          // error handling.
-         int err_get =
-           OpenMC::get_coeffs_from_cell(_index, omc_coeffs, num_coeffs_from_openmc);
+         int err_get = OpenMC::get_coeffs_from_cell(_index,
+           omc_coeffs, num_coeffs_from_openmc);
          ErrorHandling::get_coeffs_from_cell(err_get);
 
-         if (_dbg) _console << "Transferring " << num_coeffs_from_openmc <<
-           " coefficients from OpenMC to MOOSE for cell " << _cell << std::endl;
          if (_dbg)
          {
+            _console << "Transferring " << num_coeffs_from_openmc <<
+              " coefficients from OpenMC to MOOSE for cell " << _cell << std::endl;
             for (int i = 0; i < num_coeffs_from_openmc; ++i)
               _console << omc_coeffs[i] << " ";
             _console << std::endl;
@@ -202,13 +196,13 @@ MultiAppMooseOkapiTransfer::execute()
          // Loop over the variables that we are going to write
          for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
          {
-           std::vector<dof_id_type> & dof = to_variables[i]->dofIndices();
-           auto & soln_values = to_variables[i]->sln();
+           std::vector<dof_id_type> & dof = to_vars[i]->dofIndices();
+           auto & soln_values = to_vars[i]->sln();
            for (auto j = beginIndex(soln_values); j < write_var_size; ++j)
-             to_variables[i]->sys().solution().set(
+             to_vars[i]->sys().solution().set(
                dof[j], omc_coeffs[i * write_var_size + j]);
 
-           to_variables[i]->sys().solution().close();
+           to_vars[i]->sys().solution().close();
          }
        }
 
