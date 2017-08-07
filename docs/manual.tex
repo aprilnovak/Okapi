@@ -298,19 +298,17 @@ And for BISON executing first, the sequence of events are similar, except that s
 \clearpage
 \section{Initial Conditions}
 \label{sec:ICs}
-This section discusses how initial conditions are applied to OpenMC, Nek, and BISON for a coupled solve. There are two generally types of initializations that are performed for a single physics code:
+This section discusses how initial conditions are applied to OpenMC, Nek, and BISON for a coupled solve. There are generally two types of initializations that are performed for a single physics code:
 
 \begin{itemize}
-\item General initializations that specify the geometry, materials, and problem parameters that will remain unchanged throughout a simulation
+\item Initializations that specify the geometry, materials, and problem parameters that will remain unchanged throughout a simulation
 \item Initial values for solution variables that are needed to begin the finite difference time marching
 \end{itemize}
 
-It becomes increasingly difficult as the number of coupled codes increases to ensure consistency between all of the initial conditions and system specifications. To attempt to achieve consistency, all initial conditions should be set from MOOSE. However, if desired, these MOOSE initial conditions can be omitted, and initial conditions set in the usual manner in the code's input files (OpenMC's XML files or Nek's {\tt rea} and {\tt usr} files). 
-
-Either MOON or Buffalo may execute first, so the required initial conditions depends on this choice. Note that the requirements to set boundary conditions also depends on the extent to which the transfer classes have been completed - if the capability to transfer fluid density has not yet been implemented in Nek, for example, then an initial condition must be specified on the fluid density for OpenMC. 
+It becomes increasingly difficult as the number of coupled codes increases to ensure consistency between all of the initial conditions and system specifications. To attempt to achieve consistency, all initial conditions should be set from MOOSE. However, if desired, these MOOSE initial conditions can be omitted, and initial conditions can be set in the usual manner in the code's input files (OpenMC's XML files or Nek's {\tt rea} and {\tt usr} files). Either MOON or Buffalo may execute first, so the required initial conditions depends on this choice. Note that the requirements to set boundary conditions also depends on the extent to which the transfer classes have been completed - if the capability to transfer fluid density has not yet been implemented in Nek, for example, then an initial condition must be specified on the fluid density for OpenMC. 
 
 \subsection{MOON Before BISON}
-When MOON runs before BISON, initial conditions must be specified for fields that are inputs to MOON and for those fields that are inputs to Okapi that would have been determined by BISON. This section discusses how to set these initial conditions. These fields that must have initial conditions are:
+When MOON runs before BISON, initial conditions must be specified for fields that are inputs to MOON and for those fields that are inputs to Okapi that would have been determined by BISON. The fields that must have initial conditions are:
 
 \begin{itemize}
 \item Heat flux boundary condition (BISON does not run before Nek)
@@ -318,13 +316,6 @@ When MOON runs before BISON, initial conditions must be specified for fields tha
 \item Fuel density (BISON does not run before OpenMC)
 \item Fuel temperature (BISON does not run before OpenMC)
 \end{itemize}
-
-\subsubsection{Fuel Wall Heat Flux and Temperature}
-Because BISON does not run before MOON for the very first time step, an initial condition must be set on the fuel wall heat flux. Because this is a MOOSE variable (represented as a scalar auxvariable), it is most sensible to define this parameter directly in the master MOOSE input file. The fuel wall heat flux is directly related to the fuel temperature, so if the user is going to specify the wall heat flux, it would be good to ensure consistency with the initial condition specified on fuel temperature. 
-
-The initial condition on fuel temperature is required because BISON does not run before Okapi for the very first time step. An initial condition on fuel temperature can be set either in OpenMC XML input files or through an initial condition class in the MOOSE master input file. Because it is logical to specify the wall heat flux initial condition directly in the master input file, for consistency the fuel temperature initial condition is also specified in the master input file. 
-
-For simple cases, all temperature initial conditions needed by OpenMC can be specified in the OpenMC XML files, and the heat flux BC determined by hand. 
 
 \subsection{BISON Before MOON}
 When BISON runs before MOON, initial conditions must be specified for fields that are inputs to BISON and for those fields that are inputs to Okapi that would have been determined by Nek. This section discusses how to set these initial conditions. These fields that must have initial conditions are:
@@ -582,7 +573,7 @@ where the first index represents the \(l\) order, the second the \(n\) order, an
 This section discusses the capabilities added to MOOSE to use the constructed field to enact physical feedback with other physics.
 
 \subsubsubsection{{\tt KappaFissionToHeatSource}}
-OpenMC provides a set of kappa fission expansion coefficients to MOOSE, which then passes those coefficients to MOOSE. In order to use those coefficients, they must be converted to a heat source with units of W/volume (the FE mesh is units-agnostic). The {\tt ZernikeLegendreReconstruction} is used to expand these coefficients into a continuous distribution, and then this auxkernel converts the continuous tally distribution to a heat source. There are two general methods by which to do this, both of which assume the user has knowledge of the power of the expansion domain. The power of the reactor is the sum of the power produced by fission directly in the fuel rod and the power produced by gamma heating (fuel, structural materials, and coolant). The expansion coefficients record the recoverable energy produced from {\it fission}, and hence will only have nonzero values over the fuel. So, assuming the user knows the power produced in each domain over which expansion coefficients are defined (a fuel pin, for example), the heat source can be determined by: 
+OpenMC provides a set of kappa fission expansion coefficients to MOOSE. In order to use those coefficients, they must be converted to a heat source with units of W/volume (the FE mesh is units-agnostic). The {\tt ZernikeLegendreReconstruction} is used to expand these coefficients into a continuous distribution, and then the {\tt KappaFissionToHeatSource} auxkernel converts the continuous tally distribution to a heat source. There are two general methods by which to do this, both of which assume the user has knowledge of the power of the expansion domain. The power of the reactor is the sum of the power produced by fission directly in the fuel rod and the power produced by gamma heating (fuel, structural materials, and coolant). The expansion coefficients record the recoverable energy produced from {\it fission}, and hence will only have nonzero values over the fuel. So, assuming the user knows the power produced in each domain over which expansion coefficients are defined (a fuel pin, for example), the heat source can be determined by: 
 
 \begin{itemize}
 \item Multiplying the kappa fission distribution \(\kappa(\bf{r})\) (eV/source particle) by the user-specified pin fission power, divided by the integrated kappa fission distribution (over the pin):
@@ -594,32 +585,102 @@ OpenMC provides a set of kappa fission expansion coefficients to MOOSE, which th
 \item Assuming an average energy released per fission \(E_f\) and an average number of source particles born from fission \(\nu\), the fission power may be computed as:
 
 \beq
-\textrm{fission power}=\kappa(\bf{r})\times\textrm{user-defined pin fission power}\times\frac{\nu}{E_f}
+\textrm{fission power}=\kappa(\bf{r})\times\textrm{user-defined pin fission power}\times\frac{\nu}{E_f\int d\textbf{r}}
 \eeq
 \end{itemize}
 
-The first approach is more desirable and general because it requires less specifications than the second method (i.e. no assumptions are needed for values for \(\nu\) and \(E_f\)) and integration over a volume can easily be performed with a MOOSE postprocessor. However, for subtle reasons, the second method must be selected unless more changes are made to the MOOSE framework. After receiving expansion coefficients for the expansion coefficients from Okapi, BISON converts those just-received coefficients into a continuous distribution using the {\tt ZernikeLegendreReconstruction} function {\it simultaneously} with the application of the functional distribution to the continuous kappa-fission distribution auxiliary variable. The second method above requires that the auxiliary variable be fully constructed before integrating it, but this integrated value is required itself in the auxkernel that defines the auxvariable. This {\it could} be circumvented by setting an initial condition for the kappa-fisison coefficients in the BISON input file, which would be used to provide the postprocessor value for the first time step; all further time steps would lag one step in the value of the integrated kappa fission distribution. For early iterations, this lagging is undesirable, since there may be large changes in the kappa fission coefficients from one iteration to the next. Alternatively, if the second method is chosen, then the postprocessor is not required at all, at the expense of slight inaccuracies in the assumption of constant \(\nu\) and \(E_f\) (though better values of these could be obtained from OpenMC?).
+The first approach is more desirable and general because it requires less assumptions than the second method (i.e. no assumptions are needed for values for \(\nu\) and \(E_f\)). However, for subtle reasons, the second method must be selected unless more changes are made to the MOOSE framework. After receiving expansion coefficients for the expansion coefficients from Okapi, BISON converts those just-received coefficients into a continuous distribution using the {\tt ZernikeLegendreReconstruction} function {\it simultaneously} with the application of the functional distribution to the continuous kappa-fission distribution auxiliary variable. The second method above requires that the auxiliary variable be fully constructed before integrating it, but this integrated value is required itself in the auxkernel that defines the auxvariable. This {\it could} be circumvented by setting an initial condition for the kappa-fisison coefficients in the BISON input file, which would be used to provide the postprocessor value for the first time step; all further time steps would lag one step in the value of the integrated kappa fission distribution. For early iterations, this lagging is undesirable, since there may be large changes in the kappa fission coefficients from one iteration to the next. Alternatively, if the second method is chosen, then the postprocessor is not required at all, at the expense of slight inaccuracies in the assumption of constant \(\nu\) and \(E_f\).
 
-\color{magenta}
-How are changes in power accounted for?
-\color{black}
+This kernel requires the user to input the initial steady state power. A one-delayed neutron group approximation can then be used to account for (very approximate) changes in power due to thermal-hydraulic feedback. It is customary to group the delayed neutron precursors into six groups, but if the delayed neutron precursors are bundled into a single group, then the point kinetics equations become considerably simpler:
+
+\beq
+\label{eq:PointKineticsPrecursor_OneDelayedGroup}
+\frac{\partial C(t)}{\partial t}=\frac{\beta}{\Lambda}n(t)-\lambda C(t)
+\eeq
+
+\beq
+\label{eq:PointKineticsNeutrons_OneDelayedGroup}
+\frac{\partial n(t)}{\partial t}=\left\lbrack\frac{\rho(t)-\beta}{\Lambda}\right\rbrack n(t)+\lambda C(t)
+\eeq
+
+where \(\lambda\) represents a decay constant that is weighted by all of the precursor groups:
+
+\beq
+\label{eq:Lambda_OneGroup}
+\lambda=\left(\frac{1}{\beta}\sum_{i=1}^{6}\frac{\beta_i}{\lambda_i}\right)^{-1}
+\eeq
+
+and \(\beta\) is now the sum of all of the \(\beta_i\) for each precursor group:
+
+\beq
+\beta=\sum_{i}\beta_i
+\eeq
+
+and \(\Lambda\) is the effective neutron generation time. To solve Eqs. \ref{eq:PointKineticsPrecursor_OneDelayedGroup} and \ref{eq:PointKineticsNeutrons_OneDelayedGroup}, we need two initial conditions. These initial conditions can be obtained by assuming that at \(t=0\) the reactor was at steady state such that the time derivatives are zero:
+
+\beqa
+\label{eq:PKE_OneGroup_ICs}
+n(t=0)=&\ n_0\\
+C(t=0)=&\frac{\beta}{\lambda\Lambda}n_0\\
+\eeqa
+
+This system of equations can be solved by seeking exponential solutions of the form \(n=n\exp(\omega t)\) and \(C=C\exp(\omega t)\). Note that this essentially implies that the frequency of the neutron population and the precursor population are the same, which is as expected with a single delayed neutron group. Inserting these forms into Eqs. \ref{eq:PointKineticsPrecursor_OneDelayedGroup} and \ref{eq:PointKineticsNeutrons_OneDelayedGroup} and canceling the exponential terms, we obtain:
+
+\beqa
+\label{eq:PKE_OneGroup_AssumedForm}
+C\omega=&-\lambda C+\frac{\beta}{\Lambda}n\\
+n\omega=&\lambda C+\left(\frac{\rho(t)-\beta}{\Lambda}\right)n\\
+\eeqa
+
+Substituting \(C\) from the first equation into the second gives two solutions for \(\omega\):  
+
+\beq
+\label{eq:PKEomega}
+\omega=\frac{-(\Lambda\lambda+\beta-\rho)\pm\sqrt{(\Lambda\lambda+\beta-\rho)^2+4\Lambda\lambda\rho}}{2\Lambda}
+\eeq
+
+Hence, because we have two solutions for \(\omega\), our solutions are of the form:
+
+\beqa
+\label{eq:PKE_Solutions_OneGroup}
+n(t)=&n_1\exp{\omega_1 t}+n_2\exp{\omega_2 t}\\
+C(t)=&C_1\exp{\omega_1 t}+C_2\exp{\omega_2 t}\\
+\eeqa 
+
+Using our two initial conditions from Eq. \ref{eq:PKE_OneGroup_ICs} and by plugging in the solutions into the original differential equations (to obtain two time-dependent conditions) in Eqs. \ref{eq:PointKineticsPrecursor_OneDelayedGroup} and \ref{eq:PointKineticsNeutrons_OneDelayedGroup} will provide four equations and four unknowns (\(P_1, P_2, C_1, C_2\)). The solution for neutron population then becomes:
+
+\beq
+\label{eq:PowerPKE}
+n(t)=n_0\left(\frac{\omega_1+\lambda}{\lambda}\frac{\omega_2}{\omega_2-\omega_1}\exp{\omega_1 t} + \frac{\omega_2+\lambda}{\lambda}\frac{\omega_1}{\omega_1-\omega_2}\exp{\omega_2 t}\right)
+\eeq
+
+The two-term exponential behavior will give two different time behaviors, where the \(\omega_1\) term represents the prompt power jump that occurs due to a near-immediate change in the prompt neutron population. The \(\omega_2\) term, which will necessarily result in a slower time response since \(\omega_2<\omega_1\), represents the neutron population changes due to changes in the delayed neutron population. Eq. \eqref{eq:PowerPKE} is implemented in this kernel, where it is implicitly assumed that there is a direct relationship between neutron population \(n\) and power. The use of this model is optional.
+
+The assumptions made in this one-delayed neutron group include all of the approximations that are also made in the diffusion equation (the flux is at most linearly anisotropic in angle and changes in current are much smaller than the magnitude of current), as well as:
+
+\begin{itemize}
+\item The system begins at steady state (\(k=1\))
+\item There is only one delayed neutron group
+\item The flux is separable in both space and time, and the spatial dependence is given by the first eigenfunction to the diffusion equation (characterized by the geometric buckling)
+\item The delayed neutron precursor distribution can be described the same spatial distribution as the neutron population
+\end{itemize}
 
 \subsubsection{Performing the Data Transfer}
-This section describes the MOOSE transfer classes developed to transfer data between Okapi and BISON and Okapi and MOON; because Okapi is the Master App, BISON and MOON do not communicate with each other directly. The OpenMC and Nek routines that are called from within the MOOSE transfer classes developed are discussed in Sections \ref{sec:OpenMCTransfer} and \ref{sec:NekTransfer}, respectively. The convention for naming these transfer classes is the name of the sub App followed by the name of the Master App (the {\tt MultiAppOkapiMooseTransfer} class was developed with Okapi as the sub App to a MOOSE animal, before the decision was made to use Okapi as the Master App).
+This section describes the MOOSE transfer classes developed to transfer data between Okapi and BISON and Okapi and MOON; because Okapi is the Master App, BISON and MOON do not communicate with each other directly. The OpenMC and Nek routines that are called from within the MOOSE transfer classes developed are discussed in Sections \ref{sec:OpenMCTransfer} and \ref{sec:NekTransfer}, respectively. The convention for naming these transfer classes is the name of the sub App followed by the name of the Master App (the {\tt MultiAppMooseOkapiTransfer} class is used to transfer data between MOOSE and Okapi when MOOSE is the sub App to an Okapi Master App). This distinction is required because slightly different syntax is required for obtaining references to variables in the Master App versus Sub Apps. Note that this section is subject to change once the Functional Expansion MOOSE module is complete.
 
 \subsubsubsection{{\tt MultiAppMooseOkapiTransfer}}
-This transfer object defines data transfer from MOOSE to OpenMC (to MultiApp), and from OpenMC back to MOOSE (from MultiApp). In order to be flexible such that the {\tt MultiAppOkapiMooseTransfer} transfer can be used for both transfer to OpenMC and from OpenMC, the {\tt to\_aux\_scalar} parameter will be a dummy parameter for transfer to OpenMC (because OpenMC does not perform any finite element solve in the MOOSE context), while {\tt source\_variable} will be a dummy variable for transfer from OpenMC for the same reason.
+This transfer object defines data transfer from MOOSE to OpenMC (from MultiApp), and from OpenMC back to MOOSE (to MultiApp). In order to be flexible such that this transfer class can be used for both transfer to and from OpenMC, the {\tt to\_aux\_scalar} parameter will be a dummy parameter for transfer to OpenMC (because OpenMC does not perform any finite element solve in the MOOSE context), while {\tt source\_variable} will be a dummy variable for transfer from OpenMC for the same reason.
 \\\\
 {\it Transfer to OpenMC}\\
-This transfer is used to pass coefficients for fuel temperature and density from MOOSE to OpenMC. The source variable holds a list of the scalar auxvariables that hold all of the expansion coefficients for a given Legendre order for the fuel temperature. These must be present in ascending Legendre order so that OpenMC interprets these coefficients correctly. These fuel temperature coefficients are stored in an array that is passed to the {\tt receive\_coeffs\_for\_cell} subroutine, which stores these coefficients in the {\tt t \% received\_coeffs} array. The total number of coefficients available is used to allocate this array if it has not yet been allocated, and for all transfers but the first, if the number of coefficients coming from MOOSE disagrees with the number from OpenMC, an error is thrown. Finally, the OpenMC subroutines that are called from {\tt MultiAppOkapiMooseTransfer} methods require the OpenMC cell index in the {\tt cells(:)} array so that we know which cells to change the temperature of. The following checks are in place:
+This transfer is used to pass coefficients for fuel temperature from MOOSE to OpenMC. The source variable holds a list of the scalar auxvariables that hold all of the expansion coefficients for a given Legendre order for the fuel temperature. These must be present in ascending Legendre order so that OpenMC interprets these coefficients correctly. These fuel temperature coefficients are stored in an array that is passed to the {\tt receive\_coeffs\_for\_cell} subroutine, which stores these coefficients in the {\tt t \% received\_coeffs} array. The total number of coefficients available is used to allocate this array if it has not yet been allocated, and for all transfers but the first, if the number of coefficients coming from MOOSE disagrees with the number from OpenMC, an error is thrown. Finally, the OpenMC subroutines that are called from {\tt MultiAppOkapiMooseTransfer} methods require the OpenMC cell index in the {\tt cells(:)} array so that we know which cells to change the temperature of. The following checks are in place:
 
 \begin{itemize}
 \item All of the source variables must be the same length
-\item The OpenMC cell ID must be a valid cell (this check is made in OpenMC)
-\item Number of coefficients from MOOSE must match the number from MOOSE that was used to allocate the size of the array (this check is made in OpenMC)
+\item The OpenMC cell ID must be a valid cell
+\item Number of coefficients from MOOSE must match the number from MOOSE that was used to allocate the size of the array
 \end{itemize}
 
-After OpenMC receives these coefficients, no routines are available yet to implement continuous temperature tracking, so the zeroth order coefficient is used to manually change the temperature by calling the {\tt openmc\_set\_cell\_temperature} subroutine directly from the transfer. Note that to change a temperature in OpenMC requires that you have loaded cross sections at that temperature; a range of temperatures can be loaded during the initialization step by specifying the {\tt temperature\_range} parameter in the settings XML file.
+After OpenMC receives these coefficients, no routines are available yet to implement continuous temperature tracking, so the zeroth order coefficient is used to manually change the temperature by calling the {\tt openmc\_set\_cell\_temperature} subroutine directly from the transfer class. Note that to change a temperature in OpenMC requires that you have loaded cross sections at that temperature; a range of temperatures can be loaded during the initialization step by specifying the {\tt temperature\_range} parameter in the settings XML file.
 
 \color{magenta}
 This transfer only works for a single coupling cell, since we won't duplicate the transfer block shown below for every single fuel pin. We'll need to write some method to internally link the OpenMC cells with the MOOSE block IDs. A routine needs to be developed to receive the expansion coefficients in OpenMC, and store them as a function of the OpenMC cell to which they pertain. Finally, continuous material tracking needs to be implemented in OpenMC to make actual use of these coefficients.
@@ -631,12 +692,15 @@ For transferring data from OpenMC to MOOSE, the {\tt fet\_deconstruction} OpenMC
 \begin{itemize}
 \item All of the variables to write must be the same length
 \item The total size of the variables to write must match the number of coefficients in OpenMC (this check is made in OpenMC by comparing with the size of the C++ array passed to the {\tt get\_coeffs\_from\_cell} subroutine). Because each of the variables must be the same length, and the total number of coefficients must match, this also ensures that the correct number of scalar aux variables are provided.
-\item The OpenMC cell ID must be valid (this check is made in OpenMC)
+\item The OpenMC cell ID must be valid
 \end{itemize}
 
 \color{magenta}
 Like the transfer to OpenMC, this transfer only works for a single fuel pin, and in the future we'll need to internally specify which OpenMC cells map to MOOSE blocks.
 \color{black}
+
+\subsubsubsection{{\tt MultiAppMooseOkapiReactivityTransfer}}
+This transfer is used to transfer \(k_{eff}\) from Okapi to MOOSE for uses such as in point kinetics approximations that require knowledge of the system reactivity. This transfer is only defined for the direction of Okapi to MOOSE, since no reactivity can be transferred in the other direction. This transfer is separated from the {\tt MultiAppMooseOkapiTransfer} class for modularity.
 
 \subsubsubsection{{\tt MultiAppMoonOkapiTransfer}}
 This transfer object defines what routines are called to transfer data from Okapi to Nek, and from Nek back to Okapi. In order to be flexible such that the transfer can be used for both transfer to and from Nek, the {\tt to\_aux\_scalar} parameter will be a dummy parameter for transfer to Nek (because Nek does not perform any finite element solve in the MOOSE context), while {\tt source\_variable} will be a dummy variable for transfer from Nek for the same reason.
