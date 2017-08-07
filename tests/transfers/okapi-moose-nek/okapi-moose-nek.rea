@@ -13,7 +13,7 @@
    0.00000     p009
    0.00000     p010 FINTIME
  10000.000     p011 NSTEPS
-  -0.00250     p012 DT
+  -0.01000     p012 DT
    0.00000     p013 IOCOMM
    0.00000     p014 IOTIME
    2.0       p015 IOSTEP

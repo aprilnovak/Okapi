@@ -1,5 +1,6 @@
 [GlobalParams]
   dbg = true
+#  picard_max_its = 15
 []
 
 [Problem]
@@ -17,6 +18,11 @@
   [../]
 []
 
+# The only auxvariables that Okapi needs to handle are ones that represent
+# "middle-man" variables between Nek and BISON, since all transfer of
+# information representing information calculated/used directly by OpenMC
+# is done internally through transfers that dont require values to be stored
+# in MOOSE variables.
 [AuxVariables]
   # ---- middle-man storage for the temp BC computed by Nek ---- #
   [./f_0_coeffs_temp_BC]
@@ -86,7 +92,7 @@
   num_steps = 100
   [./TimeStepper]
     type = OpenMCTimeStepper
-    dt = 0.01
+    dt = 0.02
   [../]
 []
 
@@ -111,35 +117,29 @@
 []
 
 [Transfers]
-  # ---- Transfer heat flux BC from Nek to Okapi (middle-man storage ---- #
-  #      before being passed to BISON)                                    #
-
+  # ---- Transfer heat flux BC from Nek to Okapi ---- #
   [./to_nek] # transfers heat flux BC
     type = MultiAppMoonOkapiTransfer
     direction = to_multiapp
     multi_app = nek
+    openmc_cell = '4 5 6 7'
     source_variable = 'f_0_coeffs_flux_BC f_1_coeffs_flux_BC f_2_coeffs_flux_BC f_3_coeffs_flux_BC f_4_coeffs_flux_BC f_5_coeffs_flux_BC'
-    to_aux_scalar = 'foo'
+    to_aux_scalar = 'not_used'
     execute_on = timestep_begin
   [../]
 
-  # --------------------------------------------------------------------- #
-  #      Transfer temperature BC from Nek to OKapi (middle-man            #
-  #      storage before being passed to BISON)                            #
-
-  [./from_nek] # writes temperature BC
+  # ---- Transfer temperature BC from Nek to Okapi ---- #
+  [./from_nek]
     type = MultiAppMoonOkapiTransfer
     direction = from_multiapp
     multi_app = nek
-    source_variable = 'foo'
+    openmc_cell = '4 5 6 7'
+    source_variable = 'not_used'
     to_aux_scalar = 'f_0_coeffs_temp_BC f_1_coeffs_temp_BC f_2_coeffs_temp_BC f_3_coeffs_temp_BC f_4_coeffs_temp_BC f_5_coeffs_temp_BC'
     execute_on = timestep_begin
   [../]
 
-
-
   # ---- Transfer kappa fission coefficients from Okapi to BISON ---- #
-
   [./to_bison]
     type = MultiAppMooseOkapiTransfer
     direction = to_multiapp
@@ -150,12 +150,16 @@
     execute_on = timestep_end
   [../]
 
-
+  # ---- Transfer k from Okapi to BISON ---- #
+  [./to_bison_k]
+    type = MultiAppMooseOkapiReactivityTransfer
+    direction = to_multiapp
+    multi_app = bison
+    to_aux_scalar = 'keff'
+    execute_on = timestep_end
+  [../]
 
   # --- Transfer SCALAR aux variables from Okapi to BISON ---- #
-  #     Due to the nature of the MultiAppScalarToAuxScalar     #
-  #     transfer, this needs to occur one at a time            #
-
   [./to_bison_temp_f0]
     type = MultiAppScalarToAuxScalarTransfer
     direction = to_multiapp
@@ -205,24 +209,18 @@
     execute_on = timestep_end
   [../]
 
-
-
   [./from_bison]
     type = MultiAppMooseOkapiTransfer
     direction = from_multiapp
     multi_app = bison
+    to_aux_keff = 'bar'
     source_variable = 'l_0_coeffs_temp'
     to_aux_scalar = 'bar'
     openmc_cell = 1
     execute_on = timestep_end
   [../]
 
-
-
   # --- Transfer SCALAR aux variables from BISON to Okapi ---- #
-  #     Due to the nature of the MultiAppScalarToAuxScalar     #
-  #     transfer, this needs to occur one at a time            #
-
   [./from_bison_flux_0]
     type = MultiAppScalarToAuxScalarTransfer
     direction = from_multiapp

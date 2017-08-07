@@ -1,5 +1,3 @@
-# This input file performs a BISON solve over the fuel pin.
-
 [GlobalParams]
   legendre_function = legendre
   fourier_function = fourier
@@ -34,18 +32,13 @@
     center = '0.0 0.0'
   [../]
 
-
-
-  # ---- Reconstruction of the continuous kappa fission distribution ---- #
-
+  # ---- Reconstruction of the continuous kappa-fission dist   ---- #
   [./kappa_fission_reconstruction]
     type = ZernikeLegendreReconstruction
     l_order = 0
     n_order = 5
     poly_coeffs = 'l_0_coeffs_kappa_fission'
   [../]
-
-
 
   # ---- Reconstruction of the surface temperature BC from Nek ---- #
   #      Note that the l_order and f_order are interpreted          #
@@ -66,6 +59,11 @@
 []
 
 [AuxVariables]
+  [./keff]
+    family = SCALAR
+    order = FIRST
+  [../]
+
   [./l_0_coeffs_kappa_fission] # where kappa-fission coefficients are received
     family = SCALAR
     order = TWENTYFIRST
@@ -126,7 +124,7 @@
 
   # ---- Fuel temperature coefficients. Until Z-L expansion are ----#
   #      available in OpenMC, no higher Legendre orders should      #
-  #      be used.                                                   #
+  #      be used. Note that only the C_{000} coefficient is used.   #
   [./l_0_coeffs_temp] # where temperature coefficients are placed
     family = SCALAR
     order = THIRD
@@ -149,7 +147,9 @@
     type = KappaFissionToHeatSource
     variable = fission_heat
     kappa_fission_source = kappa_fission
-    power = 20
+    one_group_PKE = true
+    keff = keff
+    power = 15
   [../]
 []
 
@@ -169,6 +169,14 @@
   [../]
 []
 
+[ICs]
+  [./keff]
+    type = ScalarComponentIC
+    variable = keff
+    values = '1.0'
+  [../]
+[]
+
 [BCs]
   # ---- Apply the temperature BC received from Nek ---- #
   [./temp]
@@ -176,6 +184,13 @@
     variable = temp
     function = temp_BC_reconstruction
     boundary = 'wall'
+  [../]
+  # ---- Insulated on top and bottom ---- #
+  [./flux]
+    type = NeumannBC
+    variable = temp
+    boundary = 'top bottom'
+    value = 0.0
   [../]
 []
 
@@ -189,7 +204,6 @@
   [../]
 
   # ---- Compute heat flux BC coefficients for each Fourier order ---- #
-  #      one at a time                                                 #
   [./f_0_coeffs_flux_BC]
     type = FLDeconstruction
     flux_integral = true
@@ -259,8 +273,7 @@
   type = Transient
   nl_rel_tol = 1e-6
   l_tol = 1e-6
-  dt = 0.01
-  max_l_its = 5
+  dt = 0.02
 []
 
 [Postprocessors]
