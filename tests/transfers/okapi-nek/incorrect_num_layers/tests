@@ -1,0 +1,11 @@
+[Tests]
+  # user does not provide a number of OpenMC cells that matches the number of
+  # fluid layers. Note that this relies on a very specific version of libmoon,
+  # so this test should be modified once we specify the number of layers
+  # internally to MOOSE.
+  [./incorrect_num_layers]
+    type = 'RunException'
+    input = master.i
+    expect_err = "Number of OpenMC cells provided for transferring fluid temperatures does not match the number of layers computed in Nek! Check n_layer in the Nek usr file or the number of entries in 'openmc_cell'!"
+  [../]
+[]
