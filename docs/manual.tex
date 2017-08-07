@@ -723,7 +723,13 @@ When transferring data from Nek to Okapi, the expansion coefficients from the {\
 \item The length of each scalar variable to write must match the {\tt n\_legendre} Nek variable
 \end{itemize} 
 
-\color{magenta} A current limitation is that the expansion orders for the heat flux and temperature boundary conditions are the same, but this is not a physical limitation. \color{black}
+In addition, this transfer direction is used to change the temperatures of axial layers in the fluid based on volume integration that is performed in the {\tt axially\_binned\_integration} Nek subroutine. This requires a vector of OpenMC cell IDs to be provided, which are then used with the {\tt openmc\_cell\_set\_temperature} routine to change temperatures in OpenMC for cell layers. The following check is in place:
+
+\begin{itemize}
+\item The number of OpenMC cells provided must match the number of layers defined in Nek
+\end{itemize}
+
+\color{magenta} A current limitation is that the expansion orders for the heat flux and temperature boundary conditions are the same, but this is not a physical limitation. In addition, once continuous temperature tracking is implemented, there will no longer be a need for the user to specify the axial cells manually in the geometry XML file, and so the axial fluid temperature portion of this transfer will need to be modified.\color{black}
 
 In addition to transferring expansion coefficients for a surface temperature boundary condition, the {\tt axially\_binned\_integration} Nek subroutine is called to integrate the fluid temperature and density and store axially-binned averages in the {\tt fluid\_temp\_bins} Nek array. No subroutines in OpenMC have been developed to utilize axially-binned averages of temperature.
 
@@ -1148,7 +1154,7 @@ Hence, the brunt work of the solve is contained in the executioner, so in order 
 		\item {\tt keepGoing()} - determines whether or not to break from the main time stepping loop; a break will occur if the last solve converged (MasterApp + any MultiApps) and a) you've reached the desired number of time steps or the end simulation time or b) you've reached the steady state check, and no longer need to run a transient simulation. This method will also break out of the main time stepping loop if last solve did not converge, and you can no longer halve the time step due to minimum time step constraints.
 		\item {\tt preStep()}  - defined by custom time stepper
 		\item {\tt computeDT()} - compute \(\Delta t\), which calls {\tt computeStep} by the time stepper (where the current \(\Delta t\) is actually selected). If you're at the first time step, then call the {\tt computeInitialDT()} method of the time stepper. Otherwise, if the solve has not converged, then the {\tt computeFailedDT()}  method of the time stepper simply cuts the time step in half, provided you're not  already at the minimum time step size.
-		\item {\tt takeStep()} - {\bf Perform a single complete time step}. Initialize the number of Picard iterations to zero. The Picard loop is then controlled as a while loop. For each Picard iteration:
+		\item {\tt takeStep()} - {\bf Perform a single complete time step}. Initialize the number of Picard iterations to zero. The Picard loop is then controlled as a while loop, provided the number of Picard iterations does not exceed the {\tt picard\_max\_its} set in the input file. For each Picard iteration:
 			\begin{enumerate}
 			\item {\tt solveStep()}  - {\bf solve a single Picard step}
 				\begin{itemize}
