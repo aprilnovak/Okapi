@@ -49,9 +49,8 @@ OpenMCTimeStepper::postExecute()
   OpenMC::openmc_finalize();
 }
 
-/* If Okapi is run as the Master App, we'll need to modify this to use a better
-   estimate of convergence, since otherwise no subcycling would occur for a
-   Picard step. */
+/* Indication of whether the Monte Carlo solve converged - assume this will
+   always be true. */
 bool
 OpenMCTimeStepper::converged()
 {
