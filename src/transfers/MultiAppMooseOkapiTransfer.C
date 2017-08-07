@@ -22,7 +22,7 @@ InputParameters validParams<MultiAppMooseOkapiTransfer>()
   InputParameters params = validParams<MultiAppTransfer>();
   params.addRequiredParam<std::vector<VariableName>>("source_variable",
     "The auxiliary SCALAR variable to read values from.");
-  params.addRequiredParam<std::vector<VariableName> >("to_aux_scalar",
+  params.addRequiredParam<std::vector<VariableName>>("to_aux_scalar",
     "The name of the SCALAR auxvariable to transfer the value to.");
   params.addRequiredParam<int32_t>("openmc_cell", "OpenMC cell ID (defined in "
     "XML input file) for this transfer to be associated with.");
@@ -32,7 +32,7 @@ InputParameters validParams<MultiAppMooseOkapiTransfer>()
 
 MultiAppMooseOkapiTransfer::MultiAppMooseOkapiTransfer(const InputParameters & parameters) :
     MultiAppTransfer(parameters),
-    _source_var_names(getParam<std::vector<VariableName>>("source_variable")),
+    _src_var_names(getParam<std::vector<VariableName>>("source_variable")),
     _to_aux_names(getParam<std::vector<VariableName>>("to_aux_scalar")),
     _cell(parameters.get<int32_t>("openmc_cell")),
     _dbg(parameters.get<bool>("dbg"))
@@ -45,19 +45,21 @@ MultiAppMooseOkapiTransfer::execute()
   _console << "Beginning MultiAppMooseOkapiTransfer Transfer " <<
     name() << std::endl;
 
-  int num_apps = _multi_app->numGlobalApps();
-  int num_vars_to_read = _source_var_names.size();
-  int num_vars_to_write = _to_aux_names.size();
+  unsigned int num_apps = _multi_app->numGlobalApps();
+  unsigned int num_vars_to_read = _src_var_names.size();
+  unsigned int num_vars_to_write = _to_aux_names.size();
 
   // get the index of the cell in the cells(:) OpenMC array to be used
-  // for later calls to cell-dependent OpenMC routines
+  // for later calls to cell-dependent OpenMC routines. This cannot be
+  // put in the constructor because we cannot guarantee that the openmc_init
+  // subroutine will be called before this object's constructor.
   int err_index = OpenMC::openmc_get_cell(_cell, &_index);
   ErrorHandling::openmc_get_cell(err_index, "MultiAppMooseOkapiTransfer");
 
   switch (_direction)
   {
     // MOOSE -> Okapi. This transfer is used to pass coefficients for fuel
-    // temperature and fuel density to Okapi.
+    // temperature to Okapi.
     case FROM_MULTIAPP:
     {
       for (unsigned int I = 0; I < num_apps; ++I)
@@ -67,17 +69,17 @@ MultiAppMooseOkapiTransfer::execute()
           // get the variables to read from the sub App
           FEProblemBase & from_problem = _multi_app->appProblemBase(I);
           std::vector<MooseVariableScalar *> source_vars(num_vars_to_read);
-          for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
+          for (auto i = beginIndex(_src_var_names); i < num_vars_to_read; ++i)
           {
             source_vars[i] = &from_problem.getScalarVariable(_tid,
-              _source_var_names[i]);
+              _src_var_names[i]);
             source_vars[i]->reinit();
           }
 
           // Check that all of the source variables are of the same order
-          int source_var_size =
-            source_vars[beginIndex(_source_var_names)]->sln().size();
-          for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
+          unsigned int source_var_size =
+            source_vars[beginIndex(_src_var_names)]->sln().size();
+          for (auto i = beginIndex(_src_var_names); i < num_vars_to_read; ++i)
             if (source_vars[i]->sln().size() != source_var_size)
                 mooseError("Order of source variables for "
                   "MultiAppMooseOkapiTransfer FROM_MULTIAPP "
@@ -87,7 +89,7 @@ MultiAppMooseOkapiTransfer::execute()
           // the source variables.
           int num_coeffs_from_moose = num_vars_to_read * source_var_size;
           double moose_coeffs[num_coeffs_from_moose];
-          for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
+          for (auto i = beginIndex(_src_var_names); i < num_vars_to_read; ++i)
           {
             auto & soln_values = source_vars[i]->sln();
             for (auto j = beginIndex(soln_values); j < soln_values.size(); ++j)
@@ -110,24 +112,14 @@ MultiAppMooseOkapiTransfer::execute()
           ErrorHandling::receive_coeffs_for_cell(err_recv);
 
         // Change a temperature in OpenMC. For now, only use a single coefficient,
-        // since there's no continuous material tracking yet. Note that changing
-        // a temperature in OpenMC requires that you've loaded cross section
-        // data at that temperature, so use the temperature_range parameter in the
-        // settings XML file. Because this isn't expanded in OpenMC, here we have
-        // to apply the scaling factors for a zero-th order Legendre and zero-th
-        // order Zernike expansion.
-        Real l0_temp_exp = (source_vars[0]->sln())[0] / sqrt(2.0 * M_PI);
+        // since there's no continuous material tracking yet.
+        Real temp = (source_vars[0]->sln())[0] / sqrt(2.0 * M_PI);
         if (_dbg) _console << "Setting OpenMC cell " << _cell <<
-          " temperature to " << l0_temp_exp << std::endl;
+          " temperature to " << temp << std::endl;
 
-        // for the first iterations until we reach a converged solution, the
-        // temperature computed by BISON might be very low, but we don't want
-        // to set the temperature in OpenMC to a value lower than we have data
-        // for, so only change temperatures if we're above the valid range. We
-        // pass a NULL pointer because we're not passing the optional instance
+        // We pass a NULL pointer because we're not passing the optional instance
         // parameter.
-        int err_temp =
-          OpenMC::openmc_cell_set_temperature(_index, l0_temp_exp, NULL);
+        int err_temp = OpenMC::openmc_cell_set_temperature(_index, temp, NULL);
         ErrorHandling::openmc_cell_set_temperature(err_temp);
         }
       }
@@ -139,9 +131,8 @@ MultiAppMooseOkapiTransfer::execute()
     // fission distribution from OpenMC to MOOSE.
     case TO_MULTIAPP:
     {
-      // Before transferring any data back up to the Master App (MOOSE),
-      // OpenMC stores the expansion coefficients in an array sorted by
-      // OpenMC cell index.
+      // Before transferring any data back up to the Master App (MOOSE), OpenMC
+      // stores the expansion coefficients in an array sorted by OpenMC cell index.
       OpenMC::fet_deconstruction();
 
      for (unsigned int I = 0; I < num_apps; ++I)
@@ -158,7 +149,8 @@ MultiAppMooseOkapiTransfer::execute()
          }
 
          // Check that all of the variables to write are the same size
-         int write_var_size = to_vars[beginIndex(_to_aux_names)]->sln().size();
+         unsigned int write_var_size =
+           to_vars[beginIndex(_to_aux_names)]->sln().size();
          for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
            if (to_vars[i]->sln().size() != write_var_size)
              mooseError("The order of the variables to write for the "
