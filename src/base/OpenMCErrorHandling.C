@@ -56,6 +56,9 @@ void ErrorHandling::openmc_cell_set_temperature(int err)
 
   if (err == e_out_of_bounds)
     mooseError("Cell instance specified for setting temperature is out of bounds!");
+
+  if (err == e_unassigned)
+    mooseError("No error code assigned from OpenMC!");
 }
 
 void ErrorHandling::openmc_get_cell(int err, const std::string & desc)
