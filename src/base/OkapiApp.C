@@ -12,6 +12,7 @@
 #include "MultiAppOkapiMooseTransfer.h"
 #include "MultiAppMooseOkapiTransfer.h"
 #include "MultiAppMoonOkapiTransfer.h"
+#include "MultiAppMooseOkapiReactivityTransfer.h"
 
 template <>
 InputParameters
@@ -60,6 +61,7 @@ OkapiApp::registerObjects(Factory & factory)
   registerTransfer(MultiAppOkapiMooseTransfer);
   registerTransfer(MultiAppMooseOkapiTransfer);
   registerTransfer(MultiAppMoonOkapiTransfer);
+  registerTransfer(MultiAppMooseOkapiReactivityTransfer);
 }
 
 // External entry point for dynamic syntax association
