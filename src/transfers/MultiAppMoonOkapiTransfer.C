@@ -25,8 +25,9 @@ InputParameters validParams<MultiAppMoonOkapiTransfer>()
   params.addRequiredParam<std::vector<VariableName> >("to_aux_scalar",
     "The name of the scalar Aux variable(s) in the MultiApp to transfer"
     " the value to.");
-  params.addRequiredParam<int32_t>("openmc_cell", "Cell ID in OpenMC to transfer "
-    "axially-binned fluid temperatures to.");
+  params.addRequiredParam<std::vector<int32_t>>("openmc_cell",
+    "Cell IDs in OpenMC to transfer axially-binned fluid temperatures to "
+     "(ordered from low heights to high heights).");
   params.addParam<bool>("dbg", false, "Whether to turn on debugging information.");
   return params;
 }
@@ -35,9 +36,10 @@ MultiAppMoonOkapiTransfer::MultiAppMoonOkapiTransfer(const InputParameters & par
     MultiAppTransfer(parameters),
     _source_var_names(getParam<std::vector<VariableName>>("source_variable")),
     _to_aux_names(getParam<std::vector<VariableName>>("to_aux_scalar")),
-    _cell(getParam<int32_t>("openmc_cell")),
-    _dbg(parameters.get<bool>("dbg"))
+    _dbg(parameters.get<bool>("dbg")),
+    _cell(getParam<std::vector<int32_t>>("openmc_cell"))
 {
+  _index.resize(_cell.size());
 }
 
 void
@@ -45,14 +47,17 @@ MultiAppMoonOkapiTransfer::execute()
 {
   _console << "Beginning MultiAppMoonOkapiTransfer " << name() << std::endl;
 
-  int num_apps = _multi_app->numGlobalApps();
-  int num_vars_to_read = _source_var_names.size();
-  int num_vars_to_write = _to_aux_names.size();
+  unsigned int num_apps = _multi_app->numGlobalApps();
+  unsigned int num_vars_to_read = _source_var_names.size();
+  unsigned int num_vars_to_write = _to_aux_names.size();
 
   // get the index of the cell in the cells(:) OpenMC array to be used
   // for later calls to cell-dependent OpenMC routines
-  int err_index = OpenMC::openmc_get_cell(_cell, &_index);
-  ErrorHandling::openmc_get_cell(err_index, "MultiAppMoonOkapiTransfer");
+  for (std::size_t i = 0; i < _cell.size(); ++i)
+  {
+    int err_index = OpenMC::openmc_get_cell(_cell[i], &_index[i]);
+    ErrorHandling::openmc_get_cell(err_index, "MultiAppMoonOkapiTransfer");
+  }
 
   switch (_direction)
   {
@@ -132,7 +137,7 @@ MultiAppMoonOkapiTransfer::execute()
 
       // Initialize all of the variables we'll write to store the temp BC
       std::vector<MooseVariableScalar *> to_variables(num_vars_to_write);
-      for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
+      for (unsigned int i = 0; i < num_vars_to_write; ++i)
       {
         to_variables[i] = &_multi_app->problemBase().getScalarVariable(_tid,
           _to_aux_names[i]);
@@ -141,7 +146,7 @@ MultiAppMoonOkapiTransfer::execute()
 
       // Check that all of the variables to write are of the same order
       int write_var_size = to_variables[beginIndex(_to_aux_names)]->sln().size();
-      for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
+      for (unsigned int i = 0; i < num_vars_to_write; ++i)
       {
         if (to_variables[i]->sln().size() != write_var_size)
           mooseError("The order of the variables to be written for the "
@@ -163,10 +168,18 @@ MultiAppMoonOkapiTransfer::execute()
           "with number expected fron Nek! Change n_legendre in the Nek usr file "
           "or the order of every write variable in MultiAppMoonOkapiTransfer!");
 
+      // Check that the number of OpenMC cells provided for transferring axial
+      // fluid temperatures matches the number of layers in Nek5000
+      if (_cell.size() != Nek5000::layer_data_.n_layer)
+        mooseError("Number of OpenMC cells provided for transferring fluid "
+          "temperatures does not match the number of layers computed in Nek! "
+          "Check n_layer in the Nek usr file or the number of entries in "
+          "'openmc_cell'!");
+
       // Write temp BC coefficients from MOON to Okapi
       if(_dbg)
         _console << "Writing temp BC coeffs from MOON to Okapi..." << std::endl;
-      for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
+      for (unsigned int i = 0; i < num_vars_to_write; ++i)
       {
         std::vector<dof_id_type> & dof = to_variables[i]->dofIndices();
         auto & soln_values = to_variables[i]->sln();
@@ -187,16 +200,24 @@ MultiAppMoonOkapiTransfer::execute()
           << "(" << Nek5000::layer_data_.n_layer << " bins)" << std::endl
           << "Temperatures: " << std::endl;
 
-      double layer_temps[4];
-      for (int i = 0; i < Nek5000::layer_data_.n_layer; ++i)
+      double layer_temps[_cell.size()];
+      for (std::size_t i = 0; i < _cell.size(); ++i)
       {
         if (_dbg) _console << Nek5000::fluid_bins_.fluid_temp_bins[i] << ' ';
-        // TODO: use the axial averages in OpenMC by calling some OpenMC routine
         layer_temps[i] = Nek5000::fluid_bins_.fluid_temp_bins[i];
       }
       if (_dbg) _console << std::endl;
 
-//      OpenMC::assign_layer_temps(_index, layer_temps, 4, NULL);
+      // manually change the temperatures of each fluid layer in OpenMC. This
+      // will be changed in the future when we implement continuous temperature
+      // tracking so that the user doesn't need to define these cells in the
+      // geometry XML file.
+      for (std::size_t i = 0; i < _cell.size(); ++i)
+      {
+        int err_set =
+          OpenMC::openmc_cell_set_temperature(_index[i], layer_temps[i], NULL);
+        ErrorHandling::openmc_cell_set_temperature(err_set);
+      }
 
       break;
     }
