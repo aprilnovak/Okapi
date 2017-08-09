@@ -1,6 +1,11 @@
-# This test computes the Legendre polynomials. Simply change the 
+# This test computes the Legendre polynomials. Simply change the
 # coefficients in the initial conditions block to "pick out" different
 # polynomials to verify that they are implemented correctly.
+
+# This test is a test of the functions in my local branch of MOOSE that
+# has specific coupling features, so this test will only work if Aprils
+# "coupling" branch of MOOSE is being used. But, this test can be used
+# to verify the Functional Expansion module when it is completed.
 
 [Mesh]
   type = GeneratedMesh
