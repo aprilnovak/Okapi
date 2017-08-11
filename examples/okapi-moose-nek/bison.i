@@ -1,3 +1,5 @@
+# physical units are assumed to be in cm
+
 [GlobalParams]
   legendre_function = legendre
   fourier_function = fourier
@@ -5,6 +7,7 @@
   l_direction = 2
   surface_area_pp = 'surface_area'
   diffusion_coefficient_name = 'thermal_conductivity'
+  one_group_PKE = false
   volume_pp = 'volume'
   dbg = false
 []
@@ -36,7 +39,7 @@
   [./kappa_fission_reconstruction]
     type = ZernikeLegendreReconstruction
     l_order = 0
-    n_order = 5
+    n_order = 6
     poly_coeffs = 'l_0_coeffs_kappa_fission'
   [../]
 
@@ -66,7 +69,7 @@
 
   [./l_0_coeffs_kappa_fission] # where kappa-fission coefficients are received
     family = SCALAR
-    order = TWENTYFIRST
+    order = TWENTYEIGHTH
   [../]
 
   # ---- where temp BC coefficients are received from Okapi ---- #
@@ -137,6 +140,14 @@
   [../]
 []
 
+[ICs]
+  [./temp_ic]
+    type = ConstantIC
+    variable = temp
+    value = 600.0
+  [../]
+[]
+
 [AuxKernels]
   [./kappa_fisson]
     type = FunctionAux
@@ -147,9 +158,8 @@
     type = KappaFissionToHeatSource
     variable = fission_heat
     kappa_fission_source = kappa_fission
-    one_group_PKE = true
     keff = keff
-    power = 15
+    power = 20000
   [../]
 []
 
@@ -163,17 +173,9 @@
     variable = temp
   [../]
   [./source]
-    type = CoupledForce
+    type = FissionHeat
     variable = temp
-    v = fission_heat
-  [../]
-[]
-
-[ICs]
-  [./keff]
-    type = ScalarComponentIC
-    variable = keff
-    values = '1.0'
+    fission_heat = fission_heat
   [../]
 []
 
@@ -259,13 +261,6 @@
     fourier_function = fourier
     aux_scalar_name = 'f_5_coeffs_flux_BC_bison'
     boundary = 'wall'
-  [../]
-[]
-
-[Materials]
-  [./thermal_conductivity]
-    type = GenericConstantMaterial
-    value = 1.0
   [../]
 []
 

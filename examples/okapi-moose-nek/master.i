@@ -1,6 +1,5 @@
 [GlobalParams]
   dbg = true
-#  picard_max_its = 15
 []
 
 [Problem]
@@ -89,7 +88,7 @@
 
 [Executioner]
   type = OpenMCExecutioner
-  num_steps = 100
+  num_steps = 50
   [./TimeStepper]
     type = OpenMCTimeStepper
     dt = 0.02
@@ -272,5 +271,5 @@
 []
 
 [Outputs]
-  exodus = true
+  exodus = false
 []
