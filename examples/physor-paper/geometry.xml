@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<geometry>
+
+  <!-- Surfaces for fuel, gap, cladding. Dimensions from Figure 2 in BEAVRS -->
+  <surface id="1" type="z-cylinder" coeffs="0.0 0.0 0.5" /> <!-- Fuel OR -->
+  <surface id="9" type="z-cylinder" coeffs="0.6 0.0 0.5" /> <!-- Fuel OR -->
+
+  <surface id="4" type="x-plane" coeffs="-0.6" boundary="reflective" />
+  <surface id="5" type="x-plane" coeffs=" 0.6" />
+  <surface id="8" type="x-plane" coeffs=" 1.2" boundary="reflective" />
+  <surface id="6" type="y-plane" coeffs="-0.6" boundary="reflective" />
+  <surface id="7" type="y-plane" coeffs=" 0.6" boundary="reflective" />
+
+  <surface id="10" type="z-plane" coeffs="0.00" boundary="reflective"/>
+  <surface id="20" type="z-plane" coeffs="0.25"/>
+  <surface id="30" type="z-plane" coeffs="0.50"/>
+  <surface id="40" type="z-plane" coeffs="0.75"/>
+  <surface id="50" type="z-plane" coeffs="1.00" boundary="reflective"/>
+
+  <cell id="1" material="8" name="fuel"  region="  -1 10 -50" />
+  <cell id="4" material="12" name="water0" region="1 4 -5 6 -7 10 -20 "/>
+  <cell id="5" material="12" name="water1" region="1 4 -5 6 -7 20 -30"/>
+  <cell id="6" material="12" name="water2" region="1 4 -5 6 -7 30 -40"/>
+  <cell id="7" material="12" name="water3" region="1 4 -5 6 -7 40 -50"/>
+
+  <cell id="10" material="9" name="absorber"  region="  -9 10 -50" />
+  <cell id="14" material="13" name="water0" region="9 5 -8 6 -7 10 -50 "/>
+
+</geometry>
