@@ -19,3 +19,6 @@ for i in *.${EXT}*; do
   ext2=$((ext2+1))
 
 done
+
+# now, generate the .nek5000 file for viewing in VisIt
+${HOME}/projects/Nek5000/bin/visnek
