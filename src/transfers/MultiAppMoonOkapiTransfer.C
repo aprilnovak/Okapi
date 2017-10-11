@@ -67,7 +67,8 @@ MultiAppMoonOkapiTransfer::execute()
   unsigned int num_vars_to_write = _to_aux_names.size();
 
   // get the index of the cell in the cells(:) OpenMC array to be used
-  // for later calls to cell-dependent OpenMC routines
+  // for later calls to cell-dependent OpenMC routines. Likewise, get the
+  // indices of the materials in those cells.
   for (std::size_t i = 0; i < _cell.size(); ++i)
   {
     int err_index = OpenMC::openmc_get_cell(_cell[i], &_index[i]);
@@ -131,20 +132,21 @@ MultiAppMoonOkapiTransfer::execute()
             for (auto j = beginIndex(soln_values); j < source_var_size; ++j)
             {
               if (_dbg) _console << soln_values[j] << ' ';
+
               // store the coefficients in Nek5000 arrays.
               Nek5000::expansion_fcoef_.coeff_fij[i*100+j] = soln_values[j];
             }
             if (_dbg) _console << '\n';
           }
         }
+
       // recosntruct a continuous heat flux on the wall boundary
       FORTRAN_CALL(Nek5000::flux_reconstruction)();
       break;
     }
 
     // MOON -> Okapi. This direction is used to transfer coefficients for a
-    // temperature BC, fluid density, and fluid temperature. Currently only
-    // the temperature BC and fluid temperature are passed.
+    // temperature BC, fluid density, and fluid temperature.
     case FROM_MULTIAPP:
     {
       // expand the surface heat flux into coefficients.
@@ -197,11 +199,13 @@ MultiAppMoonOkapiTransfer::execute()
       // Write temp BC coefficients from MOON to Okapi
       if(_dbg)
         _console << "Writing temp BC coeffs from MOON to Okapi..." << std::endl;
+
       for (unsigned int i = 0; i < num_vars_to_write; ++i)
       {
         std::vector<dof_id_type> & dof = to_variables[i]->dofIndices();
         auto & soln_values = to_variables[i]->sln();
         if (_dbg) _console << "Fourier order " << i << ": ";
+
         for (auto j = beginIndex(soln_values); j < write_var_size; ++j)
         {
           if (_dbg) _console << Nek5000::expansion_tcoef_.coeff_tij[i*100+j] << ' ';
@@ -227,21 +231,32 @@ MultiAppMoonOkapiTransfer::execute()
         layer_temps[i] = Nek5000::fluid_bins_.fluid_temp_bins[i] *
           (_T_inlet - _T_outlet) + _T_inlet;
       }
+
       if (_dbg) _console << std::endl;
 
       // manually change the temperatures of each fluid layer in OpenMC. This
       // will be changed in the future when we implement continuous temperature
       // tracking so that the user doesn't need to define these cells in the
       // geometry XML file.
+      if (_dbg) _console << "Layer densities: " << std::endl;
       for (std::size_t i = 0; i < _cell.size(); ++i)
       {
         int err_set =
           OpenMC::openmc_cell_set_temperature(_index[i], layer_temps[i], NULL);
         ErrorHandling::openmc_cell_set_temperature(err_set);
 
-        // dummy value for now
+        // simple correlation for water at 15 MPa, converted to g/cm^3
+        double layer_density = -0.0097 * layer_temps[i] * layer_temps[i] +
+          8.8796 * layer_temps[i] - 1167.1;
+        layer_density /= 100.0;
+
+        // convert to atoms/barn-cm as required by OpenMC
+        layer_density = layer_density * (6.022E23) / (18.01588 * 1E24);
+
+        if (_dbg) _console << layer_density << ' ';
+
         int err_set_density =
-          OpenMC::openmc_material_set_density(_index[i], 10.0);
+          OpenMC::openmc_material_set_density(_index[i], layer_density);
         ErrorHandling::openmc_material_set_density(err_set_density);
       }
 
