@@ -20,7 +20,12 @@ protected:
   std::vector<VariableName> _to_aux_names;
   bool _dbg;
   const std::vector<int32_t> & _cell;
+  const std::vector<int32_t> & _material;
   std::vector<int32_t> _index;
+  std::vector<int32_t> _index_mat;
+
+  const Real & _T_inlet;
+  const Real & _T_outlet;
 };
 
 #endif /* MULTIAPPMOONOKAPITRANSFER_H */

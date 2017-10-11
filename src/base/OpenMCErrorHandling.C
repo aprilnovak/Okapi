@@ -72,3 +72,21 @@ void ErrorHandling::openmc_get_cell(int err, const std::string & desc)
       " Check that the call to this routine occurs after the cells array has"
       " been allocated.");
 }
+
+void ErrorHandling::openmc_get_material(int err, const std::string & desc)
+{
+  if (err == e_material_invalid_id)
+    mooseError("Invalid material ID used in call to 'openmc_get_material' routine!"
+      " Check that the material ID used for the " + desc + " transfer exists in"
+      " the material XML file.");
+  if (err == e_material_not_allocated)
+    mooseError("Material is not allocated in call to 'openmc_get_material' "
+      "routine! Check that the call to this routine occurs after the materials "
+      "array has been allocated.");
+}
+
+void ErrorHandling::openmc_material_set_density(int err)
+{
+  if (err == e_out_of_bounds)
+    mooseError("Material instance specified for setting density is out of bounds!");
+}

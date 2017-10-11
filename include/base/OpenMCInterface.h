@@ -50,12 +50,23 @@ namespace OpenMC {
     // on a cell.
     int openmc_get_cell(int32_t id, int32_t * index);
 
+    // OPENMC_GET_MATERIAL returns the index in the materialss array of a
+    // material with a given ID (defined in the XML file). This is used to
+    // avoid repeated lookups in the hash table when multiple operations
+    // will be performed on a cell.
+    int openmc_get_material(int32_t id, int32_t * index);
+
     // set a cell temperature given a temperature. This is used for transferring
     // data from MOOSE to OpenMC. Because the instance is optional, it is not
     // received by value on the Fortran side, so we use a pointer here. The
     // cell index can be determined with a call to 'openmc_get_cell'.
     int openmc_cell_set_temperature(int32_t index, double temperature,
       int32_t * instance);
+
+    // set a material density. This is used for transferring data from MOON
+    // to OpenMC. The material index can be determined with a call to
+    // 'openmc_get_material'.
+    int openmc_material_set_density(int32_t index, double density);
 
     // store expansion coefficients by cell. This is used for transferring data
     // from OpenMC to MOOSE.

@@ -28,6 +28,13 @@ InputParameters validParams<MultiAppMoonOkapiTransfer>()
   params.addRequiredParam<std::vector<int32_t>>("openmc_cell",
     "Cell IDs in OpenMC to transfer axially-binned fluid temperatures to "
      "(ordered from low heights to high heights).");
+  params.addRequiredParam<std::vector<int32_t>>("openmc_material",
+    "Material IDs in OpenMC to transfer axially-binned fluid densities to "
+     "(ordered from low heights to high heights).");
+  params.addParam<Real>("inlet_temp", 550, "Inlet temperature about which to "
+    "scale the nondimensional Nek5000 temperature results.");
+  params.addParam<Real>("outlet_temp", 600, "Outlet temperature about which to "
+    "scale the nondimensional Nek5000 temperature results.");
   params.addParam<bool>("dbg", false, "Whether to turn on debugging information.");
   return params;
 }
@@ -37,9 +44,17 @@ MultiAppMoonOkapiTransfer::MultiAppMoonOkapiTransfer(const InputParameters & par
     _source_var_names(getParam<std::vector<VariableName>>("source_variable")),
     _to_aux_names(getParam<std::vector<VariableName>>("to_aux_scalar")),
     _dbg(parameters.get<bool>("dbg")),
-    _cell(getParam<std::vector<int32_t>>("openmc_cell"))
+    _cell(getParam<std::vector<int32_t>>("openmc_cell")),
+    _material(getParam<std::vector<int32_t>>("openmc_material")),
+    _T_inlet(getParam<Real>("inlet_temp")),
+    _T_outlet(getParam<Real>("outlet_temp"))
 {
   _index.resize(_cell.size());
+  _index_mat.resize(_material.size());
+
+  if (_cell.size() != _material.size())
+    mooseError("Number of cells and material do not match for the "
+      "'MultiAppMoonOkapiTransfer'!");
 }
 
 void
@@ -57,6 +72,9 @@ MultiAppMoonOkapiTransfer::execute()
   {
     int err_index = OpenMC::openmc_get_cell(_cell[i], &_index[i]);
     ErrorHandling::openmc_get_cell(err_index, "MultiAppMoonOkapiTransfer");
+
+    int err_index_mat = OpenMC::openmc_get_material(_material[i], &_index_mat[i]);
+    ErrorHandling::openmc_get_material(err_index_mat, "MultiAppMoonOkapiTransfer");
   }
 
   switch (_direction)
@@ -204,7 +222,10 @@ MultiAppMoonOkapiTransfer::execute()
       for (std::size_t i = 0; i < _cell.size(); ++i)
       {
         if (_dbg) _console << Nek5000::fluid_bins_.fluid_temp_bins[i] << ' ';
-        layer_temps[i] = Nek5000::fluid_bins_.fluid_temp_bins[i];
+
+        // apply the scaling factor
+        layer_temps[i] = Nek5000::fluid_bins_.fluid_temp_bins[i] *
+          (_T_inlet - _T_outlet) + _T_inlet;
       }
       if (_dbg) _console << std::endl;
 
@@ -217,6 +238,11 @@ MultiAppMoonOkapiTransfer::execute()
         int err_set =
           OpenMC::openmc_cell_set_temperature(_index[i], layer_temps[i], NULL);
         ErrorHandling::openmc_cell_set_temperature(err_set);
+
+        // dummy value for now
+        int err_set_density =
+          OpenMC::openmc_material_set_density(_index[i], 10.0);
+        ErrorHandling::openmc_material_set_density(err_set_density);
       }
 
       break;
