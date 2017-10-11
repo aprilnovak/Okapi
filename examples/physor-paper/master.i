@@ -48,6 +48,14 @@
     family = SCALAR
     order = ELEVENTH
   [../]
+  [./f_6_coeffs_temp_BC]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_7_coeffs_temp_BC]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
 
   # ---- middle-man storage for the flux BC computed by Nek ---- #
   [./f_0_coeffs_flux_BC]
@@ -71,6 +79,14 @@
     order = ELEVENTH
   [../]
   [./f_5_coeffs_flux_BC]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_6_coeffs_flux_BC]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_7_coeffs_flux_BC]
     family = SCALAR
     order = ELEVENTH
   [../]
@@ -122,7 +138,8 @@
     direction = to_multiapp
     multi_app = nek
     openmc_cell = '4 5 6 7'
-    source_variable = 'f_0_coeffs_flux_BC f_1_coeffs_flux_BC f_2_coeffs_flux_BC f_3_coeffs_flux_BC f_4_coeffs_flux_BC f_5_coeffs_flux_BC'
+    openmc_material = '12 13 14 15'
+    source_variable = 'f_0_coeffs_flux_BC f_1_coeffs_flux_BC f_2_coeffs_flux_BC f_3_coeffs_flux_BC f_4_coeffs_flux_BC f_5_coeffs_flux_BC f_6_coeffs_flux_BC f_7_coeffs_flux_BC'
     to_aux_scalar = 'not_used'
     execute_on = timestep_begin
   [../]
@@ -133,8 +150,9 @@
     direction = from_multiapp
     multi_app = nek
     openmc_cell = '4 5 6 7'
+    openmc_material = '12 13 14 15'
     source_variable = 'not_used'
-    to_aux_scalar = 'f_0_coeffs_temp_BC f_1_coeffs_temp_BC f_2_coeffs_temp_BC f_3_coeffs_temp_BC f_4_coeffs_temp_BC f_5_coeffs_temp_BC'
+    to_aux_scalar = 'f_0_coeffs_temp_BC f_1_coeffs_temp_BC f_2_coeffs_temp_BC f_3_coeffs_temp_BC f_4_coeffs_temp_BC f_5_coeffs_temp_BC f_6_coeffs_temp_BC f_7_coeffs_temp_BC'
     execute_on = timestep_begin
   [../]
 
@@ -207,6 +225,22 @@
     to_aux_scalar = 'f_5_coeffs_temp_BC_bison'
     execute_on = timestep_end
   [../]
+  [./to_bison_temp_f6]
+    type = MultiAppScalarToAuxScalarTransfer
+    direction = to_multiapp
+    multi_app = bison
+    source_variable = 'f_6_coeffs_temp_BC'
+    to_aux_scalar = 'f_6_coeffs_temp_BC_bison'
+    execute_on = timestep_end
+  [../]
+  [./to_bison_temp_f7]
+    type = MultiAppScalarToAuxScalarTransfer
+    direction = to_multiapp
+    multi_app = bison
+    source_variable = 'f_7_coeffs_temp_BC'
+    to_aux_scalar = 'f_7_coeffs_temp_BC_bison'
+    execute_on = timestep_end
+  [../]
 
   [./from_bison]
     type = MultiAppMooseOkapiTransfer
@@ -266,6 +300,22 @@
     multi_app = bison
     source_variable = 'f_5_coeffs_flux_BC_bison'
     to_aux_scalar = 'f_5_coeffs_flux_BC'
+    execute_on = timestep_end
+  [../]
+  [./from_bison_flux_6]
+    type = MultiAppScalarToAuxScalarTransfer
+    direction = from_multiapp
+    multi_app = bison
+    source_variable = 'f_6_coeffs_flux_BC_bison'
+    to_aux_scalar = 'f_6_coeffs_flux_BC'
+    execute_on = timestep_end
+  [../]
+  [./from_bison_flux_7]
+    type = MultiAppScalarToAuxScalarTransfer
+    direction = from_multiapp
+    multi_app = bison
+    source_variable = 'f_7_coeffs_flux_BC_bison'
+    to_aux_scalar = 'f_7_coeffs_flux_BC'
     execute_on = timestep_end
   [../]
 []

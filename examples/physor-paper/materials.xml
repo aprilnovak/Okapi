@@ -1,3 +1,6 @@
+<!-- Initial conditions set in this material file assume 600 K
+     and 15 MPa for water. -->
+
 <?xml version="1.0"?>
 <materials>
 
@@ -17,20 +20,30 @@
   </material>
 
   <material id="12" temperature="600">
-    <density value="0.740582" units="g/cm3" />
-    <nuclide name="H1"   ao="4.9457e-02" />
-    <nuclide name="H2"   ao="7.4196e-06" />
-    <nuclide name="O16"  ao="2.4672e-02" />
-    <nuclide name="O17"  ao="6.0099e-05" />
+    <density value="0.6594" units="g/cm3" />
+    <nuclide name="H1"   ao="2.0" />
+    <nuclide name="O16"  ao="1.0" />
     <sab name="c_H_in_H2O" />
   </material>
 
   <material id="13" temperature="600">
-    <density value="0.740582" units="g/cm3" />
-    <nuclide name="H1"   ao="4.9457e-02" />
-    <nuclide name="H2"   ao="7.4196e-06" />
-    <nuclide name="O16"  ao="2.4672e-02" />
-    <nuclide name="O17"  ao="6.0099e-05" />
+    <density value="0.6594" units="g/cm3" />
+    <nuclide name="H1"   ao="2.0" />
+    <nuclide name="O16"  ao="1.0" />
+    <sab name="c_H_in_H2O" />
+  </material>
+
+  <material id="14" temperature="600">
+    <density value="0.6594" units="g/cm3" />
+    <nuclide name="H1"   ao="2.0" />
+    <nuclide name="O16"  ao="1.0" />
+    <sab name="c_H_in_H2O" />
+  </material>
+
+  <material id="15" temperature="600">
+    <density value="0.6594" units="g/cm3" />
+    <nuclide name="H1"   ao="2.0" />
+    <nuclide name="O16"  ao="1.0" />
     <sab name="c_H_in_H2O" />
   </material>
 

@@ -51,8 +51,8 @@
   [./temp_BC_reconstruction]
     type = FourierLegendreReconstruction
     l_order = 10
-    f_order = 5
-    poly_coeffs = 'f_0_coeffs_temp_BC_bison f_1_coeffs_temp_BC_bison f_2_coeffs_temp_BC_bison f_3_coeffs_temp_BC_bison f_4_coeffs_temp_BC_bison f_5_coeffs_temp_BC_bison '
+    f_order = 7
+    poly_coeffs = 'f_0_coeffs_temp_BC_bison f_1_coeffs_temp_BC_bison f_2_coeffs_temp_BC_bison f_3_coeffs_temp_BC_bison f_4_coeffs_temp_BC_bison f_5_coeffs_temp_BC_bison f_6_coeffs_temp_BC_bison f_7_coeffs_temp_BC_bison'
   [../]
 []
 
@@ -97,6 +97,14 @@
     family = SCALAR
     order = ELEVENTH
   [../]
+  [./f_6_coeffs_temp_BC_bison]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_7_coeffs_temp_BC_bison]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
 
   # ---- where heat flux BC coefficients are placed ---- #
   [./f_0_coeffs_flux_BC_bison]
@@ -120,6 +128,14 @@
     order = ELEVENTH
   [../]
   [./f_5_coeffs_flux_BC_bison]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_6_coeffs_flux_BC_bison]
+    family = SCALAR
+    order = ELEVENTH
+  [../]
+  [./f_7_coeffs_flux_BC_bison]
     family = SCALAR
     order = ELEVENTH
   [../]
@@ -149,7 +165,7 @@
   [./temp_ic]
     type = ConstantIC
     variable = temp
-    value = 600.0
+    value = 550.0
   [../]
 []
 
@@ -164,7 +180,7 @@
     variable = fission_heat
     kappa_fission_source = kappa_fission
     keff = keff
-    power = 2000000
+    power = 20000
   [../]
 []
 
@@ -261,10 +277,32 @@
     flux_integral = true
     variable = temp
     l_order = 10
-    f_order = 0
+    f_order = 5
     legendre_function = legendre
     fourier_function = fourier
     aux_scalar_name = 'f_5_coeffs_flux_BC_bison'
+    boundary = 'wall'
+  [../]
+  [./f_6_coeffs_flux_BC]
+    type = FLDeconstruction
+    flux_integral = true
+    variable = temp
+    l_order = 10
+    f_order = 6
+    legendre_function = legendre
+    fourier_function = fourier
+    aux_scalar_name = 'f_6_coeffs_flux_BC_bison'
+    boundary = 'wall'
+  [../]
+  [./f_7_coeffs_flux_BC]
+    type = FLDeconstruction
+    flux_integral = true
+    variable = temp
+    l_order = 10
+    f_order = 7
+    legendre_function = legendre
+    fourier_function = fourier
+    aux_scalar_name = 'f_7_coeffs_flux_BC_bison'
     boundary = 'wall'
   [../]
 []
