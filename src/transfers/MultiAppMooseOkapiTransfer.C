@@ -27,6 +27,8 @@ InputParameters validParams<MultiAppMooseOkapiTransfer>()
   params.addRequiredParam<int32_t>("openmc_cell", "OpenMC cell ID (defined in "
     "XML input file) for this transfer to be associated with.");
   params.addParam<bool>("dbg", false, "Whether to turn on debugging information");
+  params.addParam<bool>("store_results", true, "Whether to store the iteration "
+    "results for every Picard iteration.");
   return params;
 }
 
@@ -35,7 +37,8 @@ MultiAppMooseOkapiTransfer::MultiAppMooseOkapiTransfer(const InputParameters & p
     _src_var_names(getParam<std::vector<VariableName>>("source_variable")),
     _to_aux_names(getParam<std::vector<VariableName>>("to_aux_scalar")),
     _cell(parameters.get<int32_t>("openmc_cell")),
-    _dbg(parameters.get<bool>("dbg"))
+    _dbg(parameters.get<bool>("dbg")),
+    _store_results(parameters.get<bool>("store_results"))
 {
 }
 
@@ -117,6 +120,16 @@ MultiAppMooseOkapiTransfer::execute()
         if (_dbg) _console << "Setting OpenMC cell " << _cell <<
           " temperature to " << temp << std::endl;
 
+	if (_store_results)
+	{
+          _fuel_temp_0.push_back(temp);
+
+          _console << "Fuel average temperatures up to iteration " <<
+            _fuel_temp_0.size() << std::endl;
+
+	  printResults(_fuel_temp_0);
+	}
+
         // We pass a NULL pointer because we're not passing the optional instance
         // parameter.
         int err_temp = OpenMC::openmc_cell_set_temperature(_index, temp, NULL);
@@ -131,6 +144,14 @@ MultiAppMooseOkapiTransfer::execute()
     // fission distribution from OpenMC to MOOSE.
     case TO_MULTIAPP:
     {
+      // get the value for k and print it
+      if (_store_results)
+      {
+        _k_eff.push_back(OpenMC::get_keff());
+        _console << "k_eff, up to iteration " << _k_eff.size() << ":" << std::endl;
+        printResults(_k_eff);
+      }
+
       // Before transferring any data back up to the Master App (MOOSE), OpenMC
       // stores the expansion coefficients in an array sorted by OpenMC cell index.
       OpenMC::fet_deconstruction();
@@ -185,6 +206,22 @@ MultiAppMooseOkapiTransfer::execute()
             _console << std::endl;
          }
 
+	 if (_store_results)
+	 {
+	   _console << "fission coefficients, up to iteration " <<
+	     _fission_coeffs.size() << ":" << std::endl;
+
+	   // store this iteration's coefficients
+	   std::vector<Real> this_iteration;
+	   for (unsigned int i = 0; i < num_coeffs_from_openmc; ++i)
+	     this_iteration.push_back(omc_coeffs[i]);
+
+           // place this iteration's coefficients at end of vector, then print
+	   _fission_coeffs.push_back(this_iteration);
+	   for (unsigned int i = 0; i < _k_eff.size(); ++i)
+	     printResults(_fission_coeffs[i]);
+	 }
+
          // Loop over the variables that we are going to write
          for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
          {
@@ -203,4 +240,13 @@ MultiAppMooseOkapiTransfer::execute()
   }
 
   _console << "Finished MultiAppMooseOkapiTransfer transfer " << name() << std::endl;
+}
+
+void
+MultiAppMooseOkapiTransfer::printResults(std::vector<Real> & results)
+{
+  for (unsigned int i = 0; i < results.size(); ++i)
+    _console << results[i] << ", ";
+
+  _console << std::endl;
 }
