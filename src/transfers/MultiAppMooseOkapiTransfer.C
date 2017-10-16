@@ -122,12 +122,17 @@ MultiAppMooseOkapiTransfer::execute()
 
 	if (_store_results)
 	{
-          _fuel_temp_0.push_back(temp);
+	  std::vector<Real> this_iteration;
+	  for (int i = 0; i < num_coeffs_from_moose; ++i)
+	    this_iteration.push_back(moose_coeffs[i]);
 
-          _console << "Fuel average temperatures up to iteration " <<
-            _fuel_temp_0.size() << std::endl;
+          _fuel_temp_coeffs.push_back(this_iteration);
 
-	  printResults(_fuel_temp_0);
+          _console << "Fuel temperature coefficients up to iteration " <<
+            _fuel_temp_coeffs.size() << std::endl;
+
+          for (unsigned int i = 0; i < _fuel_temp_coeffs.size(); ++i)
+    	    printResults(_fuel_temp_coeffs[i]);
 	}
 
         // We pass a NULL pointer because we're not passing the optional instance
@@ -213,7 +218,7 @@ MultiAppMooseOkapiTransfer::execute()
 
 	   // store this iteration's coefficients
 	   std::vector<Real> this_iteration;
-	   for (unsigned int i = 0; i < num_coeffs_from_openmc; ++i)
+	   for (int i = 0; i < num_coeffs_from_openmc; ++i)
 	     this_iteration.push_back(omc_coeffs[i]);
 
            // place this iteration's coefficients at end of vector, then print

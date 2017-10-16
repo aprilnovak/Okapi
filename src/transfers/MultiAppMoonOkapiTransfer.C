@@ -36,6 +36,8 @@ InputParameters validParams<MultiAppMoonOkapiTransfer>()
   params.addParam<Real>("outlet_temp", 600, "Outlet temperature about which to "
     "scale the nondimensional Nek5000 temperature results.");
   params.addParam<bool>("dbg", false, "Whether to turn on debugging information.");
+  params.addParam<bool>("store_results", true, "Whether to store the iteration "
+    "results for each Picard iteration");
   return params;
 }
 
@@ -47,7 +49,8 @@ MultiAppMoonOkapiTransfer::MultiAppMoonOkapiTransfer(const InputParameters & par
     _cell(getParam<std::vector<int32_t>>("openmc_cell")),
     _material(getParam<std::vector<int32_t>>("openmc_material")),
     _T_inlet(getParam<Real>("inlet_temp")),
-    _T_outlet(getParam<Real>("outlet_temp"))
+    _T_outlet(getParam<Real>("outlet_temp")),
+    _store_results(getParam<bool>("store_results"))
 {
   _index.resize(_cell.size());
   _index_mat.resize(_material.size());
@@ -231,8 +234,22 @@ MultiAppMoonOkapiTransfer::execute()
         layer_temps[i] = Nek5000::fluid_bins_.fluid_temp_bins[i] *
           (_T_inlet - _T_outlet) + _T_inlet;
       }
-
       if (_dbg) _console << std::endl;
+
+      if (_store_results)
+      {
+        std::vector<Real> this_iteration;
+	for (std::size_t i = 0; i < _cell.size(); ++i)
+	  this_iteration.push_back(layer_temps[i]);
+
+	_fluid_layer_temps.push_back(this_iteration);
+
+	_console << "Fluid layer temps up to iteration " << _fluid_layer_temps.size()
+	  << ":" << std::endl;
+	for (std::size_t i = 0; i < _fluid_layer_temps.size(); ++i)
+	  printResults(_fluid_layer_temps[i]);
+      }
+
 
       // manually change the temperatures of each fluid layer in OpenMC. This
       // will be changed in the future when we implement continuous temperature
@@ -265,4 +282,13 @@ MultiAppMoonOkapiTransfer::execute()
   }
 
   _console << "Finished MultiAppMoonOkapiTransfer" << name() << std::endl;
+}
+
+void
+MultiAppMoonOkapiTransfer::printResults(std::vector<Real> & results)
+{
+  for (unsigned int i = 0; i < results.size(); ++i)
+    _console << results[i] << ", ";
+
+  _console << std::endl;
 }

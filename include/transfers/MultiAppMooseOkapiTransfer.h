@@ -27,7 +27,7 @@ protected:
 
   // vectors to hold values for all previous Picard iterations
   std::vector<Real> _k_eff;
-  std::vector<Real> _fuel_temp_0;
+  std::vector<std::vector<Real>> _fuel_temp_coeffs;
   std::vector<std::vector<Real>> _fission_coeffs;
 };
 

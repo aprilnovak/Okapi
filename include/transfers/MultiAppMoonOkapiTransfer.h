@@ -9,11 +9,12 @@ class MultiAppMoonOkapiTransfer;
 template<>
 InputParameters validParams<MultiAppMoonOkapiTransfer>();
 
-class MultiAppMoonOkapiTransfer : public MultiAppTransfer {
+class MultiAppMoonOkapiTransfer : public MultiAppTransfer
+{
 public:
   MultiAppMoonOkapiTransfer(const InputParameters & parameters);
-
   virtual void execute() override;
+  void printResults(std::vector<Real> & results);
 
 protected:
   std::vector<VariableName> _source_var_names;
@@ -26,6 +27,9 @@ protected:
 
   const Real & _T_inlet;
   const Real & _T_outlet;
+  const bool & _store_results;
+
+  std::vector<std::vector<Real>> _fluid_layer_temps;
 };
 
 #endif /* MULTIAPPMOONOKAPITRANSFER_H */
