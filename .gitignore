@@ -1,6 +1,6 @@
 *.sch
 *.fld*
-.libs
+*.libs
 *.exo
 *.la
 *.lo
@@ -70,6 +70,10 @@ temp_print_trace.*
 *.vtk
 *.vtu
 *.pvtu
+*.fls
+*.glo
+*.ist
+*.fdb_latexmk
 .depend
 *.png
 *.gif
@@ -203,3 +207,6 @@ python/peacock/tests/postprocessor_tab/TestPostprocessorPluginManager_test_scrip
 !python/peacock/tests/**/gold/*.png
 !python/peacock/icons/**/*.*
 !python/peacock/tests/**/input/*.*
+
+# Header file symlinks directory
+build
