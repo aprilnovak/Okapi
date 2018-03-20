@@ -1,4 +1,5 @@
 #include "ExtraFunctions.h"
+#include <iostream>
 
 /* extra function for computing factorials for Zernike polynomials,
    courtesy of cplusplus.com. */
@@ -20,18 +21,29 @@ int num_zernike(int N)
   return number;
 }
 
-/* compute the order of the Zernike expansion given the number of 
+/* compute the order of the Zernike expansion given the number of
    expansion coefficients. */
 int zernike_order_from_coeffs(int N)
 {
   int order = 0;
   int remaining = N;
-  
+
   while (remaining > 0)
   {
     order += 1;
     remaining = remaining - order;
   }
-  
+
   return order - 1;
+}
+
+// compute water density at 15 MPa given a temperature - for quick results
+// for PHYSOR paper. To be made more modular in the future!
+double water_density(double temperature)
+{
+  if (temperature > 615)
+    std::cout << "Boiling water detected! Temperatures too high for density "
+      "correlation" << std::endl;
+
+  return -0.0097 * temperature * temperature + 8.8796 * temperature - 1167.1;
 }

@@ -8,3 +8,6 @@ int num_zernike(int);
 // simple prototype of function determining Zernike expansion order given
 // the number of polynomials (inverse of num_zernike)
 int zernike_order_from_coeffs(int);
+
+// computes density for water at 15 MPa given temperature
+double water_density(double);
