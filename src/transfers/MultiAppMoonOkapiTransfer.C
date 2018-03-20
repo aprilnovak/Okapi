@@ -232,7 +232,7 @@ MultiAppMoonOkapiTransfer::execute()
 
         // apply the scaling factor
         layer_temps[i] = Nek5000::fluid_bins_.fluid_temp_bins[i] *
-          (_T_inlet - _T_outlet) + _T_inlet;
+          (_T_outlet - _T_inlet) + _T_inlet;
       }
       if (_dbg) _console << std::endl;
 
