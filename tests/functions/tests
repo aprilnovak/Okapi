@@ -5,4 +5,10 @@
     exodiff = zernike_out.e
     abs_zero = 1e-8
   [../]
+  [./zernike_legendre_polynomial]
+    type = Exodiff
+    input = zernike-legendre.i
+    exodiff = zernike-legendre_out.e
+    abs_zero = 1e-8
+  [../]
 []

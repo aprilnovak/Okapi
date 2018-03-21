@@ -2,23 +2,12 @@
 # coefficients in the initial conditions block to "pick out" different
 # polynomials to verify that they are implemented correctly.
 
-# This test is a test of the functions in my local branch of MOOSE that
-# has specific coupling features, so this test will only work if Aprils
-# "coupling" branch of MOOSE is being used. But, this test can be used
-# to verify the Functional Expansion module when it is completed.
+# This test is a Zernike-Legendre expansion over a cylinder, but only a first-
+# order expansion is used for the Zernike portion.
 
 [Mesh]
-  type = GeneratedMesh
-  dim = 3
-  nx = 4
-  ny = 4
-  nz = 30
-  xmin = 0.0
-  xmax = 1.0
-  ymin = 0.0
-  ymax = 1.0
-  zmin = 0.0
-  zmax = 1.0
+  # journal file is located at tests/transfers/okapi-moose/pin_coupling
+  file = cylinder.e
 []
 
 [Variables]
@@ -72,18 +61,15 @@
   [../]
 []
 
-# When coupling, these aux variables will come from a multiapp, but for testing
-# the polynomial reconstruction, just set them to a arbitrary value.
-
 [Functions]
   [./zernike]
     type = ZernikePolynomial
     radius = 0.5
-    center = '0.5 0.5'
+    center = '0.0 0.0'
   [../]
   [./legendre]
     type = LegendrePolynomial
-    l_geom_norm = '0.0 1.0'
+    l_geom_norm = '-0.5 0.5'
   [../]
 
   [./reconstruction] # function for comparing against (full reconstruction)
@@ -105,16 +91,16 @@
 []
 
 [BCs]
-  [./dir]
+  [./sides]
     type = DirichletBC
     variable = u
-    boundary = 'left'
+    boundary = '1'
     value = '1.0'
   [../]
-  [./dir2]
+  [./top_bottom]
     type = DirichletBC
     variable = u
-    boundary = 'right'
+    boundary = '2 3'
     value = '2.0'
   [../]
 []
