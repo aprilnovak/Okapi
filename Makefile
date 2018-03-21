@@ -52,21 +52,27 @@ POROUS_FLOW         := no
 include $(MOOSE_DIR)/modules/modules.mk
 ###############################################################################
 
+# Use the BUFFALO submodule if it exists and BUFFALO_DIR is not set
+BUFFALO_SUBMODULE    := $(CURDIR)/buffalo
+ifneq ($(wildcard $(BUFFALO_SUBMODULE)/Makefile),)
+  BUFFALO_DIR        ?= $(BUFFALO_SUBMODULE)
+else
+  BUFFALO_DIR        ?= $(shell dirname `pwd`)/buffalo
+endif
+
+# buffalo
+APPLICATION_DIR    := $(BUFFALO_DIR)
+APPLICATION_NAME   := buffalo
+include            $(FRAMEWORK_DIR)/app.mk
+
+EXTERNAL_FLAGS	    += -Wl,-rpath,$(OPENMC_DIR)/lib -L$(OPENMC_DIR)/lib -lopenmc
+ifneq "$(ENABLE_NEK_COUPLING)" "false"
+  EXTERNAL_FLAGS    += -Wl,-rpath,$(MOON_DIR)/lib -L$(MOON_DIR)/lib -lopenmc
+endif
+
 # dep apps
 APPLICATION_DIR    := $(CURDIR)
 APPLICATION_NAME   := okapi
 BUILD_EXEC         := yes
 DEP_APPS           := $(shell $(FRAMEWORK_DIR)/scripts/find_dep_apps.py $(APPLICATION_NAME))
 include            $(FRAMEWORK_DIR)/app.mk
-
-###############################################################################
-# Additional special case targets should be added here - set the MOON (MOOSE-
-# wrapped Nek5000) library path if coupling is enabled.
-
-ifeq "$(ENABLE_NEK_COUPLING)" "false"
-  NEK5000_COUPLING_LIBRARY ?=
-else
-  NEK5000_COUPLING_LIBRARY ?= $(MOON_DIR)/lib/libmoon-dbg.so
-endif
-
-ADDITIONAL_LIBS := /homes/anovak/projects/openmc/build/lib/libopenmc.so $(NEK5000_COUPLING_LIBRARY)
