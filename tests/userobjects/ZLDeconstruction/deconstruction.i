@@ -1,5 +1,9 @@
 # This test verifies the decomposition of a continuous variable v
-# into expansion coefficients.
+# into expansion coefficients - variable is expanded in known coefficients, then
+# those coefficients are re-computed using ZLDeconstruction. This test is
+# essentially the same as that in ../ZernikeLegendreDeconstruction, except here
+# a single userobject is used to compute all the expansion coefficients for a set
+# Legendre order.
 
 [GlobalParams]
   legendre_function = legendre
@@ -9,10 +13,11 @@
 []
 
 [Mesh]
-  file = 3D_sideset.exo
+  # journal file at tests/transfers/okapi-moose/pin_coupling
+  file = cylinder.e
   block_id = '1'
-  boundary_id = '100 200 300'
-  boundary_name = 'top bottom wall'
+  boundary_id = '1 2 3'
+  boundary_name = 'wall bottom top'
 []
 
 [Variables]
@@ -51,7 +56,7 @@
   [../]
   [./legendre]
     type = LegendrePolynomial
-    l_geom_norm = '0.0 1.0'
+    l_geom_norm = '-0.5 0.5'
   [../]
   [./reconstruction]
     type = ZernikeLegendreReconstruction
@@ -97,7 +102,7 @@ active = 'all_at_once'
     type = ZLDeconstruction
     variable = v
     l_order = 0
-    n_order_to_openmc = 2
+    n_order = 2
     aux_scalar_name = 'l_0_coeffs_end'
   [../]
   [./z00]

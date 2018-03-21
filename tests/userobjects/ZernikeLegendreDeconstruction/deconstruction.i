@@ -1,5 +1,8 @@
 # This test verifies the decomposition of a continuous variable v
-# into expansion coefficients.
+# into expansion coefficients - the variable 'u' is specified as a function with
+# known expansion coefficients, then those coefficients are re-computed in a
+# deconstruction. The coefficients match fairly closely, with some error due to
+# the quadrature rule implicit in the integration.
 
 [GlobalParams]
   legendre_function = legendre
@@ -9,10 +12,11 @@
 []
 
 [Mesh]
-  file = 3D_sideset.exo
+  # journal file is at tests/transfers/okapi-moose/pin_coupling
+  file = cylinder.e
   block_id = '1'
-  boundary_id = '100 200 300'
-  boundary_name = 'top bottom wall'
+  boundary_id = '1 2 3'
+  boundary_name = 'wall bottom top'
 []
 
 [Variables]
@@ -51,7 +55,7 @@
   [../]
   [./legendre]
     type = LegendrePolynomial
-    l_geom_norm = '0.0 1.0'
+    l_geom_norm = '-0.5 0.5'
   [../]
   [./reconstruction]
     type = ZernikeLegendreReconstruction
