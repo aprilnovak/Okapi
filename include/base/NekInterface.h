@@ -1,3 +1,5 @@
+#if ENABLE_NEK_COUPLING
+
 // Okapi is a wrapper around OpenMC, but we also use it as the Master App to
 // pass information to Nek, so we need to include an interface to the Nek
 // routines that we'll call. Because Nek is written mostly in Fortran 77, we
@@ -59,3 +61,5 @@ namespace Nek5000
 }
 
 #endif /* NEKINTERFACE_H */
+
+#endif // ENABLE_NEK_COUPLING

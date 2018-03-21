@@ -1,3 +1,5 @@
+#if ENABLE_NEK_COUPLING
+
 #include "MultiAppMoonOkapiTransfer.h"
 #include "NekInterface.h"
 #include "OpenMCInterface.h"
@@ -292,3 +294,5 @@ MultiAppMoonOkapiTransfer::printResults(std::vector<Real> & results)
 
   _console << std::endl;
 }
+
+#endif // ENABLE_NEK_COUPLING

@@ -6,6 +6,13 @@
 # MOOSE_DIR        - Root directory of the MOOSE project
 #
 ###############################################################################
+# Environment variable indicating if we should link to the MOON (Moose-wrapped
+# Nek5000) library and compile Okapi source files that contain calls to Nek5000
+# subroutines. Setting this to 'false' indicates that Okapi will be used only
+# for OpenMC-MOOSE coupling. If you change the value of this variable, make sure
+# to run 'make clean' before re-compiling.
+ENABLE_NEK_COUPLING := false
+
 # Use the MOOSE submodule if it exists and MOOSE_DIR is not set
 MOOSE_SUBMODULE    := $(CURDIR)/moose
 ifneq ($(wildcard $(MOOSE_SUBMODULE)/framework/Makefile),)
@@ -53,5 +60,13 @@ DEP_APPS           := $(shell $(FRAMEWORK_DIR)/scripts/find_dep_apps.py $(APPLIC
 include            $(FRAMEWORK_DIR)/app.mk
 
 ###############################################################################
-# Additional special case targets should be added here
-ADDITIONAL_LIBS := /homes/anovak/projects/openmc/build/lib/libopenmc.so $(MOON_DIR)/lib/libmoon-dbg.so
+# Additional special case targets should be added here - set the MOON (MOOSE-
+# wrapped Nek5000) library path if coupling is enabled.
+
+ifeq "$(ENABLE_NEK_COUPLING)" "false"
+  NEK5000_COUPLING_LIBRARY ?=
+else
+  NEK5000_COUPLING_LIBRARY ?= $(MOON_DIR)/lib/libmoon-dbg.so
+endif
+
+ADDITIONAL_LIBS := /homes/anovak/projects/openmc/build/lib/libopenmc.so $(NEK5000_COUPLING_LIBRARY)

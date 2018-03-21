@@ -11,8 +11,11 @@
 // transfers
 #include "MultiAppOkapiMooseTransfer.h"
 #include "MultiAppMooseOkapiTransfer.h"
-#include "MultiAppMoonOkapiTransfer.h"
 #include "MultiAppMooseOkapiReactivityTransfer.h"
+
+#if ENABLE_NEK_COUPLING
+#include "MultiAppMoonOkapiTransfer.h"
+#endif // ENABLE_NEK_COUPLING
 
 template <>
 InputParameters
@@ -60,8 +63,12 @@ OkapiApp::registerObjects(Factory & factory)
   registerTimeStepper(OpenMCTimeStepper);
   registerTransfer(MultiAppOkapiMooseTransfer);
   registerTransfer(MultiAppMooseOkapiTransfer);
-  registerTransfer(MultiAppMoonOkapiTransfer);
   registerTransfer(MultiAppMooseOkapiReactivityTransfer);
+
+  #if ENABLE_NEK_COUPLING
+  registerTransfer(MultiAppMoonOkapiTransfer);
+  #endif // ENABLE_NEK_COUPLING
+
 }
 
 // External entry point for dynamic syntax association
