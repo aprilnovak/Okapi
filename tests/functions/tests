@@ -1,0 +1,8 @@
+[Tests]
+  [./zernike_polynomial]
+    type = Exodiff
+    input = zernike.i
+    exodiff = zernike_out.e
+    abs_zero = 1e-8
+  [../]
+[]

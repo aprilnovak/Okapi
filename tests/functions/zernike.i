@@ -2,20 +2,15 @@
 # coefficients in the initial conditions block to "pick out" different
 # polynomials to verify that they are implemented correctly.
 
-# This test is a test of the functions in my local branch of MOOSE that
-# has specific coupling features, so this test will only work if Aprils
-# "coupling" branch of MOOSE is being used. But, this test can be used
-# to verify the Functional Expansion module when it is completed.
+# This test is a test of the functions in the
+# aprilnovak/moose/fe-module-deprecated branch, and once transitioning to the
+# new MOOSE FE module, this test should be deleted. This test serves as a
+# basis for validating the new MOOSE FE modules ability to apply a function
+# obtained from an expansion to an auxvariable.
 
 [Mesh]
-  type = GeneratedMesh
-  dim = 2
-  nx = 25
-  ny = 25
-  xmin = 0.0
-  xmax = 1.0
-  ymin = 0.0
-  ymax = 1.0
+  # journal file is located at tests/transfers/okapi-moose/pin_coupling
+  file = cylinder.e
 []
 
 [Variables]
@@ -38,7 +33,7 @@
   [./ic]
     type = ScalarComponentIC
     variable = 'l_0_coeffs'
-    values = '0.0 0.0 0.0 0.0 1.0 0.0'
+    values = '0.0 0.0 0.0 0.0 0.0 1.0'
   [../]
 []
 
@@ -57,7 +52,7 @@
   [./zernike]
     type = ZernikePolynomial
     radius = 0.5
-    center = '0.5 0.5'
+    center = '0.0 0.0'
   [../]
   [./legendre]
     type = LegendrePolynomial
@@ -83,16 +78,16 @@
 []
 
 [BCs]
-  [./dir]
+  [./walls]
     type = DirichletBC
     variable = u
-    boundary = 'left'
+    boundary = '1'
     value = '1.0'
   [../]
-  [./dir2]
+  [./top_bottom]
     type = DirichletBC
     variable = u
-    boundary = 'right'
+    boundary = '2 3'
     value = '2.0'
   [../]
 []
