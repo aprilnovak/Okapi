@@ -7,6 +7,7 @@
   [./incorrect_var_order]
     type = 'RunException'
     input = master.i
+    env_vars = "ENABLE_NEK_COUPLING"
     expect_err = "Number of Legendre polynomials in Okapi does not agree with number expected fron Nek! Change n_legendre in the Nek usr file or the order of each source variable in MultiAppMoonOkapiTransfer!"
   [../]
 []

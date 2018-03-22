@@ -1,4 +1,4 @@
-#if ENABLE_NEK_COUPLING
+#ifdef ENABLE_NEK_COUPLING
 
 #include "MultiAppMoonOkapiTransfer.h"
 #include "NekInterface.h"

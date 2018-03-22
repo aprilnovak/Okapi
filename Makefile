@@ -8,10 +8,10 @@
 ###############################################################################
 # Environment variable indicating if we should link to the MOON (Moose-wrapped
 # Nek5000) library and compile Okapi source files that contain calls to Nek5000
-# subroutines. Setting this to 'false' indicates that Okapi will be used only
-# for OpenMC-MOOSE coupling. If you change the value of this variable, make sure
-# to run 'make clean' before re-compiling.
-ENABLE_NEK_COUPLING := false
+# subroutines. This variable must NOT be set to anything in order to ignore all
+# Nek-related source files and tests. Setting ENABLE_NEK_COUPLING to ANY value
+# will allow linking to Nek5000 routines.
+ENABLE_NEK_COUPLING :=
 
 # Use the MOOSE submodule if it exists and MOOSE_DIR is not set
 MOOSE_SUBMODULE    := $(CURDIR)/moose
@@ -63,7 +63,7 @@ include            $(FRAMEWORK_DIR)/app.mk
 # Additional special case targets should be added here - set the MOON (MOOSE-
 # wrapped Nek5000) library path if coupling is enabled.
 
-ifeq "$(ENABLE_NEK_COUPLING)" "false"
+ifndef ENABLE_NEK_COUPLING
   NEK5000_COUPLING_LIBRARY ?=
 else
   NEK5000_COUPLING_LIBRARY ?= $(MOON_DIR)/lib/libmoon-dbg.so
