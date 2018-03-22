@@ -27,48 +27,61 @@ include $(FRAMEWORK_DIR)/build.mk
 include $(FRAMEWORK_DIR)/moose.mk
 
 ################################## MODULES ####################################
-# To use certain physics included with MOOSE, set variables below to
-# yes as needed.  Or set ALL_MODULES to yes to turn on everything (overrides
-# other set variables).
-
 ALL_MODULES         := no
 
-CHEMICAL_REACTIONS  := no
-CONTACT             := no
-FLUID_PROPERTIES    := no
-HEAT_CONDUCTION     := no
-MISC                := no
-NAVIER_STOKES       := no
-PHASE_FIELD         := no
-RDG                 := no
-RICHARDS            := no
-SOLID_MECHANICS     := no
-STOCHASTIC_TOOLS    := no
-TENSOR_MECHANICS    := no
-WATER_STEAM_EOS     := no
-XFEM                := no
-POROUS_FLOW         := no
-
 include $(MOOSE_DIR)/modules/modules.mk
-###############################################################################
 
-# Use the BUFFALO submodule if it exists and BUFFALO_DIR is not set
-BUFFALO_SUBMODULE    := $(CURDIR)/buffalo
-ifneq ($(wildcard $(BUFFALO_SUBMODULE)/Makefile),)
-  BUFFALO_DIR        ?= $(BUFFALO_SUBMODULE)
-else
-  BUFFALO_DIR        ?= $(shell dirname `pwd`)/buffalo
-endif
+################################## BUFFALO ####################################
 
+ifdef $(BUFFALO_DIR)
 # buffalo
 APPLICATION_DIR    := $(BUFFALO_DIR)
 APPLICATION_NAME   := buffalo
 include            $(FRAMEWORK_DIR)/app.mk
-
-EXTERNAL_FLAGS	    += -Wl,-rpath,$(OPENMC_DIR)/lib -L$(OPENMC_DIR)/lib -lopenmc
-ifneq "$(ENABLE_NEK_COUPLING)" "false"
-  EXTERNAL_FLAGS    += -Wl,-rpath,$(MOON_DIR)/lib -L$(MOON_DIR)/lib -lopenmc
 endif
+
+################################## OPENMC ####################################
+ifndef HDF5_ROOT
+$(error The HDF5_ROOT environment varible must be set in order to compile openmc)
+endif
+
+# Use the OPENMC submodule if it exists and OPENMC_DIR is not set
+OPENMC_SUBMODULE    := $(CURDIR)/openmc
+ifneq ($(wildcard $(OPENMC_SUBMODULE)/CMakeLists.txt),)
+  OPENMC_DIR        ?= $(OPENMC_SUBMODULE)
+else
+  OPENMC_DIR        ?= $(shell dirname `pwd`)/openmc
+endif
+
+OPENMC_BUILD_DIR := $(OPENMC_DIR)/build
+
+ifeq ($(UNAME), Linux)
+  OPENMC_LIB = $(OPENMC_BUILD_DIR)/lib/libopenmc.so
+else
+  OPENMC_LIB = $(OPENMC_BUILD_DIR)/lib/libopenmc.dylib
+endif
+
+$(OPENMC_BUILD_DIR):
+	mkdir $(OPENMC_BUILD_DIR)
+
+$(OPENMC_LIB): $(OPENMC_BUILD_DIR)
+	rm -rf $(OPENMC_BUILD_DIR)
+	mkdir $(OPENMC_BUILD_DIR)
+	cd $(OPENMC_BUILD_DIR) && cmake $(OPENMC_DIR) && $(MAKE)
+
+ADDITIONAL_DEPEND_LIBS += $(OPENMC_LIB)
+
+################################## GET FLAGS RIGHT ####################################
+
+ADDITIONAL_LIBS	    += -Wl,-rpath,$(OPENMC_BUILD_DIR)/lib -L$(OPENMC_BUILD_DIR)/lib -lopenmc
+ifneq "$(ENABLE_NEK_COUPLING)" "false"
+  ADDITIONAL_LIBS    += -Wl,-rpath,$(MOON_DIR)/lib -L$(MOON_DIR)/lib -lmoon
+endif
+ifdef $(BUFFALO_DIR)
+CPPFLAGS += -DENABLE_BUFFALO_COUPLING
+endif
+
+################################## OKAPI ####################################
 
 # dep apps
 APPLICATION_DIR    := $(CURDIR)
