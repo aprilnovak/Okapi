@@ -1,4 +1,5 @@
 #include "OkapiApp.h"
+#include "BuffaloApp.h"
 #include "Moose.h"
 #include "AppFactory.h"
 #include "ModulesApp.h"
@@ -29,10 +30,12 @@ OkapiApp::OkapiApp(InputParameters parameters) : MooseApp(parameters)
 {
   Moose::registerObjects(_factory);
   ModulesApp::registerObjects(_factory);
+  BuffaloApp::registerObjects(_factory);
   OkapiApp::registerObjects(_factory);
 
   Moose::associateSyntax(_syntax, _action_factory);
   ModulesApp::associateSyntax(_syntax, _action_factory);
+  BuffaloApp::associateSyntax(_syntax, _action_factory);
   OkapiApp::associateSyntax(_syntax, _action_factory);
 }
 
@@ -48,6 +51,7 @@ void
 OkapiApp::registerApps()
 {
   registerApp(OkapiApp);
+  registerApp(BuffaloApp);
 }
 
 // External entry point for dynamic object registration
@@ -65,10 +69,9 @@ OkapiApp::registerObjects(Factory & factory)
   registerTransfer(MultiAppMooseOkapiTransfer);
   registerTransfer(MultiAppMooseOkapiReactivityTransfer);
 
-  #if ENABLE_NEK_COUPLING
+#if ENABLE_NEK_COUPLING
   registerTransfer(MultiAppMoonOkapiTransfer);
-  #endif // ENABLE_NEK_COUPLING
-
+#endif // ENABLE_NEK_COUPLING
 }
 
 // External entry point for dynamic syntax association
