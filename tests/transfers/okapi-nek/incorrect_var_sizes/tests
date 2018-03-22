@@ -7,6 +7,7 @@
   [./incorrect_var_size]
     type = 'RunException'
     input = master.i
+    env_vars = "ENABLE_NEK_COUPLING"
     expect_err = "The order of the source variables for the MultiAppMoonOkapiTransfer direction TO_MULTIAPP are not all the same!"
   [../]
 []

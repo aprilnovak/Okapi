@@ -6,6 +6,7 @@
   [./incorrect_num_layers]
     type = 'RunException'
     input = master.i
+    env_vars = "ENABLE_NEK_COUPLING"
     expect_err = "Number of OpenMC cells provided for transferring fluid temperatures does not match the number of layers computed in Nek! Check n_layer in the Nek usr file or the number of entries in 'openmc_cell'!"
   [../]
 []
