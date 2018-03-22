@@ -16,7 +16,7 @@
 #include "MultiAppMooseOkapiTransfer.h"
 #include "MultiAppMooseOkapiReactivityTransfer.h"
 
-#if ENABLE_NEK_COUPLING
+#ifdef ENABLE_NEK_COUPLING
 #include "MultiAppMoonOkapiTransfer.h"
 #endif // ENABLE_NEK_COUPLING
 
@@ -77,7 +77,7 @@ OkapiApp::registerObjects(Factory & factory)
   registerTransfer(MultiAppMooseOkapiTransfer);
   registerTransfer(MultiAppMooseOkapiReactivityTransfer);
 
-#if ENABLE_NEK_COUPLING
+#ifdef ENABLE_NEK_COUPLING
   registerTransfer(MultiAppMoonOkapiTransfer);
 #endif // ENABLE_NEK_COUPLING
 }

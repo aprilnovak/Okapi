@@ -6,12 +6,6 @@
 # MOOSE_DIR        - Root directory of the MOOSE project
 #
 ###############################################################################
-# Environment variable indicating if we should link to the MOON (Moose-wrapped
-# Nek5000) library and compile Okapi source files that contain calls to Nek5000
-# subroutines. Setting this to 'false' indicates that Okapi will be used only
-# for OpenMC-MOOSE coupling. If you change the value of this variable, make sure
-# to run 'make clean' before re-compiling.
-ENABLE_NEK_COUPLING := false
 
 # Use the MOOSE submodule if it exists and MOOSE_DIR is not set
 MOOSE_SUBMODULE    := $(CURDIR)/moose
@@ -37,6 +31,15 @@ ifdef BUFFALO_DIR
 # buffalo
 APPLICATION_DIR    := $(BUFFALO_DIR)
 APPLICATION_NAME   := buffalo
+include            $(FRAMEWORK_DIR)/app.mk
+endif
+
+################################## MOON ####################################
+
+ifdef MOON_DIR
+# buffalo
+APPLICATION_DIR    := $(MOON_DIR)
+APPLICATION_NAME   := moon
 include            $(FRAMEWORK_DIR)/app.mk
 endif
 
@@ -74,11 +77,11 @@ ADDITIONAL_DEPEND_LIBS += $(OPENMC_LIB)
 ################################## GET FLAGS RIGHT ####################################
 
 ADDITIONAL_LIBS	    += -Wl,-rpath,$(OPENMC_BUILD_DIR)/lib -L$(OPENMC_BUILD_DIR)/lib -lopenmc
-ifneq "$(ENABLE_NEK_COUPLING)" "false"
-  ADDITIONAL_LIBS    += -Wl,-rpath,$(MOON_DIR)/lib -L$(MOON_DIR)/lib -lmoon
-endif
 ifdef BUFFALO_DIR
 ADDITIONAL_CPPFLAGS += -DENABLE_BUFFALO_COUPLING
+endif
+ifdef MOON_DIR
+ADDITIONAL_CPPFLAGS += -DENABLE_NEK_COUPLING
 endif
 
 ################################## OKAPI ####################################
