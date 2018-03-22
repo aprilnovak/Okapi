@@ -33,7 +33,7 @@ include $(MOOSE_DIR)/modules/modules.mk
 
 ################################## BUFFALO ####################################
 
-ifdef $(BUFFALO_DIR)
+ifdef BUFFALO_DIR
 # buffalo
 APPLICATION_DIR    := $(BUFFALO_DIR)
 APPLICATION_NAME   := buffalo
@@ -77,8 +77,8 @@ ADDITIONAL_LIBS	    += -Wl,-rpath,$(OPENMC_BUILD_DIR)/lib -L$(OPENMC_BUILD_DIR)/
 ifneq "$(ENABLE_NEK_COUPLING)" "false"
   ADDITIONAL_LIBS    += -Wl,-rpath,$(MOON_DIR)/lib -L$(MOON_DIR)/lib -lmoon
 endif
-ifdef $(BUFFALO_DIR)
-CPPFLAGS += -DENABLE_BUFFALO_COUPLING
+ifdef BUFFALO_DIR
+ADDITIONAL_CPPFLAGS += -DENABLE_BUFFALO_COUPLING
 endif
 
 ################################## OKAPI ####################################
