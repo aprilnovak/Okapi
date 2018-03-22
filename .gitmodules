@@ -1,0 +1,6 @@
+[submodule "moose"]
+	path = moose
+	url = https://github.com/aprilnovak/moose
+[submodule "openmc"]
+	path = openmc
+	url = https://github.com/aprilnovak/openmc
