@@ -56,7 +56,13 @@ else
   OPENMC_DIR        ?= $(shell dirname `pwd`)/openmc
 endif
 
+ifeq ($(METHOD),dbg)
+OPENMC_BUILD_DIR := $(OPENMC_DIR)/build-dbg
+CMAKE := cmake -DCMAKE_BUILD_TYPE=Debug
+else
 OPENMC_BUILD_DIR := $(OPENMC_DIR)/build
+CMAKE := cmake
+endif
 
 ifeq ($(UNAME), Linux)
   OPENMC_LIB = $(OPENMC_BUILD_DIR)/lib/libopenmc.so
@@ -70,7 +76,7 @@ $(OPENMC_BUILD_DIR):
 $(OPENMC_LIB): $(OPENMC_BUILD_DIR)
 	rm -rf $(OPENMC_BUILD_DIR)
 	mkdir $(OPENMC_BUILD_DIR)
-	cd $(OPENMC_BUILD_DIR) && cmake $(OPENMC_DIR) && $(MAKE)
+	cd $(OPENMC_BUILD_DIR) && $(CMAKE) $(OPENMC_DIR) && $(MAKE)
 
 ADDITIONAL_DEPEND_LIBS += $(OPENMC_LIB)
 
