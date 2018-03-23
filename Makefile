@@ -27,8 +27,12 @@ include $(MOOSE_DIR)/modules/modules.mk
 
 ################################## BUFFALO ####################################
 
+# Use a BUFFALO directory if its on the same level as Okapi and BUFFALO_DIR is not set
+ifneq ($(wildcard $(shell dirname `pwd`)/buffalo/Makefile),)
+  BUFFALO_DIR        ?= $(shell dirname `pwd`)/buffalo
+endif
+
 ifdef BUFFALO_DIR
-# buffalo
 APPLICATION_DIR    := $(BUFFALO_DIR)
 APPLICATION_NAME   := buffalo
 include            $(FRAMEWORK_DIR)/app.mk
@@ -36,8 +40,12 @@ endif
 
 ################################## MOON ####################################
 
+# Use a MOON directory if its on the same level as Okapi and MOON_DIR is not set
+ifneq ($(wildcard $(shell dirname `pwd`)/moon/Makefile),)
+  MOON_DIR        ?= $(shell dirname `pwd`)/moon
+endif
+
 ifdef MOON_DIR
-# buffalo
 APPLICATION_DIR    := $(MOON_DIR)
 APPLICATION_NAME   := moon
 include            $(FRAMEWORK_DIR)/app.mk
