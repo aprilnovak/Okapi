@@ -4,6 +4,6 @@
     type = 'RunException'
     input = master.i
     expect_err = "Invalid cell ID specified for storing expansion coefficients for FE tally! Check that there is an FET defined for the requested cell ID."
-    required_objects = 'KappaFissionToHeatSource'
+    required_applications = 'BuffaloApp'
   [../]
 []

@@ -5,6 +5,6 @@
     type = 'RunException'
     input = master.i
     expect_err = "Invalid cell ID used in call to 'openmc_get_cell' routine! Check that the cell ID used for the MultiAppMooseOkapiTransfer transfer exists in the geometry XML file."
-    required_objects = 'KappaFissionToHeatSource'
+    required_applications = 'BuffaloApp'
   [../]
 []

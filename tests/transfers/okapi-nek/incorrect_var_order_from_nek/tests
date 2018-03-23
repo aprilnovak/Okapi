@@ -9,6 +9,6 @@
     input = master.i
     expect_err = "Number of Legendre polynomials in Okapi does not agree with number expected fron Nek! Change n_legendre in the Nek usr file or the order of every write variable in MultiAppMoonOkapiTransfer!"
     group = 'nek'
-    required_objects = 'MultiAppMoonOkapiTransfer'
+    required_applications = 'MoonApp'
   [../]
 []

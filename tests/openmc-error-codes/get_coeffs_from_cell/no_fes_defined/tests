@@ -5,6 +5,6 @@
     type = 'RunException'
     input = master.i
     expect_err = "Cannot receive expansion coefficients for cell because no FE tallies are defined in OpenMC! Check that an FET has been defined in the tallies.xml file."
-    required_objects = 'KappaFissionToHeatSource'
+    required_applications = 'BuffaloApp'
   [../]
 []

@@ -5,6 +5,6 @@
     input = master.i
     expect_err = "Cross sections not available for specified temperature, setting temperature to highest available data point!"
     should_crash = false
-    required_objects = 'KappaFissionToHeatSource'
+    required_applications = 'BuffaloApp'
   [../]
 []
