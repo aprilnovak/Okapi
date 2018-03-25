@@ -1,10 +1,12 @@
 #include "OpenMCErrorHandling.h"
+#include "OpenMCInterface.h"
 #include "MooseObject.h"
 
 /* This file contains functions for handling error codes returned from OpenMC
-   routines. Specific error messages are defined for each of the OpenMC routines
-   to assist in debugging errors. Note that any changes made to these error
-   messages will require you to modify all of the tests files. */
+   routines. OpenMC sets its own error codes in 'openmc_err_msg', but we want to
+   print more verbose messages to aid in debugging. Note that any changes made to
+   these error messages will require you to modify the tests files. */
+
 void ErrorHandling::receive_coeffs_for_cell(int err)
 {
   if (err == e_tally_not_allocated)
@@ -42,47 +44,59 @@ void ErrorHandling::get_coeffs_from_cell(int err)
 
 void ErrorHandling::openmc_cell_set_temperature(int err)
 {
-  if (err == w_below_min_bound)
-    mooseWarning("Cross sections not available for specified temperature, "
-      "setting temperature to lowest available data point!");
+  if (err != 0)
+  {
+    std::string openmc_error_message(openmc_err_msg);
+    openmc_error_message = "OpenMC Error: '" + openmc_error_message + "' ";
 
-  if (err == w_above_max_bound)
-    mooseWarning("Cross sections not available for specified temperature, "
-      "setting temperature to highest available data point!");
+    if (err == e_warning)
+      mooseWarning(openmc_error_message +
+        "Setting temperature to nearest available point!");
 
-  if (err == e_cell_no_material)
-    mooseError("Cannot specify cell filled with a universe for "
-      "'openmc_cell_set_temperature' routine!");
+    if (err == e_out_of_bounds)
+      mooseError(openmc_error_message +
+        "Check that the cell used in 'openmc_cell_set_temperature' exists in "
+	"the geometry XML file.");
 
-  if (err == e_out_of_bounds)
-    mooseError("Cell instance specified for setting temperature is out of bounds!");
-
-  if (err == e_unassigned)
-    mooseError("No error code assigned from OpenMC!");
+    // no additional descriptions needed for e_geometry or e_unassigned
+  }
 }
 
-void ErrorHandling::openmc_get_cell(int err, const std::string & desc)
+void ErrorHandling::openmc_get_cell_index(int err, const std::string & desc)
 {
-  if (err == e_cell_invalid_id)
-    mooseError("Invalid cell ID used in call to 'openmc_get_cell' routine!"
-      " Check that the cell ID used for the " + desc + " transfer exists in"
-      " the geometry XML file.");
-  if (err == e_cell_not_allocated)
-    mooseError("Cell is not allocated in call to 'openmc_get_cell' routine!"
-      " Check that the call to this routine occurs after the cells array has"
-      " been allocated.");
+
+  if (err != 0)
+  {
+    std::string openmc_error_message(openmc_err_msg);
+    openmc_error_message = "OpenMC Error: '" + openmc_error_message + "' ";
+
+    if (err == e_invalid_id)
+      mooseError(openmc_error_message +
+        "Check that the OpenMC cell ID used for the " + desc + " transfer exists "
+        "in the geometry XML file.");
+    if (err == e_allocate)
+      mooseError(openmc_error_message +
+        "Check that the call to 'openmc_get_cell' in " + desc +
+        " occurs after the OpenMC cells have been allocated.");
+  }
 }
 
-void ErrorHandling::openmc_get_material(int err, const std::string & desc)
+void ErrorHandling::openmc_get_material_index(int err, const std::string & desc)
 {
-  if (err == e_material_invalid_id)
-    mooseError("Invalid material ID used in call to 'openmc_get_material' routine!"
-      " Check that the material ID used for the " + desc + " transfer exists in"
-      " the material XML file.");
-  if (err == e_material_not_allocated)
-    mooseError("Material is not allocated in call to 'openmc_get_material' "
-      "routine! Check that the call to this routine occurs after the materials "
-      "array has been allocated.");
+  if (err != 0)
+  {
+    std::string openmc_error_message(openmc_err_msg);
+    openmc_error_message = "OpenMC Error: '" + openmc_error_message + "' ";
+
+    if (err == e_invalid_id)
+      mooseError(openmc_error_message +
+        "Check that the OpenMC material ID used for the " + desc + " transfer "
+        "exists in the material XML file.");
+    if (err == e_allocate)
+      mooseError(openmc_error_message +
+        "Check that the call to 'openmc_get_material' in " + desc +
+        "occurs after the OpenMC materials have been allocated.");
+  }
 }
 
 void ErrorHandling::openmc_material_set_density(int err)

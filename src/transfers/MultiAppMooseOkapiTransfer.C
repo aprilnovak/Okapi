@@ -76,8 +76,8 @@ MultiAppMooseOkapiTransfer::execute()
   // for later calls to cell-dependent OpenMC routines. This cannot be
   // put in the constructor because we cannot guarantee that the openmc_init
   // subroutine will be called before this object's constructor.
-  int err_index = OpenMC::openmc_get_cell(_cell, &_index);
-  ErrorHandling::openmc_get_cell(err_index, "MultiAppMooseOkapiTransfer");
+  int err_index = OpenMC::openmc_get_cell_index(_cell, &_index);
+  ErrorHandling::openmc_get_cell_index(err_index, "MultiAppMooseOkapiTransfer");
 
   switch (_direction)
   {
