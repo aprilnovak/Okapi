@@ -44,17 +44,17 @@ namespace OpenMC {
     // global variables.
     void openmc_finalize();
 
-    // OPENMC_GET_CELL returns the index in the cells array of a cell with
+    // OPENMC_GET_CELL_INDEX returns the index in the cells array of a cell with
     // a given ID (defined in the XML file). This is used to avoid repeated
     // lookups in the hash table when multiple operations will be performed
     // on a cell.
-    int openmc_get_cell(int32_t id, int32_t * index);
+    int openmc_get_cell_index(int32_t id, int32_t * index);
 
-    // OPENMC_GET_MATERIAL returns the index in the materialss array of a
+    // OPENMC_GET_MATERIAL_INDEX returns the index in the materialss array of a
     // material with a given ID (defined in the XML file). This is used to
     // avoid repeated lookups in the hash table when multiple operations
     // will be performed on a cell.
-    int openmc_get_material(int32_t id, int32_t * index);
+    int openmc_get_material_index(int32_t id, int32_t * index);
 
     // set a cell temperature given a temperature. This is used for transferring
     // data from MOOSE to OpenMC. Because the instance is optional, it is not

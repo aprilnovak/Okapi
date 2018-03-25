@@ -4,7 +4,7 @@
   [./invalid_cell_id]
     type = 'RunException'
     input = master.i
-    expect_err = "Invalid cell ID used in call to 'openmc_get_cell' routine! Check that the cell ID used for the MultiAppMooseOkapiTransfer transfer exists in the geometry XML file."
     required_applications = 'BuffaloApp'
+    expect_err = "OpenMC Error: 'No cell exists with ID=10.' Check that the OpenMC cell ID used for the MultiAppMooseOkapiTransfer transfer exists in the geometry XML file."
   [../]
 []

@@ -86,11 +86,11 @@ MultiAppMoonOkapiTransfer::execute()
   // indices of the materials in those cells.
   for (std::size_t i = 0; i < _cell.size(); ++i)
   {
-    int err_index = OpenMC::openmc_get_cell(_cell[i], &_index[i]);
-    ErrorHandling::openmc_get_cell(err_index, "MultiAppMoonOkapiTransfer");
+    int err_index = OpenMC::openmc_get_cell_index(_cell[i], &_index[i]);
+    ErrorHandling::openmc_get_cell_index(err_index, "MultiAppMoonOkapiTransfer");
 
-    int err_index_mat = OpenMC::openmc_get_material(_material[i], &_index_mat[i]);
-    ErrorHandling::openmc_get_material(err_index_mat, "MultiAppMoonOkapiTransfer");
+    int err_index_mat = OpenMC::openmc_get_material_index(_material[i], &_index_mat[i]);
+    ErrorHandling::openmc_get_material_index(err_index_mat, "MultiAppMoonOkapiTransfer");
   }
 
   switch (_direction)
