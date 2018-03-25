@@ -1,5 +1,6 @@
 #include "MultiAppMooseOkapiReactivityTransfer.h"
 #include "OpenMCInterface.h"
+#include "OpenMCErrorHandling.h"
 
 #include "MooseTypes.h"
 #include "MooseVariableScalar.h"
@@ -61,19 +62,22 @@ MultiAppMooseOkapiReactivityTransfer::execute()
            &_multi_app->appProblemBase(I).getScalarVariable(_tid, _to_aux_names);
          to_vars->reinit();
 
-         Real keff = OpenMC::get_keff();
+         // get k_eff from OpenMC
+         double keff[2];
+         int err_keff = OpenMC::openmc_get_keff(keff);
+         ErrorHandling::openmc_get_keff(err_keff);
 
-         if (_dbg) _console << "Sending k_eff value of: " << keff <<
+         if (_dbg) _console << "Sending k_eff value of: " << keff[0] <<
            " from OpenMC to MOOSE!" << std::endl;
 
          // we will use this value for keff in a PKE approximation, so print a
          // warning if the reactivity is greater than 0.00645 (beta)
-         if ((keff - 1.0) / keff >= 0.00645)
+         if ((keff[0] - 1.0) / keff[0] >= 0.00645)
            mooseWarning("Reactivity is greater than 'beta'! Results for changes "
              "in fission power will be inaccurate using PKE approximation!");
 
          std::vector<dof_id_type> & dof = to_vars->dofIndices();
-         to_vars->sys().solution().set(dof[0], keff);
+         to_vars->sys().solution().set(dof[0], keff[0]);
          to_vars->sys().solution().close();
        }
 

@@ -15,6 +15,7 @@ extern int e_physics;
 // all warning codes from OpenMC that are to be handled
 extern int e_warning;
 
+// error message returned by OpenMC
 extern char openmc_err_msg [256];
 
 namespace ErrorHandling{
@@ -25,4 +26,5 @@ namespace ErrorHandling{
   void openmc_get_cell_index(int, const std::string &);
   void openmc_get_material_index(int, const std::string &);
   void openmc_material_set_density(int);
+  void openmc_get_keff(int);
 }
