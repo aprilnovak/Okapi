@@ -80,8 +80,9 @@ namespace OpenMC {
     // transferring data from MOOSE to OpenMC. This returns an error code.
     int receive_coeffs_for_cell(int32_t index, double [], int n);
 
-    // retrieve the value for keff from global tally data
-    double get_keff();
+    // retrieve the value for keff and its standard deviation. This subroutine
+    // returns both k_eff and its variance.
+    int openmc_get_keff(double []);
   }
 }
 

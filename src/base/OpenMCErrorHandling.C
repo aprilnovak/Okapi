@@ -103,4 +103,14 @@ void ErrorHandling::openmc_material_set_density(int err)
 {
   if (err == e_out_of_bounds)
     mooseError("Material instance specified for setting density is out of bounds!");
+
+void ErrorHandling::openmc_get_keff(int err)
+{
+  // the openmc_get_keff subroutine in OpenMC/eigenvalue.F90 should be adapted
+  // to using the C-API error codes and return a warning/error message from OpenMC
+  // via the openmc_err_msg array. This error handling function is sufficient
+  // until then.
+  if (err != 0)
+    mooseError("Less that four k_eff realizations in call to "
+      "'openmc_get_keff' subroutines!");
 }
