@@ -88,6 +88,9 @@ OkapiApp::registerObjects(Factory & factory)
   registerTransfer(MultiAppOkapiMooseTransfer);
   registerTransfer(MultiAppMooseOkapiTransfer);
   registerTransfer(MultiAppMooseOkapiReactivityTransfer);
+#ifdef ENABLE_NEK_COUPLING
+  registerTransfer(MultiAppMoonOkapiTransfer);
+#endif
 }
 
 // External entry point for dynamic syntax association

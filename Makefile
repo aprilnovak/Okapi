@@ -2,8 +2,10 @@
 ################### MOOSE Application Standard Makefile #######################
 ###############################################################################
 #
-# Optional Environment variables
+# Optional Directory Environment variables
 # MOOSE_DIR        - Root directory of the MOOSE project
+# BUFFALO_DIR      - Root directory of the BUFFALO project
+# MOON_DIR         - Root directory of the MOON project
 #
 ###############################################################################
 
@@ -26,10 +28,15 @@ ALL_MODULES         := no
 include $(MOOSE_DIR)/modules/modules.mk
 
 ################################## BUFFALO ####################################
+# Local variable indicating if we should link to the BUFFALO (BISON stand-in)
+# library. If you change the value of this variable, make sure to run 'make clean'
+# before re-compiling.
+ENABLE_BUFFALO_COUPLING := false
 
+ifdef ENABLE_BUFFALO_COUPLING
 # Use a BUFFALO directory if its on the same level as Okapi and BUFFALO_DIR is not set
-ifneq ($(wildcard $(shell dirname `pwd`)/buffalo/Makefile),)
-  BUFFALO_DIR        ?= $(shell dirname `pwd`)/buffalo
+ifneq ($(wildcard $(shell dirname `pwd`)/Buffalo/Makefile),)
+  BUFFALO_DIR        ?= $(shell dirname `pwd`)/Buffalo
 endif
 
 ifdef BUFFALO_DIR
@@ -37,9 +44,17 @@ APPLICATION_DIR    := $(BUFFALO_DIR)
 APPLICATION_NAME   := buffalo
 include            $(FRAMEWORK_DIR)/app.mk
 endif
+endif
 
 ################################## MOON ####################################
+# Local variable indicating if we should link to the MOON (Moose-wrapped
+# Nek5000) library and compile Okapi source files that contain calls to Nek5000
+# subroutines. Setting this to 'false' indicates that Okapi will be used only
+# for OpenMC-MOOSE coupling. If you change the value of this variable, make sure
+# to run 'make clean' before re-compiling.
+ENABLE_NEK_COUPLING := false
 
+ifdef ENABLE_NEK_COUPLING
 # Use a MOON directory if its on the same level as Okapi and MOON_DIR is not set
 ifneq ($(wildcard $(shell dirname `pwd`)/moon/Makefile),)
   MOON_DIR        ?= $(shell dirname `pwd`)/moon
@@ -49,6 +64,7 @@ ifdef MOON_DIR
 APPLICATION_DIR    := $(MOON_DIR)
 APPLICATION_NAME   := moon
 include            $(FRAMEWORK_DIR)/app.mk
+endif
 endif
 
 ################################## OPENMC ####################################
@@ -91,10 +107,10 @@ ADDITIONAL_DEPEND_LIBS += $(OPENMC_LIB)
 ################################## GET FLAGS RIGHT ####################################
 
 ADDITIONAL_LIBS	    += -Wl,-rpath,$(OPENMC_BUILD_DIR)/lib -L$(OPENMC_BUILD_DIR)/lib -lopenmc
-ifdef BUFFALO_DIR
+ifneq ($(and $(ENABLE_BUFFALO_COUPLING),$(BUFFALO_DIR)),)
 ADDITIONAL_CPPFLAGS += -DENABLE_BUFFALO_COUPLING
 endif
-ifdef MOON_DIR
+ifneq ($(and $(ENABLE_NEK_COUPLING),$(MOON_DIR)),)
 ADDITIONAL_CPPFLAGS += -DENABLE_NEK_COUPLING
 endif
 
