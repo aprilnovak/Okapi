@@ -8,7 +8,6 @@
     type = 'RunException'
     input = master.i
     expect_err = "Number of Fourier polynomials in Okapi does not agree with number expected from Nek! Change m_fourier in the Nek usr file or the number of source variables in MultiAppMoonOkapiTransfer!"
-    group = 'nek'
     required_applications = 'MoonApp'
   [../]
 []

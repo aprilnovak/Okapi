@@ -8,7 +8,6 @@
     type = 'RunException'
     input = master.i
     expect_err = "The order of the source variables for the MultiAppMoonOkapiTransfer direction TO_MULTIAPP are not all the same!"
-    group = 'nek'
     required_applications = 'MoonApp'
   [../]
 []

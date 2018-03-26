@@ -4,7 +4,6 @@
     type = 'RunException'
     input = master.i
     expect_err = "The order of the variables to be written for the MultiAppMoonOkapiTransfer are not all the same!"
-    group = 'nek'
     required_applications = 'MoonApp'
   [../]
 []
