@@ -32,7 +32,6 @@
     app_type = BuffaloApp
     positions = '0 0 0'
     input_files = bison.i
-    library_path = /homes/anovak/projects/buffalo/lib
     execute_on = timestep_begin
   [../]
 []
