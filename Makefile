@@ -82,7 +82,7 @@ endif
 
 ifeq ($(METHOD),dbg)
 OPENMC_BUILD_DIR := $(OPENMC_DIR)/build-dbg
-CMAKE := cmake -DCMAKE_BUILD_TYPE=Debug
+CMAKE := cmake -Ddebug=ON
 else
 OPENMC_BUILD_DIR := $(OPENMC_DIR)/build
 CMAKE := cmake
