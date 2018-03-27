@@ -41,8 +41,7 @@
     type = MultiAppMooseOkapiTransfer
     direction = to_multiapp
     multi_app = bison
-    source_variable = 'bar'
-    to_aux_scalar = 'l_0_coeffs_kappa_fission'
+    multi_app_object_name = kappa_fission_mutable_series
     openmc_cell = 1
     execute_on = timestep_end
   [../]
@@ -50,8 +49,7 @@
     type = MultiAppMooseOkapiTransfer
     direction = from_multiapp
     multi_app = bison
-    source_variable = 'l_0_coeffs_temp'
-    to_aux_scalar = 'bar'
+    multi_app_object_name = temperature_mutable_series_uo
     openmc_cell = 1
     execute_on = timestep_begin
   [../]

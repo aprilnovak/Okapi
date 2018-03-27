@@ -14,8 +14,9 @@
 #include "libmesh/meshfree_interpolation.h"
 #include "libmesh/system.h"
 
-template<>
-InputParameters validParams<MultiAppOkapiMooseTransfer>()
+template <>
+InputParameters
+validParams<MultiAppOkapiMooseTransfer>()
 {
   InputParameters params = validParams<MultiAppTransfer>();
   /* To MultiApp (MOOSE -> OkapiApp):
@@ -32,19 +33,21 @@ InputParameters validParams<MultiAppOkapiMooseTransfer>()
      source_varibale = dummy variable
      to_aux_scalar = expansion coefficients used in MOOSE */
 
-  params.addRequiredParam<std::vector<VariableName>>("source_variable",
-    "The auxiliary SCALAR variable to read values from");
-  params.addRequiredParam<std::vector<VariableName> >("to_aux_scalar",
-    "The name of the SCALAR auxvariable in the MultiApp to transfer the "
-    "value to.");
-  params.addRequiredParam<int>("openmc_cell", "OpenMC cell ID (defined in "
-    "input file) for this transfer to be associated with.");
+  params.addRequiredParam<std::vector<VariableName>>(
+      "source_variable", "The auxiliary SCALAR variable to read values from");
+  params.addRequiredParam<std::vector<VariableName>>(
+      "to_aux_scalar",
+      "The name of the SCALAR auxvariable in the MultiApp to transfer the "
+      "value to.");
+  params.addRequiredParam<int>("openmc_cell",
+                               "OpenMC cell ID (defined in "
+                               "input file) for this transfer to be associated with.");
   params.addParam<bool>("dbg", false, "Whether to turn on debugging information");
   return params;
 }
 
-MultiAppOkapiMooseTransfer::MultiAppOkapiMooseTransfer(const InputParameters & parameters) :
-    MultiAppTransfer(parameters),
+MultiAppOkapiMooseTransfer::MultiAppOkapiMooseTransfer(const InputParameters & parameters)
+  : MultiAppTransfer(parameters),
     _source_var_names(getParam<std::vector<VariableName>>("source_variable")),
     _to_aux_names(getParam<std::vector<VariableName>>("to_aux_scalar")),
     _cell(parameters.get<int>("openmc_cell")),
@@ -74,8 +77,6 @@ MultiAppOkapiMooseTransfer::execute()
   int zernike_order_from_MOOSE = 0;
   int old_zernike_order = 0;
 
-  int legendre_order_from_OpenMC = 0;
-  int zernike_order_from_OpenMC = 0;
   int old_zernike_order_OpenMC = 0;
 
   switch (_direction)
@@ -88,8 +89,7 @@ MultiAppOkapiMooseTransfer::execute()
       std::vector<MooseVariableScalar *> source_variables(num_vars_to_read);
       for (auto i = beginIndex(_source_var_names); i < num_vars_to_read; ++i)
       {
-        source_variables[i] = &from_problem.getScalarVariable(_tid,\
-          _source_var_names[i]);
+        source_variables[i] = &from_problem.getScalarVariable(_tid, _source_var_names[i]);
         source_variables[i]->reinit();
       }
 
@@ -108,8 +108,8 @@ MultiAppOkapiMooseTransfer::execute()
              to read multiplied by the order of the first of these variables. If
              the source variables are actually the same size, an error will be thrown
              before this would become a problem. */
-          int num_coeffs_from_moose = num_vars_to_read *
-            source_variables[beginIndex(_source_var_names)]->sln().size();
+          int num_coeffs_from_moose =
+              num_vars_to_read * source_variables[beginIndex(_source_var_names)]->sln().size();
           double moose_coeffs[num_coeffs_from_moose];
 
           /* Loop through each SCALAR variable. The order of the Legendre
@@ -127,10 +127,9 @@ MultiAppOkapiMooseTransfer::execute()
             if (i > 0)
               if (old_zernike_order != zernike_order_from_MOOSE)
                 mooseError("The order of the Zernike expansion does not "
-                  "match each coupling Legendre coefficient aux variable.");
+                           "match each coupling Legendre coefficient aux variable.");
 
-            zernike_order_from_MOOSE =
-              zernike_order_from_coeffs(soln_values.size());
+            zernike_order_from_MOOSE = zernike_order_from_coeffs(soln_values.size());
 
             for (auto j = beginIndex(soln_values); j < soln_values.size(); ++j)
               moose_coeffs[i * num_vars_to_read + j] = soln_values[j];
@@ -138,33 +137,34 @@ MultiAppOkapiMooseTransfer::execute()
             _console << '\n';
           }
 
-        if (_dbg)
-        {
-          _console << "Transferring " << num_coeffs_from_moose << " coefficients"
-            " from MOOSE to OpenMC..." << std::endl;
-          _console << "For cell " << _cell << ":" << std::endl;
+          if (_dbg)
+          {
+            _console << "Transferring " << num_coeffs_from_moose
+                     << " coefficients"
+                        " from MOOSE to OpenMC..."
+                     << std::endl;
+            _console << "For cell " << _cell << ":" << std::endl;
 
-          for (int i = 0; i < num_coeffs_from_moose; ++i)
-            _console << moose_coeffs[i] << " ";
+            for (int i = 0; i < num_coeffs_from_moose; ++i)
+              _console << moose_coeffs[i] << " ";
 
-          _console << std::endl;
+            _console << std::endl;
+          }
+
+          // send all expansion coefficients for a cell to OpenMC at one time
+          int err = OpenMC::receive_coeffs_for_cell(_cell, moose_coeffs, num_coeffs_from_moose);
+          ErrorHandling::receive_coeffs_for_cell(err);
+
+          /* Change a temperature in OpenMC. For now, only use a single coefficient,
+             since there's no continuous material tracking yet. Note that changing
+             a temperature in OpenMC requires that you've loaded cross section data
+             at that temperature, so use the temperature_range parameter in the
+             settings XML file. Because this isn't expanded in OpenMC, here we have
+             to apply the scaling factors for a zero-th order Legendre and zero-th
+             order Zernike expansion. */
+          OpenMC::openmc_cell_set_temperature(
+              _cell, (source_variables[0]->sln())[0] / sqrt(2.0 * M_PI), NULL);
         }
-
-        // send all expansion coefficients for a cell to OpenMC at one time
-        int err = OpenMC::receive_coeffs_for_cell(_cell, moose_coeffs,
-          num_coeffs_from_moose);
-        ErrorHandling::receive_coeffs_for_cell(err);
-
-        /* Change a temperature in OpenMC. For now, only use a single coefficient,
-           since there's no continuous material tracking yet. Note that changing
-           a temperature in OpenMC requires that you've loaded cross section data
-           at that temperature, so use the temperature_range parameter in the
-           settings XML file. Because this isn't expanded in OpenMC, here we have
-           to apply the scaling factors for a zero-th order Legendre and zero-th
-           order Zernike expansion. */
-        OpenMC::openmc_cell_set_temperature(_cell, \
-          (source_variables[0]->sln())[0] / sqrt(2.0 * M_PI), NULL);
-      }
       break;
     }
 
@@ -180,8 +180,7 @@ MultiAppOkapiMooseTransfer::execute()
       std::vector<MooseVariableScalar *> to_variables(num_vars_to_write);
       for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)
       {
-        to_variables[i] = &from_problem.getScalarVariable(_tid,\
-          _to_aux_names[i]);
+        to_variables[i] = &from_problem.getScalarVariable(_tid, _to_aux_names[i]);
         to_variables[i]->reinit();
       }
 
@@ -196,39 +195,39 @@ MultiAppOkapiMooseTransfer::execute()
          t % coeffs array) matches what is allocated in C++ to receive it.*/
 
       // Check that all of the coupled variables are of the same length
-      int zernike_order_from_OpenMC = zernike_order_from_coeffs(
-        to_variables[beginIndex(_to_aux_names)]->sln().size());
+      int zernike_order_from_OpenMC =
+          zernike_order_from_coeffs(to_variables[beginIndex(_to_aux_names)]->sln().size());
       for (int i = 0; i < num_vars_to_write; ++i)
       {
         if (i > 0)
           if (old_zernike_order_OpenMC != zernike_order_from_OpenMC)
             mooseError("The order of the Zernike expansion does not "
-              "match each coupling Legendre coefficient aux variable.");
+                       "match each coupling Legendre coefficient aux variable.");
         old_zernike_order_OpenMC = (to_variables[i]->sln()).size();
       }
 
       // Determine size of array to allocate based on size of MOOSE variables
-      int num_zernike_coeffs_per_var =
-        (to_variables[beginIndex(_to_aux_names)]->sln()).size();
+      int num_zernike_coeffs_per_var = (to_variables[beginIndex(_to_aux_names)]->sln()).size();
 
       int num_coeffs_from_openmc = num_vars_to_write * num_zernike_coeffs_per_var;
       double omc_coeffs[num_coeffs_from_openmc];
 
       // store coefficients from OpenMC into the omc_coeffs array
-      int err = OpenMC::get_coeffs_from_cell(_cell, omc_coeffs,
-        num_coeffs_from_openmc);
+      int err = OpenMC::get_coeffs_from_cell(_cell, omc_coeffs, num_coeffs_from_openmc);
       ErrorHandling::get_coeffs_from_cell(err);
 
       if (_dbg)
       {
-         _console << "Transferring " << num_coeffs_from_openmc << " coefficients"
-           " from OpenMC to MOOSE..." << std::endl;
-         _console << "For cell " << _cell << ":" << std::endl;
+        _console << "Transferring " << num_coeffs_from_openmc
+                 << " coefficients"
+                    " from OpenMC to MOOSE..."
+                 << std::endl;
+        _console << "For cell " << _cell << ":" << std::endl;
 
-         for (int i = 0; i < num_coeffs_from_openmc; ++i)
-           _console << omc_coeffs[i] << " ";
+        for (int i = 0; i < num_coeffs_from_openmc; ++i)
+          _console << omc_coeffs[i] << " ";
 
-         _console << std::endl;
+        _console << std::endl;
       }
 
       // Loop over the variables that we are going to write
@@ -239,7 +238,7 @@ MultiAppOkapiMooseTransfer::execute()
         for (auto j = beginIndex(soln_values); j < soln_values.size(); ++j)
         {
           to_variables[i]->sys().solution().set(dof[j],
-            omc_coeffs[i * num_zernike_coeffs_per_var + j]);
+                                                omc_coeffs[i * num_zernike_coeffs_per_var + j]);
         }
         to_variables[i]->sys().solution().close();
       }

@@ -1,6 +1,6 @@
 [submodule "moose"]
 	path = moose
-	url = ../../aprilnovak/moose
+	url = ../../idaholab/moose
 [submodule "openmc"]
 	path = openmc
 	url = ../../aprilnovak/openmc

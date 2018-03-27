@@ -24,20 +24,31 @@
 []
 
 [Functions]
-  [./legendre]
-    type = LegendrePolynomial
-    l_geom_norm = '0.0 1.0'
+  [./kappa_fission_mutable_series]
+    type = FunctionSeries
+    series_type = CylindricalDuo
+    orders = '0   5' # Axial first, then (r, t) FX
+    physical_bounds = '-0.5 0.5   0 0 0.5' # z_min z_max   x_center y_center radius
+    z = Legendre # Axial in z
+    disc = Zernike # (r, t) default to unit disc in x-y plane
+    expansion_type = 'sqrt_mu'
   [../]
-  [./zernike]
-    type = ZernikePolynomial
-    radius = 0.5
-    center = '0.0 0.0'
+  [./temperature_mutable_series]
+    type = FunctionSeries
+    series_type = CylindricalDuo
+    orders = '2   1' # Axial first, then (r, t) FX
+    physical_bounds = '-0.5 0.5   0 0 0.5' # z_min z_max   x_center y_center radius
+    z = Legendre # Axial in z
+    disc = Zernike # (r, t) default to unit disc in x-y plane
+    generation_type = 'sqrt_mu'
   [../]
-  [./kappa_fission_reconstruction]
-    type = ZernikeLegendreReconstruction
-    l_order = 0
-    n_order = 5
-    poly_coeffs = 'l_0_coeffs_kappa_fission'
+[]
+
+[UserObjects]
+  [./temperature_mutable_series_uo]
+    type = FXVolumeUserObject
+    function = temperature_mutable_series
+    variable = temp
   [../]
 []
 
@@ -47,38 +58,18 @@
 []
 
 [AuxVariables]
-  [./l_0_coeffs_kappa_fission] # where kappa-fission coefficients are received
-    family = SCALAR
-    order = TWENTYFIRST
-  [../]
-
-  [./l_0_coeffs_temp] # where temperature coefficients are placed
-    family = SCALAR
-    order = THIRD
-  [../]
-  [./l_1_coeffs_temp] # where temperature coefficients are placed
-    family = SCALAR
-    order = THIRD
-  [../]
-  [./l_2_coeffs_temp] # where temperature coefficients are placed
-    family = SCALAR
-    order = THIRD
-  [../]
-
   [./kappa_fission] # holds eV/particle field from OpenMC
   [../]
-
   [./fission_heat] # holds the fission heat source
   [../]
 []
 
 [AuxKernels]
-  [./kappa_fisson]
-    type = FunctionAux
+  [./reconstruct_kapp_fission]
+    type = FunctionSeriesToAux
+    function = kappa_fission_mutable_series
     variable = kappa_fission
-    function = kappa_fission_reconstruction
   [../]
-
   # the power set here is an arbitrary number - if you make this higher, you
   # can sort of see the impact of the fission distribution on the temperature
   [./fission_heat]
@@ -120,30 +111,6 @@
   [../]
 []
 
-[UserObjects]
-  [./l_0_temp_coeffs]
-    type = ZLDeconstruction
-    variable = temp
-    l_order = 0
-    n_order = 1
-    aux_scalar_name = 'l_0_coeffs_temp'
-  [../]
-  [./l_1_temp_coeffs]
-    type = ZLDeconstruction
-    variable = temp
-    l_order = 1
-    n_order = 1
-    aux_scalar_name = 'l_1_coeffs_temp'
-  [../]
-  [./l_2_temp_coeffs]
-    type = ZLDeconstruction
-    variable = temp
-    l_order = 2
-    n_order = 1
-    aux_scalar_name = 'l_2_coeffs_temp'
-  [../]
-[]
-
 [Executioner]
   type = Transient
   nl_rel_tol = 1e-6
@@ -162,4 +129,3 @@
 [Outputs]
   exodus = true
 []
-
