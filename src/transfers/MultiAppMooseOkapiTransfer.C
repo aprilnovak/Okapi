@@ -120,11 +120,11 @@ MultiAppMooseOkapiTransfer::execute()
         if (_dbg) _console << "Setting OpenMC cell " << _cell <<
           " temperature to " << temp << std::endl;
 
-	if (_store_results)
-	{
-	  std::vector<Real> this_iteration;
-	  for (int i = 0; i < num_coeffs_from_moose; ++i)
-	    this_iteration.push_back(moose_coeffs[i]);
+        if (_store_results)
+        {
+          std::vector<Real> this_iteration;
+          for (int i = 0; i < num_coeffs_from_moose; ++i)
+            this_iteration.push_back(moose_coeffs[i]);
 
           _fuel_temp_coeffs.push_back(this_iteration);
 
@@ -132,8 +132,8 @@ MultiAppMooseOkapiTransfer::execute()
             _fuel_temp_coeffs.size() << std::endl;
 
           for (unsigned int i = 0; i < _fuel_temp_coeffs.size(); ++i)
-    	    printResults(_fuel_temp_coeffs[i]);
-	}
+            printResults(_fuel_temp_coeffs[i]);
+        }
 
         // We pass a NULL pointer because we're not passing the optional instance
         // parameter.
@@ -211,21 +211,21 @@ MultiAppMooseOkapiTransfer::execute()
             _console << std::endl;
          }
 
-	 if (_store_results)
-	 {
-	   _console << "fission coefficients, up to iteration " <<
-	     _fission_coeffs.size() << ":" << std::endl;
+         if (_store_results)
+         {
+           _console << "fission coefficients, up to iteration " <<
+             _fission_coeffs.size() << ":" << std::endl;
 
-	   // store this iteration's coefficients
-	   std::vector<Real> this_iteration;
-	   for (int i = 0; i < num_coeffs_from_openmc; ++i)
-	     this_iteration.push_back(omc_coeffs[i]);
+           // store this iteration's coefficients
+           std::vector<Real> this_iteration;
+           for (int i = 0; i < num_coeffs_from_openmc; ++i)
+             this_iteration.push_back(omc_coeffs[i]);
 
            // place this iteration's coefficients at end of vector, then print
-	   _fission_coeffs.push_back(this_iteration);
-	   for (unsigned int i = 0; i < _k_eff.size(); ++i)
-	     printResults(_fission_coeffs[i]);
-	 }
+           _fission_coeffs.push_back(this_iteration);
+           for (unsigned int i = 0; i < _k_eff.size(); ++i)
+             printResults(_fission_coeffs[i]);
+         }
 
          // Loop over the variables that we are going to write
          for (auto i = beginIndex(_to_aux_names); i < num_vars_to_write; ++i)

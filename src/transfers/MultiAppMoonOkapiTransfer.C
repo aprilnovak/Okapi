@@ -241,15 +241,15 @@ MultiAppMoonOkapiTransfer::execute()
       if (_store_results)
       {
         std::vector<Real> this_iteration;
-	for (std::size_t i = 0; i < _cell.size(); ++i)
-	  this_iteration.push_back(layer_temps[i]);
+        for (std::size_t i = 0; i < _cell.size(); ++i)
+          this_iteration.push_back(layer_temps[i]);
 
-	_fluid_layer_temps.push_back(this_iteration);
+        _fluid_layer_temps.push_back(this_iteration);
 
-	_console << "Fluid layer temps up to iteration " << _fluid_layer_temps.size()
-	  << ":" << std::endl;
-	for (std::size_t i = 0; i < _fluid_layer_temps.size(); ++i)
-	  printResults(_fluid_layer_temps[i]);
+        _console << "Fluid layer temps up to iteration " << _fluid_layer_temps.size()
+          << ":" << std::endl;
+        for (std::size_t i = 0; i < _fluid_layer_temps.size(); ++i)
+          printResults(_fluid_layer_temps[i]);
       }
 
 
