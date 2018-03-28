@@ -31,7 +31,7 @@ include $(MOOSE_DIR)/modules/modules.mk
 # Local variable indicating if we should link to the BUFFALO (BISON stand-in)
 # library. If you change the value of this variable, make sure to run 'make clean'
 # before re-compiling.
-ENABLE_BUFFALO_COUPLING := false
+ENABLE_BUFFALO_COUPLING := true
 
 ifdef ENABLE_BUFFALO_COUPLING
 # Use a BUFFALO directory if its on the same level as Okapi and BUFFALO_DIR is not set
@@ -94,13 +94,12 @@ else
   OPENMC_LIB = $(OPENMC_BUILD_DIR)/lib/libopenmc.dylib
 endif
 
-$(OPENMC_BUILD_DIR):
-	mkdir $(OPENMC_BUILD_DIR)
+$(OPENMC_BUILD_DIR)/Makefile:
+	mkdir -p $(OPENMC_BUILD_DIR)
+	cd $(OPENMC_BUILD_DIR) && $(CMAKE) $(OPENMC_DIR)
 
-$(OPENMC_LIB): $(OPENMC_BUILD_DIR)
-	rm -rf $(OPENMC_BUILD_DIR)
-	mkdir $(OPENMC_BUILD_DIR)
-	cd $(OPENMC_BUILD_DIR) && $(CMAKE) $(OPENMC_DIR) && $(MAKE) --no-print-directory
+$(OPENMC_LIB): $(OPENMC_BUILD_DIR)/Makefile
+	cd $(OPENMC_BUILD_DIR) && $(MAKE) --no-print-directory
 
 ADDITIONAL_DEPEND_LIBS += $(OPENMC_LIB)
 
