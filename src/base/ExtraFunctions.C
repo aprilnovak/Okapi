@@ -1,4 +1,5 @@
 #include "ExtraFunctions.h"
+#include "MooseError.h"
 #include <iostream>
 
 /* extra function for computing factorials for Zernike polynomials,
@@ -42,8 +43,7 @@ int zernike_order_from_coeffs(int N)
 double water_density(double temperature)
 {
   if (temperature > 615)
-    std::cout << "Boiling water detected! Temperatures too high for density "
-      "correlation" << std::endl;
+    mooseWarning("Boiling water detected! Temperatures too high for density correlation");
 
   return -0.0097 * temperature * temperature + 8.8796 * temperature - 1167.1;
 }

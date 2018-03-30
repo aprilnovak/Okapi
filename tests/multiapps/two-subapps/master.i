@@ -1,4 +1,4 @@
-# This input file is used by the Master App. With this configuration, 
+# This input file is used by the Master App. With this configuration,
 # the Master App does not perform any actual solves - it just facilitates
 # solution transfers.
 

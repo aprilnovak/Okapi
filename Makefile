@@ -82,7 +82,7 @@ endif
 
 ifeq ($(METHOD),dbg)
 OPENMC_BUILD_DIR := $(OPENMC_DIR)/build-dbg
-CMAKE := cmake -DCMAKE_BUILD_TYPE=Debug
+CMAKE := cmake -Ddebug=ON
 else
 OPENMC_BUILD_DIR := $(OPENMC_DIR)/build
 CMAKE := cmake
@@ -100,7 +100,7 @@ $(OPENMC_BUILD_DIR):
 $(OPENMC_LIB): $(OPENMC_BUILD_DIR)
 	rm -rf $(OPENMC_BUILD_DIR)
 	mkdir $(OPENMC_BUILD_DIR)
-	cd $(OPENMC_BUILD_DIR) && $(CMAKE) $(OPENMC_DIR) && $(MAKE)
+	cd $(OPENMC_BUILD_DIR) && $(CMAKE) $(OPENMC_DIR) && $(MAKE) --no-print-directory
 
 ADDITIONAL_DEPEND_LIBS += $(OPENMC_LIB)
 
