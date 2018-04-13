@@ -15,7 +15,6 @@
 #include "OpenMCTimeStepper.h"
 
 // transfers
-#include "MultiAppOkapiMooseTransfer.h"
 #include "MultiAppMooseOkapiTransfer.h"
 #include "MultiAppMooseOkapiReactivityTransfer.h"
 
@@ -85,7 +84,6 @@ OkapiApp::registerObjects(Factory & factory)
 {
   registerExecutioner(OpenMCExecutioner);
   registerTimeStepper(OpenMCTimeStepper);
-  registerTransfer(MultiAppOkapiMooseTransfer);
   registerTransfer(MultiAppMooseOkapiTransfer);
   registerTransfer(MultiAppMooseOkapiReactivityTransfer);
 #ifdef ENABLE_NEK_COUPLING
