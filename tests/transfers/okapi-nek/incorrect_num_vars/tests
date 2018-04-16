@@ -9,5 +9,6 @@
     input = master.i
     env_vars = "ENABLE_NEK_COUPLING"
     expect_err = "Number of Fourier polynomials in Okapi does not agree with number expected from Nek! Change m_fourier in the Nek usr file or the number of source variables in MultiAppMoonOkapiTransfer!"
+    required_applications = 'MoonApp'
   [../]
 []

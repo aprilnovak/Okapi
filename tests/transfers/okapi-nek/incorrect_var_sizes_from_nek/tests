@@ -5,5 +5,6 @@
     input = master.i
     env_vars = "ENABLE_NEK_COUPLING"
     expect_err = "The order of the variables to be written for the MultiAppMoonOkapiTransfer are not all the same!"
+    required_applications = 'MoonApp'
   [../]
 []

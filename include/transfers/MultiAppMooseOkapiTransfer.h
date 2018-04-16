@@ -2,24 +2,22 @@
 #define MULTIAPPMOOSEOKAPITRANSFER_H
 
 // MOOSE includes
-#include "MultiAppTransfer.h"
+#include "MultiAppFXTransfer.h"
 
 class MultiAppMooseOkapiTransfer;
 
-template<>
+template <>
 InputParameters validParams<MultiAppMooseOkapiTransfer>();
 
-class MultiAppMooseOkapiTransfer :
-  public MultiAppTransfer
+class MultiAppMooseOkapiTransfer : public MultiAppFXTransfer
 {
 public:
   MultiAppMooseOkapiTransfer(const InputParameters & parameters);
   virtual void execute() override;
+  virtual void initialSetup() override;
   void printResults(std::vector<Real> & results);
 
 protected:
-  std::vector<VariableName> _src_var_names;
-  std::vector<VariableName> _to_aux_names;
   int32_t _cell;
   const bool & _dbg;
   const bool & _store_results;
