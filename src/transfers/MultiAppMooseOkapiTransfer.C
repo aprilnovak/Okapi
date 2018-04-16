@@ -155,7 +155,7 @@ MultiAppMooseOkapiTransfer::execute()
         // get k_eff value from OpenMC, then store results in _k_eff vector.
         double keff[2];
         int err_keff = OpenMC::openmc_get_keff(keff);
-	ErrorHandling::openmc_get_keff(err_keff);
+        ErrorHandling::openmc_get_keff(err_keff);
         _k_eff.push_back(keff[0]);
         _console << "k_eff, up to iteration " << _k_eff.size() << ":" << std::endl;
         printResults(_k_eff);

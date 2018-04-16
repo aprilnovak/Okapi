@@ -5,7 +5,7 @@
 
 class OpenMCTimeStepper;
 
-template<>
+template <>
 InputParameters validParams<OpenMCTimeStepper>();
 
 class OpenMCTimeStepper : public TimeStepper
@@ -24,4 +24,4 @@ private:
   Real _dt;
 };
 
-#endif //OPENMCTIMESTEPPER_H
+#endif // OPENMCTIMESTEPPER_H

@@ -16,15 +16,16 @@ extern int e_physics;
 extern int e_warning;
 
 // error message returned by OpenMC
-extern char openmc_err_msg [256];
+extern char openmc_err_msg[256];
 
-namespace ErrorHandling{
+namespace ErrorHandling
+{
 
-  void receive_coeffs_for_cell(int);
-  void get_coeffs_from_cell(int);
-  void openmc_cell_set_temperature(int);
-  void openmc_get_cell_index(int, const std::string &);
-  void openmc_get_material_index(int, const std::string &);
-  void openmc_material_set_density(int);
-  void openmc_get_keff(int);
+void receive_coeffs_for_cell(int);
+void get_coeffs_from_cell(int);
+void openmc_cell_set_temperature(int);
+void openmc_get_cell_index(int, const std::string &);
+void openmc_get_material_index(int, const std::string &);
+void openmc_material_set_density(int);
+void openmc_get_keff(int);
 }

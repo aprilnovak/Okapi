@@ -8,7 +8,7 @@
 
 class MultiAppMoonOkapiTransfer;
 
-template<>
+template <>
 InputParameters validParams<MultiAppMoonOkapiTransfer>();
 
 class MultiAppMoonOkapiTransfer : public MultiAppTransfer

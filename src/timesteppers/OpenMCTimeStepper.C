@@ -1,17 +1,17 @@
 #include "OpenMCTimeStepper.h"
 #include "OpenMCInterface.h"
 
-template<>
-InputParameters validParams<OpenMCTimeStepper>()
+template <>
+InputParameters
+validParams<OpenMCTimeStepper>()
 {
   InputParameters params = validParams<TimeStepper>();
   params.addParam<Real>("dt", 1.0, "Size of the time step");
   return params;
 }
 
-OpenMCTimeStepper::OpenMCTimeStepper(const InputParameters & parameters) :
-    TimeStepper(parameters),
-    _dt(getParam<Real>("dt"))
+OpenMCTimeStepper::OpenMCTimeStepper(const InputParameters & parameters)
+  : TimeStepper(parameters), _dt(getParam<Real>("dt"))
 {
 }
 
