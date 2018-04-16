@@ -1,8 +1,0 @@
-[Tests]
-  [./compact_deconstruction]
-    type = Exodiff
-    input = deconstruction.i
-    exodiff = deconstruction_out.e
-    abs_zero = 1e-8
-  [../]
-[]

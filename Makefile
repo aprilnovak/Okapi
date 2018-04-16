@@ -23,7 +23,8 @@ include $(FRAMEWORK_DIR)/build.mk
 include $(FRAMEWORK_DIR)/moose.mk
 
 ################################## MODULES ####################################
-ALL_MODULES         := no
+ALL_MODULES                := no
+FUNCTIONAL_EXPANSION_TOOLS := yes
 
 include $(MOOSE_DIR)/modules/modules.mk
 
