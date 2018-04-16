@@ -52,10 +52,10 @@ ErrorHandling::openmc_cell_set_temperature(int err)
     std::string openmc_error_message(openmc_err_msg);
     openmc_error_message = "OpenMC Error: '" + openmc_error_message + "' ";
 
-    if (err == e_warning)
+    if (err == E_WARNING)
       mooseWarning(openmc_error_message + "Setting temperature to nearest available point!");
 
-    if (err == e_out_of_bounds)
+    if (err == E_OUT_OF_BOUNDS)
       mooseError(openmc_error_message +
                  "Check that the cell used in 'openmc_cell_set_temperature' exists in "
                  "the geometry XML file.");
@@ -73,11 +73,11 @@ ErrorHandling::openmc_get_cell_index(int err, const std::string & desc)
     std::string openmc_error_message(openmc_err_msg);
     openmc_error_message = "OpenMC Error: '" + openmc_error_message + "' ";
 
-    if (err == e_invalid_id)
+    if (err == E_INVALID_ID)
       mooseError(openmc_error_message + "Check that the OpenMC cell ID used for the " + desc +
                  " transfer exists "
                  "in the geometry XML file.");
-    if (err == e_allocate)
+    if (err == E_ALLOCATE)
       mooseError(openmc_error_message + "Check that the call to 'openmc_get_cell' in " + desc +
                  " occurs after the OpenMC cells have been allocated.");
   }
@@ -91,11 +91,11 @@ ErrorHandling::openmc_get_material_index(int err, const std::string & desc)
     std::string openmc_error_message(openmc_err_msg);
     openmc_error_message = "OpenMC Error: '" + openmc_error_message + "' ";
 
-    if (err == e_invalid_id)
+    if (err == E_INVALID_ID)
       mooseError(openmc_error_message + "Check that the OpenMC material ID used for the " + desc +
                  " transfer "
                  "exists in the material XML file.");
-    if (err == e_allocate)
+    if (err == E_ALLOCATE)
       mooseError(openmc_error_message + "Check that the call to 'openmc_get_material' in " + desc +
                  "occurs after the OpenMC materials have been allocated.");
   }
@@ -106,14 +106,16 @@ ErrorHandling::openmc_material_set_density(int err)
 {
   if (err == e_out_of_bounds)
     mooseError("Material instance specified for setting density is out of bounds!");
+}
 
-  void ErrorHandling::openmc_get_keff(int err)
-  {
-    // the openmc_get_keff subroutine in OpenMC/eigenvalue.F90 should be adapted
-    // to using the C-API error codes and return a warning/error message from OpenMC
-    // via the openmc_err_msg array. This error handling function is sufficient
-    // until then.
-    if (err != 0)
-      mooseError("Less that four k_eff realizations in call to "
-                 "'openmc_get_keff' subroutines!");
-  }
+void
+ErrorHandling::openmc_get_keff(int err)
+{
+  // the openmc_get_keff subroutine in OpenMC/eigenvalue.F90 should be adapted
+  // to using the C-API error codes and return a warning/error message from OpenMC
+  // via the openmc_err_msg array. This error handling function is sufficient
+  // until then.
+  if (err != 0)
+    mooseError("Less that four k_eff realizations in call to "
+               "'openmc_get_keff' subroutines!");
+}
