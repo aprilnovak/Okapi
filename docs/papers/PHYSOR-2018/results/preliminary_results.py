@@ -31,9 +31,9 @@ k_eff_absolute_change = np.zeros(len(k_eff))
 k_eff_relative_change = np.zeros(len(k_eff))
 
 for i in range(1, len(k_eff)):
-	k_eff_relative_change[i] = np.abs(k_eff[i] - k_eff[i - 1]) / k_eff[i - 1]
-	k_eff_absolute_change[i] = np.abs(k_eff[i] - k_eff[i - 1])
-	fuel_average_temps_relative_change[i] = np.abs(fuel_average_temps[i] - fuel_average_temps[i - 1]) / fuel_average_temps[i]
+        k_eff_relative_change[i] = np.abs(k_eff[i] - k_eff[i - 1]) / k_eff[i - 1]
+        k_eff_absolute_change[i] = np.abs(k_eff[i] - k_eff[i - 1])
+        fuel_average_temps_relative_change[i] = np.abs(fuel_average_temps[i] - fuel_average_temps[i - 1]) / fuel_average_temps[i]
 
 fission_distribution = np.zeros((len(k_eff), num_Zernike))
 fission_distribution[0, :] = (1.86772e+07, 12449.1, -1.48766e+06, -10169, 72822.6, -879879, 3092.37, -5535.34, -60986.7, -307155, 8553.63, 558.366, 56976.6, -77558, -95028, 457.528, 2710.82, -4701, 858.016, -38431, 114884, -14353.3, -3374.94, 3712.83, -39642.7, 21163.2, -11713.2, 81546.9)

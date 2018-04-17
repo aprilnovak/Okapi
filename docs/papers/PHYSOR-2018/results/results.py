@@ -30,9 +30,9 @@ k_eff_absolute_change = np.zeros(len(k_eff))
 k_eff_relative_change = np.zeros(len(k_eff))
 
 for i in range(1, len(k_eff)):
-	k_eff_relative_change[i] = np.abs(k_eff[i] - k_eff[i - 1]) / k_eff[i - 1]
-	k_eff_absolute_change[i] = np.abs(k_eff[i] - k_eff[i - 1])
-	fuel_average_temps_relative_change[i] = np.abs(fuel_average_temps[i] - fuel_average_temps[i - 1]) / fuel_average_temps[i]
+        k_eff_relative_change[i] = np.abs(k_eff[i] - k_eff[i - 1]) / k_eff[i - 1]
+        k_eff_absolute_change[i] = np.abs(k_eff[i] - k_eff[i - 1])
+        fuel_average_temps_relative_change[i] = np.abs(fuel_average_temps[i] - fuel_average_temps[i - 1]) / fuel_average_temps[i]
 
 fluid_layer_temps = np.zeros((len(k_eff) + 3, num_fluid_layers))
 fluid_layer_temps[0, :] = (550, 550, 550, 500)
