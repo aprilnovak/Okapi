@@ -1,11 +1,12 @@
 Okapi
 =====
 
-Okapi is OpenMC wrapped as a MOOSE App that allows relatively easy coupling to any MOOSE-based application. Most of the development notes have been located in docs/manual.tex for coupling OpenMC, Buffalo (a lightweight surrogate for BISON), and MOON (Nek wrapped as a MOOSE App).
+Okapi is a "wrapping" of the open-source Monte Carlo code OpenMC that allows OpenMC to be run within the Multiphysics Object-Oriented Simulation Environment (MOOSE) framework. This wrapping essentially involves replacing key MOOSE methods that would ordinarily call libMesh finite element routines with calls to OpenMC subroutines. This wrapping allows OpenMC to be run as a MOOSE application, allowing relatively easy coupling to any MOOSE-based application (such as [BISON](https://bison.inl.gov/SitePages/Home.aspx) fuels performance, [RELAP-7](https://relap7.inl.gov/SitePages/Overview.aspx) system-level thermal-hydraulics, and many more) and non-MOOSE codes that have also been wrapped as MOOSE applications (such as [Nek5000](https://nek5000.mcs.anl.gov/) computational fluid dynamics).
 
-Okapi relies on specific versions of OpenMC, Nek, and MOOSE. A branch created by merging paulromano/c-api into xgitlab/zernike is needed for access to C-API routines to interface with C++ code and for interacting with functional expansion talleis, respectively. The branch of MOOSE required has my temporary construction and deconstruction classes that will be replaced by the Functional Expansion MOOSE module in the future. The branch of MOON must not have duplicate versions of classes in this temporary MOOSE branch. This will be cleaned up in the future..
+Okapi has MOOSE and OpenMC as git submodules to ensure that the correct versions of OpenMC and MOOSE are used.
 
-The repository branches are organized as follows:
+The `docs/papers` directory contains publications and presentations related to Okapi that are a good starting point for understanding the wrapping and coupling, while the `docs/notes` directory contains developer notes compiled throughout the development that may provide useful secondary information.
 
-* _master_ - Okapi, MOON, and MOOSE coupling
-* _okapi-moose_ - Okapi and MOOSE coupling only, i.e. all source code related to transfers between MOON and MOOSE/Okapi have been removed, and the Okapi Makefile does not link to the MOON shared library.
+The `tests` directory contains several test problems illustrating OpenMC-Buffalo, OpenMC-Nek5000, and OpenMC-Buffalo-Nek5000 coupling examples, where [Buffalo](https://github.com/aprilnovak/Buffalo) is a lightweight surrogate for the BISON fuels performance code. The `examples/physor-paper` directory contains the input files used to obtain simulation results for the 2018 PHYSOR conference, with paper information available in `docs/papers/PHYSOR-2018`.
+
+We welcome all contributors and users!
