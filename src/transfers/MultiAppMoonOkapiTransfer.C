@@ -2,7 +2,7 @@
 
 #include "MultiAppMoonOkapiTransfer.h"
 #include "NekInterface.h"
-#include "OpenMCInterface.h"
+#include "openmc.h"
 #include "OpenMCErrorHandling.h"
 
 // MOOSE includes
@@ -86,10 +86,10 @@ MultiAppMoonOkapiTransfer::execute()
   // indices of the materials in those cells.
   for (std::size_t i = 0; i < _cell.size(); ++i)
   {
-    int err_index = OpenMC::openmc_get_cell_index(_cell[i], &_index[i]);
+    int err_index = openmc_get_cell_index(_cell[i], &_index[i]);
     ErrorHandling::openmc_get_cell_index(err_index, "MultiAppMoonOkapiTransfer");
 
-    int err_index_mat = OpenMC::openmc_get_material_index(_material[i], &_index_mat[i]);
+    int err_index_mat = openmc_get_material_index(_material[i], &_index_mat[i]);
     ErrorHandling::openmc_get_material_index(err_index_mat, "MultiAppMoonOkapiTransfer");
   }
 
@@ -275,7 +275,7 @@ MultiAppMoonOkapiTransfer::execute()
         _console << "Layer densities: " << std::endl;
       for (std::size_t i = 0; i < _cell.size(); ++i)
       {
-        int err_set = OpenMC::openmc_cell_set_temperature(_index[i], layer_temps[i], NULL);
+        int err_set = openmc_cell_set_temperature(_index[i], layer_temps[i], NULL);
         ErrorHandling::openmc_cell_set_temperature(err_set);
 
         // simple correlation for water at 15 MPa, converted to g/cm^3
@@ -289,7 +289,7 @@ MultiAppMoonOkapiTransfer::execute()
         if (_dbg)
           _console << layer_density << ' ';
 
-        int err_set_density = OpenMC::openmc_material_set_density(_index[i], layer_density);
+        int err_set_density = openmc_material_set_density(_index[i], layer_density);
         ErrorHandling::openmc_material_set_density(err_set_density);
       }
 

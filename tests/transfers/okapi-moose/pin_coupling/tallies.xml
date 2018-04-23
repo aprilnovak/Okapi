@@ -5,10 +5,17 @@
     <type> cell</type>
     <bins> 1</bins>
   </filter>
+  <filter id="2">
+    <type>zernike</type>
+    <order>5</order>
+    <x>0</x>
+    <y>0</y>
+    <r>1</r>
+  </filter>
 
   <tally id="1">
-    <filters> 25</filters>
-    <scores>kappa-fission-z5</scores>
+    <filters> 25 2</filters>
+    <scores>kappa-fission</scores>
   </tally>
 
 </tallies>

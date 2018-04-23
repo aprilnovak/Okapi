@@ -1,6 +1,6 @@
 #include "MultiAppMooseOkapiReactivityTransfer.h"
-#include "OpenMCInterface.h"
 #include "OpenMCErrorHandling.h"
+#include "openmc.h"
 
 #include "MooseTypes.h"
 #include "MooseVariableScalar.h"
@@ -65,7 +65,7 @@ MultiAppMooseOkapiReactivityTransfer::execute()
 
           // get k_eff from OpenMC
           double keff[2];
-          int err_keff = OpenMC::openmc_get_keff(keff);
+          int err_keff = openmc_get_keff(keff);
           ErrorHandling::openmc_get_keff(err_keff);
 
           if (_dbg)

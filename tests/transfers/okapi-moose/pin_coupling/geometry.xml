@@ -2,12 +2,12 @@
 <geometry>
 
   <!-- Surfaces for fuel, gap, cladding -->
-  <surface id="1" type="z-cylinder" coeffs="0.0 0.0 0.5" /> <!-- Fuel OR -->
+  <surface id="1" type="z-cylinder" coeffs="0.0 0.0 1" /> <!-- Fuel OR -->
 
-  <surface id="4" type="x-plane" coeffs="-0.6" boundary="reflective" />
-  <surface id="5" type="x-plane" coeffs=" 0.6" boundary="reflective" />
-  <surface id="6" type="y-plane" coeffs="-0.6" boundary="reflective" />
-  <surface id="7" type="y-plane" coeffs=" 0.6" boundary="reflective" />
+  <surface id="4" type="x-plane" coeffs="-1.1" boundary="reflective" />
+  <surface id="5" type="x-plane" coeffs=" 1.1" boundary="reflective" />
+  <surface id="6" type="y-plane" coeffs="-1.1" boundary="reflective" />
+  <surface id="7" type="y-plane" coeffs=" 1.1" boundary="reflective" />
   <surface id="8" type="z-plane" coeffs="-0.5" boundary="reflective" />
   <surface id="9" type="z-plane" coeffs=" 0.5" boundary="reflective" />
 

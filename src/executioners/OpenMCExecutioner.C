@@ -1,5 +1,5 @@
 #include "OpenMCExecutioner.h"
-#include "OpenMCInterface.h"
+#include "openmc.h"
 
 template <>
 InputParameters
@@ -18,6 +18,5 @@ void
 OpenMCExecutioner::init()
 {
   Transient::init();
-  OpenMC::openmc_init(_communicator.get());
-  //  OpenMC::initialize_coupling();
+  openmc_init(&_communicator.get());
 }

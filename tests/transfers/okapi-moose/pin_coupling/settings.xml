@@ -18,8 +18,8 @@
   <source>
     <space type="box">
       <parameters>
-        -0.6 -0.6 -1.
-        0.6 0.6  1.
+        -1.1 -1.1 -1.
+        1.1 1.1  1.
       </parameters>
     </space>
   </source>
@@ -28,8 +28,8 @@
        bounds for a mesh over which the Shannon entropy should be
        calculated. The extent in the z direction is made arbitrarily large. -->
   <entropy>
-    <lower_left>-0.5 -0.5 -1.e50</lower_left>
-    <upper_right>0.5 0.5  1.e50</upper_right>
+    <lower_left>-1.1 -1.1 -1.e50</lower_left>
+    <upper_right>1.1 1.1  1.e50</upper_right>
     <dimension>10 10 1</dimension>
   </entropy>
 
