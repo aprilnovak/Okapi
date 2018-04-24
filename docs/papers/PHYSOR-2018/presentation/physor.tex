@@ -45,7 +45,7 @@
 }
 
 \title[Multiphysics Coupling]{Preliminary Coupling of OpenMC and Nek5000 Within the MOOSE Framework}
-\author[Novak, Romano, et. al]{A.~J.~ Novak\inst{1}, P.~K.~Romano\inst{2}, B.~Wendt\inst{3}, R.~Rahaman\inst{2}, E.~Merzari\inst{2}, C.~Permann\inst{4}, R.~C.~Martineau\inst{4}, L.~Kerby\inst{3,4}, R.~N.~Slaybaugh\inst{1}}
+\author[Novak et. al]{A.~J.~ Novak\inst{1}, P.~K.~Romano\inst{2}, B.~Wendt\inst{3}, R.~Rahaman\inst{2}, E.~Merzari\inst{2}, C.~Permann\inst{4}, R.~C.~Martineau\inst{4}, L.~Kerby\inst{3,4}, R.~N.~Slaybaugh\inst{1}}
 \institute[]
 {
 	\inst{1}
@@ -81,13 +81,14 @@
 \end{overprint}
 \end{frame}
 
-\begin{frame}{Neutronics-Thermal/Hydraulics Multiphysics}
+\begin{frame}{This Publication}
 
-\begin{equation}
-\Sigma=\sigma(T) N(\rho)
-\end{equation}
-\vspace{0.5cm}
+\begin{figure}
+\includegraphics[width=7cm]{../Figures/exascalelogo.jpg}
+\end{figure}
+
 \begin{itemize}
+\item \textbf{Motivation}: Perform high-fidelity multiphysics simulations\newline
 \item Monte Carlo (MC) neutron transport
 	\begin{itemize}
 	\item OpenMC: {\tt https://github.com/mit-crpg/openmc}\newline
@@ -99,12 +100,16 @@
 \end{itemize}
 \end{frame}
 
+\begin{frame}{Table of Contents}
+\tableofcontents
+\end{frame}
+
 \section{Software Design}
 
 \begin{frame}{Software Design}
 
 \begin{figure}
-\includegraphics[width=5.65cm]{../Figures/internal_vs_external.png}
+\includegraphics[width=6.5cm]{../Figures/internal_vs_external.png}
 \caption{Internal and external data transfer implementations for 50 MC-T/H publications}
 \end{figure}
 
@@ -114,7 +119,7 @@
 	\begin{itemize}
 	\item File-based communication
 	\item Controlled by scripts
-	\item No source code modifications required
+	\item No code modifications
 	\item Code-specific\newline
 	\end{itemize}
 \end{column}
@@ -123,7 +128,7 @@
 	\begin{itemize}
 	\item Memory-based communication
 	\item Controlled by driver program
-	\item Possible significant source code modifications
+	\item Significant code modifications
 	\item Mostly code agnostic; re-usable
 	\end{itemize}
 \end{column}
@@ -149,18 +154,18 @@
 \item Call OpenMC and Nek5000 routines from within MOOSE applications
 \end{itemize}
 \begin{figure}
-\includegraphics[width=9cm]{../Figures/moose_driver.png}
+\includegraphics[width=10cm]{../Figures/moose_driver.png}
 \caption{Simplified description of MOOSE-wrapped OpenMC}
 \end{figure}
 \end{frame}
 
 \begin{frame}{Software Design}
-\begin{itemize}
-\item (Possibly) first in-memory coupling of MC and CFD codes using a third-party driver framework
-\end{itemize}
+%\begin{itemize}
+%\item (Possibly) first in-memory coupling of MC and CFD codes using a third-party driver framework
+%\end{itemize}
 
 \begin{figure}
-\includegraphics[width=10cm]{../Figures/MOOSE_capabilities.png}
+\includegraphics[width=12cm]{../Figures/MOOSE_capabilities.png}
 \caption{Multiscale multiphysics coupling capabilities}
 \end{figure}
 \end{frame}
@@ -187,27 +192,20 @@ Giraffe = Nek5000 wrapped as a MOOSE application
 
 \section{Monte Carlo \(\rightarrow\) T/H Data Transfer}
 
-\begin{frame}{A Fundamental Difficulty}
+\begin{frame}{A Difficulty - How to Limit Information Loss?}
 
 \begin{columns}
-\begin{column}{0.575\linewidth}
-\vspace{0.8cm}
-\begin{enumerate}
-\item How to construct a mapping?\newline
-\item How to limit information loss?
-\end{enumerate}
-\vspace{1.2cm}
-\begin{figure}
-\includegraphics[width=5.5cm]{../Figures/MCNP_STARCD_meshes.png}
-\caption{One-to-one correspondence between Monte Carlo and CFD cells; 3,328 cells and tallies in fuel \cite{cardoni}}
-\end{figure}
-
-%\vspace{.5cm}
-\end{column}
 \begin{column}{0.4\linewidth}
 \begin{figure}
 \includegraphics[width=2cm]{../Figures/MC_vs_CFD_mesh.png}
 \caption{(a) Monte Carlo and (b) CFD geometry representations}
+\end{figure}
+%\vspace{.5cm}
+\end{column}
+\begin{column}{0.575\linewidth}
+\begin{figure}
+\includegraphics[width=5.5cm]{../Figures/MCNP_STARCD_meshes.png}
+\caption{One-to-one correspondence between Monte Carlo and CFD cells; 3,328 cells and tallies in fuel \cite{cardoni}}
 \end{figure}
 \end{column}
 \end{columns}
@@ -240,9 +238,9 @@ Apply orthogonality condition:
 C_{lmn}=\int_{-1}^1\int_{-1}^1\int_{-1}^1P_l(x)P_m(y)P_n(z)F(\vv{r})\ dx\ dy\ dz
 \end{equation}
 
-\begin{itemize}
-\item (Possibly) the first to use functional expansion tallies in a MC-CFD-fuels simulation
-\end{itemize}
+%\begin{itemize}
+%\item (Possibly) the first to use functional expansion tallies in a MC-CFD-fuels simulation
+%\end{itemize}
 
 \end{frame}
 
@@ -289,12 +287,10 @@ d&=&\frac{-\ln{(\xi)}}{\Sigma_t}
 
 \vspace{0.25cm}
 \begin{itemize}
-\item At the time of writing, \(\Sigma_t(x)\) is constant in each cell, but have since implemented a Newton method to solve Eq. \eqref{eq:Sample}a (Brown and Martin, \cite{brown_martin_direct})
+\item At the time of writing, \(\Sigma_t(x)\) is constant in each cell
 \item Functional expansions have been implemented in Nek5000 and MOOSE
-\item (Possibly) the first MC-T/H coupling to transfer most data with functional expansions
-	\begin{itemize}
-	\item Several of the Serpent-T/H couplings use a different continuous representation technique
-	\end{itemize}
+\item M. Ellis, A. Lund, and P. Romano have since implemented a Newton method \cite{brown_martin_direct} to solve Eq. \eqref{eq:Sample}a
+%\item (Possibly) the first MC-T/H coupling to transfer most data with functional expansions
 \end{itemize}
 \end{frame}
 
@@ -303,7 +299,7 @@ d&=&\frac{-\ln{(\xi)}}{\Sigma_t}
 \begin{frame}{Other Coupling Considerations}
 
 \begin{itemize}
-\item Use standard fixed-point iteration:
+\item Tightly-coupled fixed-point iteration:
 
 \begin{subequations}
 \begin{eqnarray}
@@ -366,7 +362,7 @@ T^{(k+1)}, \rho^{(k+1)}&=&\textbf{M}\left(\phi^{(k+1)}\right)
 	\end{itemize}
 \item Buffalo, a lightweight surrogate for BISON (heat conduction):
 	\begin{itemize}
-	\item Specific pin surface temperature
+	\item Specified pin surface temperature
 	\item Insulated top and bottom
 	\end{itemize}
 \end{itemize}
@@ -376,10 +372,11 @@ T^{(k+1)}, \rho^{(k+1)}&=&\textbf{M}\left(\phi^{(k+1)}\right)
 \end{frame}
 
 \begin{frame}{A Pincell Example}
-\begin{figure}
-\includegraphics[width=12cm]{../Figures/detailed_coupling_pic.png}
-\caption{Detailed description of coupling data transfer for simple pincell example}
-\end{figure}
+\begin{overprint}
+\onslide<1>\centering\includegraphics[width=12.25cm]{../Figures/detailed_coupling_pic1.png}
+\onslide<2>\centering\includegraphics[width=12.25cm]{../Figures/detailed_coupling_pic2.png}
+\onslide<3>\centering\includegraphics[width=12.25cm]{../Figures/detailed_coupling_pic3.png}
+\end{overprint}
 \end{frame}
 
 \begin{frame}{Results}
@@ -447,9 +444,10 @@ and (b) (nondimensional) fluid temperature at Picard iteration 12.}
 \begin{itemize}
 \item In-memory coupling of Monte Carlo and CFD using an established driver framework
 	\begin{itemize}
-	\item Many possibilities for coupling to other MOOSE applications\newline
+	\item Many possibilities for coupling to other MOOSE applications
+	\item ``Plug-and-play'' capabilities \newline
 	\end{itemize}
-\item Functional expansion tallies used for most of the data transfers
+\item Functional expansions used for most of the data transfers
 	\begin{itemize}
 	\item Continuous representation of solutions
 	\item Relatively few floating point number transfers\newline
@@ -457,7 +455,7 @@ and (b) (nondimensional) fluid temperature at Picard iteration 12.}
 \item Future work:
 	\begin{itemize}
 	\item Repeat simulations with continuous material tracking
-	\item More sophisticated relaxation iterations, convergence estimates, and temperature-dependent cross sections
+	\item More sophisticated iteration scheme, convergence estimates, and temperature-dependent cross sections
 	\end{itemize}
 \end{itemize}
 \end{frame}
@@ -474,10 +472,15 @@ and (b) (nondimensional) fluid temperature at Picard iteration 12.}
 \end{figure}
 \centering
 Thank you!
+\vfill
+
+\footnotesize
+Presentation, with references, provided online at {\tt https://github.com/aprilnovak/Okapi}
 
 % to get all of the references to populate the bibliography
+% added four additional!!!
 \footnotesize
-\color{white}\cite{mori,waata,seker,espel,sanchez,cardoni,ivanov,travleev,espel_2013,ivanov_2013,daeubler,ivanov_2014,daeubler_2015,henry,aviles,li_2013,suikkanen,wu,hu,vazquez,meplan,aufiero,aufiero_2017,krolikowski,aufiero_2016,pham,novak,guo,scarlat,yexin,gurecky,sjenitzer,breitkreutz,gill,erfaninia,bennett,gourbesville,guo_2013,hoogenboom,kelly,laureau,smure,pecchia,shan,li_2012,kotlyar_2011,tuominen, guo_2018,cui,chen}
+\color{white}\cite{mori,waata,seker,espel,sanchez,cardoni,ivanov,travleev,espel_2013,ivanov_2013,daeubler,ivanov_2014,daeubler_2015,henry,aviles,li_2013,suikkanen,wu,hu,vazquez,meplan,aufiero,aufiero_2017,krolikowski,aufiero_2016,pham,novak,guo,scarlat,yexin,gurecky,sjenitzer,breitkreutz,gill,erfaninia,bennett,gourbesville,guo_2013,hoogenboom,kelly,laureau,smure,pecchia,shan,li_2012,kotlyar_2011, tuominen, guo_2018, cui, chen}
 \color{black}
 \end{frame}
 
