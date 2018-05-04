@@ -18,6 +18,9 @@ public:
   void printResults(std::vector<Real> & results);
 
 protected:
+  bool getOrderAndCheckExpansionType(const char *& type, const int32_t & index, int32_t & order);
+
+protected:
   int32_t _cell;
   int32_t _tally;
   const bool & _dbg;

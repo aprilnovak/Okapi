@@ -44,6 +44,7 @@
     multi_app_object_name = kappa_fission_mutable_series
     openmc_cell = 1
     execute_on = timestep_end
+    openmc_tally = 1
   [../]
   [./from_bison]
     type = MultiAppMooseOkapiTransfer
@@ -52,6 +53,7 @@
     multi_app_object_name = temperature_mutable_series_uo
     openmc_cell = 1
     execute_on = timestep_end
+    openmc_tally = 1
   [../]
 []
 
