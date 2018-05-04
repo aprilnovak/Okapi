@@ -1,0 +1,20 @@
+<?xml version='1.0' encoding='utf-8'?>
+<tallies>
+  <filter id="1" type="spatiallegendre">
+    <order>8</order>
+    <axis>z</axis>
+    <min>-10.0</min>
+    <max>10.0</max>
+  </filter>
+  <filter id="2" type="cell">
+    <bins>2 1</bins>
+  </filter>
+  <tally id="1">
+    <filters>1</filters>
+    <scores>flux</scores>
+  </tally>
+  <tally id="2">
+    <filters>2 1</filters>
+    <scores>flux</scores>
+  </tally>
+</tallies>

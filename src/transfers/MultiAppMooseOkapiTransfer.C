@@ -26,6 +26,8 @@ validParams<MultiAppMooseOkapiTransfer>()
   params.addRequiredParam<int32_t>("openmc_cell",
                                    "OpenMC cell ID (defined in "
                                    "XML input file) for this transfer to be associated with.");
+  params.addRequiredParam<int32_t>("openmc_tally",
+                                   "The functional expansion tally id that covers the desired cell geometry.");
   params.addParam<bool>("dbg", false, "Whether to turn on debugging information");
   params.addParam<bool>("store_results",
                         true,
@@ -37,6 +39,7 @@ validParams<MultiAppMooseOkapiTransfer>()
 MultiAppMooseOkapiTransfer::MultiAppMooseOkapiTransfer(const InputParameters & parameters)
   : MultiAppFXTransfer(parameters),
     _cell(parameters.get<int32_t>("openmc_cell")),
+    _tally(parameters.get<int32_t>("openmc_tally")),
     _dbg(parameters.get<bool>("dbg")),
     _store_results(parameters.get<bool>("store_results"))
 {
@@ -76,8 +79,10 @@ MultiAppMooseOkapiTransfer::execute()
   // for later calls to cell-dependent OpenMC routines. This cannot be
   // put in the constructor because we cannot guarantee that the openmc_init
   // subroutine will be called before this object's constructor.
-  int err_index = openmc_get_cell_index(_cell, &_index);
+  int err_index = openmc_get_cell_index(_cell, &_cell_index);
   ErrorHandling::openmc_get_cell_index(err_index, "MultiAppMooseOkapiTransfer");
+  err_index = openmc_get_tally_index(_tally, &_tally_index);
+  ErrorHandling::openmc_get_tally_index(err_index, "MultiAppMooseOkapiTransfer");
 
   switch (_direction)
   {
@@ -133,7 +138,7 @@ MultiAppMooseOkapiTransfer::execute()
 
           // We pass a NULL pointer because we're not passing the optional instance
           // parameter.
-          int err_temp = openmc_cell_set_temperature(_index, temp, NULL);
+          int err_temp = openmc_cell_set_temperature(_cell_index, temp, NULL);
           ErrorHandling::openmc_cell_set_temperature(err_temp);
         }
       }
@@ -164,26 +169,40 @@ MultiAppMooseOkapiTransfer::execute()
           MutableCoefficientsInterface & to_object =
               (this->*getSubAppObject)(_multi_app->appProblemBase(I), _multi_app_object_name, 0);
 
-          // Initialize an array to hold the expansion coefficients we'll receive
-          // from OpenMC. This array holds all of the expansion coefficients
-          // for the cell we specify. For a generic Zernike-Legendre expansion,
-          // the order used by OpenMC is specified in the tallies XML file. It is
-          // assumed that this XML order matches the available slots to write in
-          // the to_aux_scalar variables provided from MOOSE, so this is used to
-          // determine how large of an array to specify here that will be written.
-          // A check is provided in OpenMC to make sure that the length of the
-          // t % coeffs array) matches what is allocated in C++ to receive it.
-
           // Determine size of array to allocate based on size of MOOSE variables
           std::vector<Real> & coefficients = to_object.getCoefficients();
-          size_t num_coeffs_from_openmc = coefficients.size();
           double * tally_results = nullptr;
           int shape_[3];
 
-          // store coefficients from OpenMC into the omc_coeffs array and perform
-          // error handling.
-          int err_get = openmc_tally_results(_index, &tally_results, shape_);
-          ErrorHandling::get_coeffs_from_cell(err_get);
+          int err_get = openmc_tally_results(_tally_index, &tally_results, shape_);
+          ErrorHandling::openmc_tally_results(err_get);
+
+          int32_t * filter_indices = nullptr;
+          int num_filter_indices;
+          err_get = openmc_tally_get_filters(_tally_index, &filter_indices, &num_filter_indices);
+          ErrorHanding::openmc_tally_get_filters(err_get);
+          unsigned stride_amount = 0;
+
+          for (decltype(num_filter_indices) i = 0; i < num_filter_indices; ++i)
+          {
+            const char* type;
+            err_get = openmc_filter_get_type(i, &type);
+            ErrorHandling::openmc_filter_get_type(err_get);
+            std::string cell_filter_name = "cell";
+            if (!cell_filter_name.compare(type))
+            {
+              int32_t* cell_indices = nullptr;
+              int32_t num_cells;
+              err_get =  openmc_cell_filter_get_bins(i, &cell_indices, &num_cells);
+              ErrorHandling::openmc_cell_filter_get_bins(err_get);
+              for (decltype(num_cells) j = 0; j < num_cells; ++j)
+              {
+
+
+          if (coefficients.size() != shape_[2])
+            mooseError("The giving and receiving data structures don't have a matching number of coefficients");
+
+
 
           // if (_dbg)
           // {

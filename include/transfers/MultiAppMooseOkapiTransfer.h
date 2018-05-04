@@ -19,9 +19,11 @@ public:
 
 protected:
   int32_t _cell;
+  int32_t _tally;
   const bool & _dbg;
   const bool & _store_results;
-  int32_t _index;
+  int32_t _cell_index;
+  int32_t _tally_index;
 
   // vectors to hold values for all previous Picard iterations
   std::vector<Real> _k_eff;

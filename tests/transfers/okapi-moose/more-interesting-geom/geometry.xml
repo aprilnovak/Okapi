@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<geometry>
+  <cell id="1" material="1" region="1 -2 3 -4 5 -6" universe="1" />
+  <cell id="2" material="2" region="1 -2 3 -4 6 -7" universe="1" />
+  <cell id="3" material="1" region="1 -2 3 -4 7 -8" universe="1" />
+  <surface boundary="reflective" coeffs="-5.0" id="1" name="minimum x" type="x-plane" />
+  <surface boundary="reflective" coeffs="5.0" id="2" name="maximum x" type="x-plane" />
+  <surface boundary="reflective" coeffs="-5.0" id="3" name="minimum y" type="y-plane" />
+  <surface boundary="reflective" coeffs="5.0" id="4" name="maximum y" type="y-plane" />
+  <surface boundary="vacuum" coeffs="-10.0" id="5" type="z-plane" />
+  <surface coeffs="-0.5" id="6" type="z-plane" />
+  <surface coeffs="0.5" id="7" type="z-plane" />
+  <surface boundary="vacuum" coeffs="10.0" id="8" type="z-plane" />
+</geometry>

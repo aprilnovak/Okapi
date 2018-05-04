@@ -5,7 +5,7 @@
   <run_mode>eigenvalue</run_mode>
   <seed>123456</seed>
   <batches>20</batches>
-  <inactive>10</inactive>
+  <inactive>0</inactive>
   <particles>1000</particles>
 
   <!-- set the temperature method -->
