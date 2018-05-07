@@ -31,7 +31,7 @@
     physical_bounds = '-0.5 0.5   0 0 0.5' # z_min z_max   x_center y_center radius
     z = Legendre # Axial in z
     disc = Zernike # (r, t) default to unit disc in x-y plane
-    expansion_type = 'sqrt_mu'
+    expansion_type = 'orthonormal'
   [../]
   [./temperature_mutable_series]
     type = FunctionSeries

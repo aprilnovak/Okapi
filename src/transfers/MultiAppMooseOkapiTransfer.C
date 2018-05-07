@@ -175,6 +175,9 @@ MultiAppMooseOkapiTransfer::execute()
           int shape_[3];
 
           int err_get = openmc_tally_results(_tally_index, &tally_results, shape_);
+          std::vector<double> tally_results_mean(shape_[1] * shape_[2]);
+          for (auto i = beginIndex(tally_results_mean); i < tally_results_mean.size(); ++i)
+            tally_results_mean[i] = tally_results[1 + i * 3];
 
           int32_t * filter_indices = nullptr;
           int32_t num_filter_indices;
@@ -192,13 +195,13 @@ MultiAppMooseOkapiTransfer::execute()
 
           // Important variables
           int32_t order;
-          const char * type;
+          char type[20];
           int32_t * cell_indices = nullptr;
           int32_t num_cells_in_filter;
           bool cell_id_found = false;
           int32_t stride_integer = 0;
 
-          err_get = openmc_filter_get_type(filter_indices[0], &type);
+          err_get = openmc_filter_get_type(filter_indices[0], type);
           std::string cell_filter_name = "cell";
           if (!cell_filter_name.compare(type))
           {
@@ -217,13 +220,13 @@ MultiAppMooseOkapiTransfer::execute()
             if (!cell_id_found)
               mooseError("Requested cell_id not in the passed tally.");
 
-            err_get = openmc_filter_get_type(filter_indices[1], &type);
+            err_get = openmc_filter_get_type(filter_indices[1], type);
             getOrderAndCheckExpansionType(type, filter_indices[1], order);
 
             // The point at which the results we care about begin
-            auto starting_point = (order + 1) * stride_integer;
-            std::vector<double> temp_results(tally_results + starting_point,
-                                             tally_results + starting_point + order + 1);
+            auto starting_point = coefficients.size() * stride_integer;
+            std::vector<double> temp_results(&tally_results_mean[starting_point],
+                                             &tally_results_mean[starting_point] + coefficients.size());
             if (temp_results.size() != coefficients.size())
               mooseError("Coefficient results from openmc don't match the coefficient vector size "
                          "from MOOSE");
@@ -247,8 +250,8 @@ MultiAppMooseOkapiTransfer::execute()
               mooseError("Requested cell_id not in the passed tally.");
 
             std::vector<double> temp_results;
-            for (decltype(order) i = 0; i < order + 1; ++i)
-              temp_results.push_back(*(tally_results + stride_integer + i * num_cells_in_filter));
+            for (decltype(order) i = 0; i < coefficients.size(); ++i)
+              temp_results.push_back(tally_results_mean[stride_integer + i * num_cells_in_filter]);
             if (temp_results.size() != coefficients.size())
               mooseError("Coefficient results from openmc don't match the coefficient vector size "
                          "from MOOSE");
@@ -281,7 +284,7 @@ MultiAppMooseOkapiTransfer::printResults(std::vector<Real> & results)
 }
 
 bool
-MultiAppMooseOkapiTransfer::getOrderAndCheckExpansionType(const char *& type,
+MultiAppMooseOkapiTransfer::getOrderAndCheckExpansionType(const char * type,
                                                           const int32_t & index,
                                                           int32_t & order)
 {
