@@ -1,19 +1,15 @@
 <?xml version="1.0"?>
 <tallies>
 
-  <filter id="25">
-    <type> cell</type>
-    <bins> 1</bins>
-  </filter>
   <filter id="2" type="zernike">
     <order> 5</order>
     <x> 0 </x>
     <y> 0 </y>
-    <r> 0.5 </r>
+    <r> 0.6 </r>
   </filter>
 
   <tally id="1">
-    <filters> 25 2</filters>
+    <filters>2</filters>
     <scores>kappa-fission</scores>
   </tally>
 

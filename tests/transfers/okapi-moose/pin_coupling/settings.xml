@@ -4,9 +4,9 @@
   <!-- Define how many particles to run and for how many batches -->
   <run_mode>eigenvalue</run_mode>
   <seed>123456</seed>
-  <batches>20</batches>
-  <inactive>10</inactive>
-  <particles>1000</particles>
+  <batches>80</batches>
+  <inactive>30</inactive>
+  <particles>10000</particles>
 
   <!-- set the temperature method -->
   <temperature_method>nearest</temperature_method>

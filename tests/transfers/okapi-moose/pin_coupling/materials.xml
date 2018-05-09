@@ -105,4 +105,13 @@
     <nuclide name="O17"  ao="6.0099e-05" />
   </material>
 
+  <material id="14" temperature="400">
+    <density value="6.55" units="g/cm3" />
+    <nuclide name="Zr90"  ao = "2.1827e-2" />
+    <nuclide name="Zr91"  ao = "4.76e-3" />
+    <nuclide name="Zr92"  ao = "7.2758e-3" />
+    <nuclide name="Zr94"  ao = "7.3734e-3" />
+    <nuclide name="Zr96"  ao = "1.1879e-3" />
+  </material>
+
 </materials>

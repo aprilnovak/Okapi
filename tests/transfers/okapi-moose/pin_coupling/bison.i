@@ -24,7 +24,16 @@
 []
 
 [Functions]
-  [./kappa_fission_mutable_series]
+  [./kappa_fission_mutable_series_fuel]
+    type = FunctionSeries
+    series_type = CylindricalDuo
+    orders = '0   5' # Axial first, then (r, t) FX
+    physical_bounds = '-0.5 0.5   0 0 0.5' # z_min z_max   x_center y_center radius
+    z = Legendre # Axial in z
+    disc = Zernike # (r, t) default to unit disc in x-y plane
+    expansion_type = 'orthonormal'
+  [../]
+  [./kappa_fission_mutable_series_clad]
     type = FunctionSeries
     series_type = CylindricalDuo
     orders = '0   5' # Axial first, then (r, t) FX
@@ -58,24 +67,31 @@
 []
 
 [AuxVariables]
-  [./kappa_fission] # holds eV/particle field from OpenMC
+  [./kappa_fission_fuel] # holds eV/particle field from OpenMC
+  [../]
+  [./kappa_fission_clad] # holds eV/particle field from OpenMC
   [../]
   [./fission_heat] # holds the fission heat source
   [../]
 []
 
 [AuxKernels]
-  [./reconstruct_kapp_fission]
+  [./reconstruct_kapp_fission_fuel]
     type = FunctionSeriesToAux
-    function = kappa_fission_mutable_series
-    variable = kappa_fission
+    function = kappa_fission_mutable_series_fuel
+    variable = kappa_fission_fuel
+  [../]
+  [./reconstruct_kapp_fission_clad]
+    type = FunctionSeriesToAux
+    function = kappa_fission_mutable_series_clad
+    variable = kappa_fission_clad
   [../]
   # the power set here is an arbitrary number - if you make this higher, you
   # can sort of see the impact of the fission distribution on the temperature
   [./fission_heat]
     type = KappaFissionToHeatSource
     variable = fission_heat
-    kappa_fission_source = kappa_fission
+    kappa_fission_source = kappa_fission_fuel
     power = 1e3
   [../]
 []
