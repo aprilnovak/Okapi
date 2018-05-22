@@ -4,9 +4,9 @@
   <!-- Define how many particles to run and for how many batches -->
   <run_mode>eigenvalue</run_mode>
   <seed>123456</seed>
-  <batches>80</batches>
-  <inactive>30</inactive>
-  <particles>10000</particles>
+  <batches>50</batches>
+  <inactive>10</inactive>
+  <particles>100000</particles>
 
   <!-- set the temperature method -->
   <temperature_method>nearest</temperature_method>
@@ -18,8 +18,8 @@
   <source>
     <space type="box">
       <parameters>
-        -0.6 -0.6 -1.
-        0.6 0.6  1.
+        -60 -60 -0.5
+        60 60  0.5
       </parameters>
     </space>
   </source>
@@ -28,8 +28,8 @@
        bounds for a mesh over which the Shannon entropy should be
        calculated. The extent in the z direction is made arbitrarily large. -->
   <entropy>
-    <lower_left>-0.5 -0.5 -1.e50</lower_left>
-    <upper_right>0.5 0.5  1.e50</upper_right>
+    <lower_left>-60 -60 -0.5</lower_left>
+    <upper_right>60 60 0.5</upper_right>
     <dimension>10 10 1</dimension>
   </entropy>
 
