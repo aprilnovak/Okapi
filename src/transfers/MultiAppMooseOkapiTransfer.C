@@ -117,7 +117,7 @@ MultiAppMooseOkapiTransfer::execute()
 
           // Change a temperature in OpenMC. For now, only use a single coefficient,
           // since there's no continuous material tracking yet.
-          Real temp = moose_coeffs[0] / sqrt(2.0 * M_PI);
+          Real temp = moose_coeffs[0];
           if (_dbg)
             _console << "Setting OpenMC cell " << _cell << " temperature to " << temp << std::endl;
 
@@ -210,7 +210,7 @@ MultiAppMooseOkapiTransfer::execute()
 
             for (decltype(num_cells_in_filter) i = 0; i < num_cells_in_filter; ++i)
             {
-              if (cell_indices[i] == _cell)
+              if (cell_indices[i] == _cell_index)
               {
                 cell_id_found = true;
                 stride_integer = i;
@@ -226,7 +226,8 @@ MultiAppMooseOkapiTransfer::execute()
             // The point at which the results we care about begin
             auto starting_point = coefficients.size() * stride_integer;
             std::vector<double> temp_results(&tally_results_mean[starting_point],
-                                             &tally_results_mean[starting_point] + coefficients.size());
+                                             &tally_results_mean[starting_point] +
+                                                 coefficients.size());
             if (temp_results.size() != coefficients.size())
               mooseError("Coefficient results from openmc don't match the coefficient vector size "
                          "from MOOSE");
@@ -239,7 +240,7 @@ MultiAppMooseOkapiTransfer::execute()
 
             for (decltype(num_cells_in_filter) i = 0; i < num_cells_in_filter; ++i)
             {
-              if (cell_indices[i] == _cell)
+              if (cell_indices[i] == _cell_index)
               {
                 cell_id_found = true;
                 stride_integer = i;
@@ -250,8 +251,9 @@ MultiAppMooseOkapiTransfer::execute()
               mooseError("Requested cell_id not in the passed tally.");
 
             std::vector<double> temp_results;
-            for (decltype(order) i = 0; i < coefficients.size(); ++i)
-              temp_results.push_back(tally_results_mean[stride_integer + i * num_cells_in_filter]);
+            for (auto i = beginIndex(coefficients); i < coefficients.size(); ++i)
+              temp_results.push_back(tally_results_mean[stride_integer + i * num_cells_in_filter] /
+                                     n_realizations);
             if (temp_results.size() != coefficients.size())
               mooseError("Coefficient results from openmc don't match the coefficient vector size "
                          "from MOOSE");

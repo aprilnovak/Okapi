@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<tallies>
+  <filter id="2" type="spatiallegendre">
+    <order> 10</order>
+    <axis> x </axis>
+    <min> -60 </min>
+    <max> 60 </max>
+  </filter>
+  <filter id="10" type="cell">
+    <bins>4</bins>
+  </filter>
+  <tally id="1">
+    <filters>2 10</filters>
+    <scores>kappa-fission</scores>
+  </tally>
+  <mesh id="1" type="regular">
+    <dimension>100 100</dimension>
+    <lower_left>-60 -0.5</lower_left>
+    <upper_right>60 0.5</upper_right>
+  </mesh>
+  <filter id="3" type="mesh">
+    <bins>1</bins>
+  </filter>
+  <tally id="2" name="mesh">
+    <filters>3</filters>
+    <scores>fission kappa-fission flux total</scores>
+  </tally>
+  <tally id="3" name="none">
+    <scores>fission kappa-fission flux total nu-fission</scores>
+  </tally>
+</tallies>

@@ -1,0 +1,9 @@
+[Tests]
+  [./bare_reactor]
+    type = Exodiff
+    input = master.i
+    exodiff = master_out_bison0.e
+    abs_zero = 1e-8
+    required_applications = 'BuffaloApp'
+  [../]
+[]

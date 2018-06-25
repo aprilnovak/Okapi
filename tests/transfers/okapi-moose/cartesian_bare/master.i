@@ -37,21 +37,12 @@
 []
 
 [Transfers]
-  [./to_bison_fuel]
+  [./to_bison]
     type = MultiAppMooseOkapiTransfer
     direction = to_multiapp
     multi_app = bison
-    multi_app_object_name = kappa_fission_mutable_series_fuel
-    openmc_cell = 1
-    execute_on = timestep_end
-    openmc_tally = 1
-  [../]
-  [./to_bison_clad]
-    type = MultiAppMooseOkapiTransfer
-    direction = to_multiapp
-    multi_app = bison
-    multi_app_object_name = kappa_fission_mutable_series_clad
-    openmc_cell = 2
+    multi_app_object_name = kappa_fission_mutable_series
+    openmc_cell = 4
     execute_on = timestep_end
     openmc_tally = 1
   [../]
@@ -60,7 +51,7 @@
     direction = from_multiapp
     multi_app = bison
     multi_app_object_name = temperature_mutable_series_uo
-    openmc_cell = 1
+    openmc_cell = 4
     execute_on = timestep_end
     openmc_tally = 1
   [../]
