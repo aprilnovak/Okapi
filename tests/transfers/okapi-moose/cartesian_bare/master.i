@@ -45,6 +45,7 @@
     openmc_cell = 4
     execute_on = timestep_end
     openmc_tally = 1
+    geometry_type = 'cartesian'
   [../]
   [./from_bison]
     type = MultiAppMooseOkapiTransfer
@@ -54,9 +55,11 @@
     openmc_cell = 4
     execute_on = timestep_end
     openmc_tally = 1
+    geometry_type = 'cartesian'
   [../]
 []
 
 [Outputs]
   exodus = true
+  csv = true
 []

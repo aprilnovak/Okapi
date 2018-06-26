@@ -19,7 +19,7 @@
 
 [Executioner]
   type = OpenMCExecutioner
-  num_steps = 1
+  num_steps = 2
   [./TimeStepper]
     type = OpenMCTimeStepper
     dt = 0.01
@@ -45,6 +45,7 @@
     openmc_cell = 4
     execute_on = timestep_end
     openmc_tally = 1
+    geometry_type = cylindrical
   [../]
   [./from_bison]
     type = MultiAppMooseOkapiTransfer
@@ -54,9 +55,11 @@
     openmc_cell = 4
     execute_on = timestep_end
     openmc_tally = 1
+    geometry_type = cylindrical
   [../]
 []
 
 [Outputs]
   exodus = true
+  csv = true
 []

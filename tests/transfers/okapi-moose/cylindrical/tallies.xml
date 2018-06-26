@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <tallies>
   <filter id="2" type="zernike">
-    <order> 0</order>
+    <order>4</order>
     <x> 0 </x>
     <y> 0 </y>
     <r> 60 </r>

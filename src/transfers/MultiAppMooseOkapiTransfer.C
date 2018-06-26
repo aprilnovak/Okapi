@@ -33,6 +33,9 @@ validParams<MultiAppMooseOkapiTransfer>()
                         true,
                         "Whether to store the iteration "
                         "results for every Picard iteration.");
+  MooseEnum geometry_type("cartesian cylindrical");
+  params.addRequiredParam<MooseEnum>(
+      "geometry_type", geometry_type, "The type of geometry. Either cylindrical or cartesian.");
   return params;
 }
 
@@ -41,7 +44,8 @@ MultiAppMooseOkapiTransfer::MultiAppMooseOkapiTransfer(const InputParameters & p
     _cell(parameters.get<int32_t>("openmc_cell")),
     _tally(parameters.get<int32_t>("openmc_tally")),
     _dbg(parameters.get<bool>("dbg")),
-    _store_results(parameters.get<bool>("store_results"))
+    _store_results(parameters.get<bool>("store_results")),
+    _geometry_type(getParam<MooseEnum>("geometry_type"))
 {
 }
 
@@ -201,6 +205,11 @@ MultiAppMooseOkapiTransfer::execute()
           bool cell_id_found = false;
           int32_t stride_integer = 0;
 
+          // We have to perform an orthonormalization. For a CylindricalDuo function series, this
+          // will introduce a factor of 1/2 because of the 0th order Legendre polynomial multiplying
+          // the Zernike series. We have to compensate by multiplying our coefficients by 2 here.
+          Real multiplier = _geometry_type == "cylindrical" ? 2. : 1.;
+
           err_get = openmc_filter_get_type(filter_indices[0], type);
           std::string cell_filter_name = "cell";
           if (!cell_filter_name.compare(type))
@@ -228,6 +237,13 @@ MultiAppMooseOkapiTransfer::execute()
             std::vector<double> temp_results(&tally_results_mean[starting_point],
                                              &tally_results_mean[starting_point] +
                                                  coefficients.size());
+
+            std::transform(temp_results.begin(),
+                           temp_results.end(),
+                           temp_results.begin(),
+                           std::bind(std::multiplies<Real>(),
+                                     std::placeholders::_1,
+                                     multiplier / n_realizations));
             if (temp_results.size() != coefficients.size())
               mooseError("Coefficient results from openmc don't match the coefficient vector size "
                          "from MOOSE");
@@ -252,20 +268,22 @@ MultiAppMooseOkapiTransfer::execute()
 
             std::vector<double> temp_results;
             for (auto i = beginIndex(coefficients); i < coefficients.size(); ++i)
-              temp_results.push_back(tally_results_mean[stride_integer + i * num_cells_in_filter] /
-                                     n_realizations);
+              temp_results.push_back(tally_results_mean[stride_integer + i * num_cells_in_filter] *
+                                     multiplier / n_realizations);
             if (temp_results.size() != coefficients.size())
               mooseError("Coefficient results from openmc don't match the coefficient vector size "
                          "from MOOSE");
             coefficients = std::move(temp_results);
           }
+          else
+            mooseError("You must have one cell filter and one expansion filter!");
 
           if (_dbg)
           {
             _console << "Transferring " << coefficients.size()
                      << " coefficients from OpenMC to MOOSE for cell " << _cell << std::endl;
             for (auto i = beginIndex(coefficients); i < coefficients.size(); ++i)
-              _console << coefficients[i] << " ";
+              _console << coefficients[i] / multiplier << " ";
             _console << std::endl;
           }
         }

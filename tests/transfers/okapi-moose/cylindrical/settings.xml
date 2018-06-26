@@ -6,7 +6,7 @@
   <seed>123456</seed>
   <batches>20</batches>
   <inactive>10</inactive>
-  <particles>30000</particles>
+  <particles>1000</particles>
 
   <!-- set the temperature method -->
   <temperature_method>nearest</temperature_method>

@@ -104,8 +104,19 @@
     type = VolumePostprocessor
     execute_on = timestep_begin
   [../]
+  [./kappa_average]
+    type = ElementAverageValue
+    variable = kappa_fission
+    execute_on = timestep_end
+  [../]
+  [./temperature_average]
+    type = ElementAverageValue
+    variable = temp
+    execute_on = timestep_end
+  [../]
 []
 
 [Outputs]
   exodus = true
+  csv = true
 []

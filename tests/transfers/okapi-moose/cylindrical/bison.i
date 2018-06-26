@@ -11,7 +11,7 @@
   [./kappa_fission_mutable_series]
     type = FunctionSeries
     series_type = CylindricalDuo
-    orders = '0   0' # Axial first, then (r, t) FX
+    orders = '0   4' # Axial first, then (r, t) FX
     physical_bounds = '-0.5 0.5   0 0 60' # z_min z_max   x_center y_center radius
     z = Legendre # Axial in z
     disc = Zernike # (r, t) default to unit disc in x-y plane
@@ -20,7 +20,7 @@
   [./temperature_mutable_series]
     type = FunctionSeries
     series_type = CylindricalDuo
-    orders = '2   1' # Axial first, then (r, t) FX
+    orders = '0   0' # Axial first, then (r, t) FX
     physical_bounds = '-0.5 0.5   0 0 60' # z_min z_max   x_center y_center radius
     z = Legendre # Axial in z
     disc = Zernike # (r, t) default to unit disc in x-y plane
@@ -113,8 +113,14 @@
     variable = kappa_fission
     execute_on = timestep_end
   [../]
+  [./temperature_average]
+    type = ElementAverageValue
+    variable = temp
+    execute_on = timestep_end
+  [../]
 []
 
 [Outputs]
   exodus = true
+  csv = true
 []

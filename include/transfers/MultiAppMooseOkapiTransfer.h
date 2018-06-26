@@ -32,6 +32,8 @@ protected:
   std::vector<Real> _k_eff;
   std::vector<std::vector<Real>> _fuel_temp_coeffs;
   std::vector<std::vector<Real>> _fission_coeffs;
+
+  const MooseEnum _geometry_type;
 };
 
 #endif /* MULTIAPPMOOSEOKAPITRANSFER_H */
