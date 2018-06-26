@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<geometry>
+
+  <surface id="1" type="z-cylinder" coeffs="0.0 0.0 60" boundary="vacuum"/> <!-- Fuel OR -->
+  <surface id="8" type="z-plane" coeffs="-0.5" boundary="reflective" />
+  <surface id="9" type="z-plane" coeffs=" 0.5" boundary="reflective" />
+  <cell id="4" material="8" name="fuel" region="-1 8 -9"/>
+
+</geometry>

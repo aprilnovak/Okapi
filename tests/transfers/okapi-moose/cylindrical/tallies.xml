@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 <tallies>
-  <filter id="2" type="spatiallegendre">
-    <order> 10</order>
-    <axis> x </axis>
-    <min> -60 </min>
-    <max> 60 </max>
+  <filter id="2" type="zernike">
+    <order> 0</order>
+    <x> 0 </x>
+    <y> 0 </y>
+    <r> 60 </r>
   </filter>
-  <filter id="10" type="cell">
+  <filter id="10" type = "cell">
     <bins>4</bins>
   </filter>
   <tally id="1">
@@ -15,8 +15,8 @@
   </tally>
   <mesh id="1" type="regular">
     <dimension>100 100</dimension>
-    <lower_left>-60 -0.5</lower_left>
-    <upper_right>60 0.5</upper_right>
+    <lower_left>-60 -60</lower_left>
+    <upper_right>60 60</upper_right>
   </mesh>
   <filter id="3" type="mesh">
     <bins>1</bins>
