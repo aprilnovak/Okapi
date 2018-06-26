@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <tallies>
   <filter id="2" type="spatiallegendre">
-    <order> 10</order>
+    <order>10</order>
     <axis> x </axis>
     <min> -60 </min>
     <max> 60 </max>

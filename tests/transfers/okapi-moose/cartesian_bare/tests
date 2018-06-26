@@ -6,4 +6,12 @@
     rel_err = 5e-2
     required_applications = 'BuffaloApp'
   [../]
+  [./coeffs_dont_match]
+    type = RunException
+    expect_err = "Coefficient results from openmc don't match the coefficient vector size from MOOSE"
+    input = master.i
+    required_applications = 'BuffaloApp'
+    cli_args = 'bison:Functions/kappa_fission_mutable_series/orders=9'
+    prereq = 'pin_coupling'
+  [../]
 []

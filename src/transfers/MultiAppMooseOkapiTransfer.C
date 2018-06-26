@@ -176,10 +176,13 @@ MultiAppMooseOkapiTransfer::execute()
           // Determine size of array to allocate based on size of MOOSE variables
           std::vector<Real> & coefficients = to_object.getCoefficients();
           double * tally_results = nullptr;
-          int shape_[3];
+          int shape[3];
 
-          int err_get = openmc_tally_results(_tally_index, &tally_results, shape_);
-          std::vector<double> tally_results_mean(shape_[1] * shape_[2]);
+          int err_get = openmc_tally_results(_tally_index, &tally_results, shape);
+          std::vector<double> tally_results_mean(shape[1] * shape[2]);
+          if (tally_results_mean.size() != coefficients.size())
+            mooseError("Coefficient results from openmc don't match the coefficient vector size "
+                       "from MOOSE");
           for (auto i = beginIndex(tally_results_mean); i < tally_results_mean.size(); ++i)
             tally_results_mean[i] = tally_results[1 + i * 3];
 
@@ -244,9 +247,6 @@ MultiAppMooseOkapiTransfer::execute()
                            std::bind(std::multiplies<Real>(),
                                      std::placeholders::_1,
                                      multiplier / n_realizations));
-            if (temp_results.size() != coefficients.size())
-              mooseError("Coefficient results from openmc don't match the coefficient vector size "
-                         "from MOOSE");
             coefficients = std::move(temp_results);
           }
           else if (getOrderAndCheckExpansionType(type, filter_indices[0], order))
@@ -270,9 +270,6 @@ MultiAppMooseOkapiTransfer::execute()
             for (auto i = beginIndex(coefficients); i < coefficients.size(); ++i)
               temp_results.push_back(tally_results_mean[stride_integer + i * num_cells_in_filter] *
                                      multiplier / n_realizations);
-            if (temp_results.size() != coefficients.size())
-              mooseError("Coefficient results from openmc don't match the coefficient vector size "
-                         "from MOOSE");
             coefficients = std::move(temp_results);
           }
           else
