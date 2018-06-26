@@ -1,0 +1,115 @@
+<?xml version="1.0"?>
+<materials>
+
+  <material id="1" temperature="293">
+    <density value="10.29769" units="g/cm3" />
+    <nuclide name="U235"  ao="5.5815e-04" />
+    <nuclide name="U238"  ao="2.2408e-02" />
+    <nuclide name="O16"   ao="4.5829e-02" />
+    <nuclide name="O17"   ao="1.1164e-04" />
+  </material>
+
+  <material id="2" temperature="400">
+    <density value="10.29769" units="g/cm3" />
+    <nuclide name="U235"  ao="5.5815e-04" />
+    <nuclide name="U238"  ao="2.2408e-02" />
+    <nuclide name="O16"   ao="4.5829e-02" />
+    <nuclide name="O17"   ao="1.1164e-04" />
+  </material>
+
+  <material id="3" temperature="500">
+    <density value="10.29769" units="g/cm3" />
+    <nuclide name="U235"  ao="5.5815e-04" />
+    <nuclide name="U238"  ao="2.2408e-02" />
+    <nuclide name="O16"   ao="4.5829e-02" />
+    <nuclide name="O17"   ao="1.1164e-04" />
+  </material>
+
+  <material id="4" temperature="600">
+    <density value="10.29769" units="g/cm3" />
+    <nuclide name="U235"  ao="5.5815e-04" />
+    <nuclide name="U238"  ao="2.2408e-02" />
+    <nuclide name="O16"   ao="4.5829e-02" />
+    <nuclide name="O17"   ao="1.1164e-04" />
+  </material>
+
+  <material id="5" temperature="700">
+    <density value="10.29769" units="g/cm3" />
+    <nuclide name="U235"  ao="5.5815e-04" />
+    <nuclide name="U238"  ao="2.2408e-02" />
+    <nuclide name="O16"   ao="4.5829e-02" />
+    <nuclide name="O17"   ao="1.1164e-04" />
+  </material>
+
+  <material id="6" temperature="800">
+    <density value="10.29769" units="g/cm3" />
+    <nuclide name="U235"  ao="5.5815e-04" />
+    <nuclide name="U238"  ao="2.2408e-02" />
+    <nuclide name="O16"   ao="4.5829e-02" />
+    <nuclide name="O17"   ao="1.1164e-04" />
+  </material>
+
+  <material id="7" temperature="900">
+    <density value="10.29769" units="g/cm3" />
+    <nuclide name="U235"  ao="5.5815e-04" />
+    <nuclide name="U238"  ao="2.2408e-02" />
+    <nuclide name="O16"   ao="4.5829e-02" />
+    <nuclide name="O17"   ao="1.1164e-04" />
+  </material>
+
+  <material id="8" temperature="1000">
+    <density value="10.29769" units="g/cm3" />
+    <nuclide name="U235"  ao="5.5815e-04" />
+    <nuclide name="U238"  ao="2.2408e-02" />
+    <nuclide name="O16"   ao="4.5829e-02" />
+    <nuclide name="O17"   ao="1.1164e-04" />
+  </material>
+
+  <material id="9" temperature="1200">
+    <density value="10.29769" units="g/cm3" />
+    <nuclide name="U235"  ao="5.5815e-04" />
+    <nuclide name="U238"  ao="2.2408e-02" />
+    <nuclide name="O16"   ao="4.5829e-02" />
+    <nuclide name="O17"   ao="1.1164e-04" />
+  </material>
+
+  <material id="10" temperature="1500">
+    <density value="10.29769" units="g/cm3" />
+    <nuclide name="U235"  ao="5.5815e-04" />
+    <nuclide name="U238"  ao="2.2408e-02" />
+    <nuclide name="O16"   ao="4.5829e-02" />
+    <nuclide name="O17"   ao="1.1164e-04" />
+  </material>
+
+  <material id="11" temperature="1800">
+    <density value="10.29769" units="g/cm3" />
+    <nuclide name="U235"  ao="5.5815e-04" />
+    <nuclide name="U238"  ao="2.2408e-02" />
+    <nuclide name="O16"   ao="4.5829e-02" />
+    <nuclide name="O17"   ao="1.1164e-04" />
+  </material>
+
+  <material id="12" temperature="400">
+    <density value="0.740582" units="g/cm3" />
+    <nuclide name="H1"   ao="4.9457e-02" />
+    <nuclide name="H2"   ao="7.4196e-06" />
+    <nuclide name="O16"  ao="2.4672e-02" />
+    <nuclide name="O17"  ao="6.0099e-05" />
+  </material>
+
+  <material id="13" temperature="500">
+    <density value="0.740582" units="g/cm3" />
+    <nuclide name="H1"   ao="4.9457e-02" />
+    <nuclide name="H2"   ao="7.4196e-06" />
+    <nuclide name="O16"  ao="2.4672e-02" />
+    <nuclide name="O17"  ao="6.0099e-05" />
+  </material>
+
+  <material id="14">
+    <density units="g/cm3" value="2.5" />
+    <nuclide ao="0.7928" name="B10" />
+    <nuclide ao="3.2072" name="B11" />
+    <nuclide ao="1.0" name="C0" />
+  </material>
+
+</materials>

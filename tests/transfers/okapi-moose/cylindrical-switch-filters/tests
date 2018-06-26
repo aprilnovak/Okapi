@@ -1,0 +1,9 @@
+[Tests]
+  [./pin_coupling]
+    type = CSVDiff
+    input = master.i
+    csvdiff = master_out_bison0.csv
+    rel_err = 5e-2
+    required_applications = 'BuffaloApp'
+  [../]
+[]

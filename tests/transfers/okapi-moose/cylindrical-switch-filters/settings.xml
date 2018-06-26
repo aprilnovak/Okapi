@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<settings>
+
+  <!-- Define how many particles to run and for how many batches -->
+  <run_mode>eigenvalue</run_mode>
+  <seed>123456</seed>
+  <batches>20</batches>
+  <inactive>10</inactive>
+  <particles>1000</particles>
+
+  <!-- set the temperature method -->
+  <temperature_method>nearest</temperature_method>
+  <temperature_range> 200.0 1000.0 </temperature_range>
+
+  <!-- The starting source is a uniform distribution over the entire pin
+       cell. Note that since this is effectively a 2D model, the z coordinates
+       are inconsequential -->
+  <source>
+    <space type="box">
+      <parameters>
+        -60 -60 -0.5
+        60 60  0.5
+      </parameters>
+    </space>
+  </source>
+
+  <!-- To assess convergence of the source distribution, we need to define the
+       bounds for a mesh over which the Shannon entropy should be
+       calculated. The extent in the z direction is made arbitrarily large. -->
+  <entropy>
+    <lower_left>-60 -60 -0.5</lower_left>
+    <upper_right>60 60 0.5</upper_right>
+    <dimension>10 10 1</dimension>
+  </entropy>
+
+</settings>
