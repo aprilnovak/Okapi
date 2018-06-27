@@ -3,4 +3,4 @@
 	url = ../../idaholab/moose
 [submodule "openmc"]
 	path = openmc
-	url = ../../aprilnovak/openmc
+	url = ../../mit-crpg/openmc
