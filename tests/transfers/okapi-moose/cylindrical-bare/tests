@@ -8,7 +8,9 @@
   [../]
   [./coeffs_dont_match]
     type = RunException
-    expect_err = "Coefficient results from openmc don't match the coefficient vector size from MOOSE"
+    expect_err = "The coefficient vector size from openmc doesn't match the coefficient "
+                 "vector size from MOOSE. Check that the expansion orders are consistent "
+                 "between openmc and MOOSE input files."
     input = master.i
     required_applications = 'BuffaloApp'
     cli_args = "bison0:Functions/kappa_fission_mutable_series/orders='0 2'"
