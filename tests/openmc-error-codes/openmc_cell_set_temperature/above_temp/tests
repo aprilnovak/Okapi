@@ -5,6 +5,6 @@
     input = master.i
     should_crash = false
     required_applications = 'BuffaloApp'
-    expect_err = "OpenMC Error: 'Nuclear data has not been loaded beyond upper bound of T=1330.04 K.' Setting temperature to nearest available point!"
+    expect_err = "OpenMC Error: '.*upper bound.*' Setting temperature to nearest available point!"
   [../]
 []

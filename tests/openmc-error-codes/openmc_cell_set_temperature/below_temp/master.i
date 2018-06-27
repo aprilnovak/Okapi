@@ -55,7 +55,7 @@
     openmc_cell = 1
     openmc_tally = 1
     geometry_type = 'cylindrical'
-    execute_on = timestep_end
+    execute_on = timestep_begin
   [../]
 []
 

@@ -182,7 +182,8 @@ MultiAppMooseOkapiTransfer::execute()
           if (num_filter_indices != 2)
             mooseError(
                 "We expect there to be exactly two filters, one a cell filter and the other an "
-                "expansion filter.");
+                "expansion filter. Check the tallies XML file to verify the existence of both for "
+                "the requested tally");
           std::map<int32_t, int32_t> index_to_id;
           for (decltype(n_cells) i = 0; i < n_cells; ++i)
           {

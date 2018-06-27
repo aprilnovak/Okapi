@@ -5,7 +5,9 @@
   [./no_fes_defined]
     type = 'RunException'
     input = master.i
-    expect_err = "Cannot set expansion coefficients for cell because no FE tallies are defined in OpenMC! Check that an FET has been defined in the tallies.xml file."
+    expect_err = "We expect there to be exactly two filters, one a cell filter and the other an "
+                "expansion filter. Check the tallies XML file to verify the existence of both for "
+                "the requested tally"
     required_applications = 'BuffaloApp'
   [../]
 []
