@@ -40,7 +40,7 @@
 
 [Variables]
   [./temp]
-    initial_condition = 300
+    initial_condition = 293
   [../]
 []
 
@@ -88,7 +88,7 @@
     type = DirichletBC
     variable = temp
     boundary = 'left right'
-    value = 300.0
+    value = 293.0
   [../]
 []
 

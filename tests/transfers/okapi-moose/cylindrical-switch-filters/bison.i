@@ -38,7 +38,7 @@
 
 [Variables]
   [./temp]
-    initial_condition = 300
+    initial_condition = 293
   [../]
 []
 
@@ -86,7 +86,7 @@
     type = DirichletBC
     variable = temp
     boundary = '1'
-    value = 300.0
+    value = 293.0
   [../]
   [./top_bottom]
     type = NeumannBC

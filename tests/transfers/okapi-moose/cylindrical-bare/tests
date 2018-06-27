@@ -1,9 +1,9 @@
 [Tests]
-  [./pin_coupling]
+  [./bare_reactor_coupling]
     type = CSVDiff
     input = master.i
     csvdiff = master_out_bison0.csv
-    rel_err = 5e-2
+    rel_err = 1e-3
     required_applications = 'BuffaloApp'
   [../]
   [./coeffs_dont_match]
@@ -14,6 +14,6 @@
     input = master.i
     required_applications = 'BuffaloApp'
     cli_args = "bison0:Functions/kappa_fission_mutable_series/orders='0 2'"
-    prereq = 'pin_coupling'
+    prereq = 'bare_reactor_coupling'
   [../]
 []

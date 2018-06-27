@@ -104,12 +104,4 @@
     <nuclide name="O16"  ao="2.4672e-02" />
     <nuclide name="O17"  ao="6.0099e-05" />
   </material>
-
-  <material id="14">
-    <density units="g/cm3" value="2.5" />
-    <nuclide ao="0.7928" name="B10" />
-    <nuclide ao="3.2072" name="B11" />
-    <nuclide ao="1.0" name="C0" />
-  </material>
-
 </materials>
