@@ -18,6 +18,6 @@ void
 OpenMCExecutioner::init()
 {
   Transient::init();
-  char * argv[] = {nullptr, (char *)"-s", (char *)"24", nullptr};
-  openmc_init(3, argv, &_communicator.get());
+  char * argv[] = {nullptr, nullptr};
+  openmc_init(1, argv, &_communicator.get());
 }
