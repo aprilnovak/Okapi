@@ -84,9 +84,9 @@ MultiAppMooseOkapiTransfer::execute()
   // put in the constructor because we cannot guarantee that the openmc_init
   // subroutine will be called before this object's constructor.
   int err_index = openmc_get_cell_index(_cell, &_cell_index);
-  // ErrorHandling::openmc_get_cell_index(err_index, "MultiAppMooseOkapiTransfer");
+  ErrorHandling::openmc_get_cell_index(err_index, "MultiAppMooseOkapiTransfer");
   err_index = openmc_get_tally_index(_tally, &_tally_index);
-  // ErrorHandling::openmc_get_tally_index(err_index, "MultiAppMooseOkapiTransfer");
+  ErrorHandling::openmc_get_tally_index(err_index, "MultiAppMooseOkapiTransfer");
 
   switch (_direction)
   {
@@ -140,9 +140,9 @@ MultiAppMooseOkapiTransfer::execute()
               printResults(_fuel_temp_coeffs[i]);
           }
 
-          // We pass a NULL pointer because we're not passing the optional instance
+          // We pass a nullptr because we're not passing the optional instance
           // parameter.
-          int err_temp = openmc_cell_set_temperature(_cell_index, temp, NULL);
+          int err_temp = openmc_cell_set_temperature(_cell_index, temp, nullptr);
           ErrorHandling::openmc_cell_set_temperature(err_temp);
         }
       }
@@ -179,16 +179,22 @@ MultiAppMooseOkapiTransfer::execute()
           int shape[3];
 
           int err_get = openmc_tally_results(_tally_index, &tally_results, shape);
+          ErrorHandling::openmc_tally_results(err_get, "MultiAppMooseOkapiTransfer");
+
           std::vector<double> tally_results_mean(shape[1] * shape[2]);
           if (tally_results_mean.size() != coefficients.size())
-            mooseError("Coefficient results from openmc don't match the coefficient vector size "
-                       "from MOOSE");
+            mooseError(
+                "The coefficient vector size from openmc doesn't match the coefficient vector size "
+                "from MOOSE. Check that the expansion orders are consistent between openmc and "
+                "MOOSE input files.");
           for (auto i = beginIndex(tally_results_mean); i < tally_results_mean.size(); ++i)
             tally_results_mean[i] = tally_results[1 + i * 3];
 
           int32_t * filter_indices = nullptr;
           int32_t num_filter_indices;
           err_get = openmc_tally_get_filters(_tally_index, &filter_indices, &num_filter_indices);
+          ErrorHandling::openmc_tally_get_filters(err_get, "MultiAppMooseOkapiTransfer");
+
           if (num_filter_indices != 2)
             mooseError("We expect there to be two filters, one a cell filter and the other an "
                        "expansion filter.");
@@ -197,6 +203,7 @@ MultiAppMooseOkapiTransfer::execute()
           {
             int32_t id;
             err_get = openmc_cell_get_id(i + 1, &id);
+            ErrorHandling::openmc_cell_get_id(err_get, "MultiAppMooseOkapiTransfer");
             index_to_id[i + 1] = id;
           }
 
@@ -214,11 +221,14 @@ MultiAppMooseOkapiTransfer::execute()
           Real multiplier = _geometry_type == "cylindrical" ? 2. : 1.;
 
           err_get = openmc_filter_get_type(filter_indices[0], type);
+          ErrorHandling::openmc_filter_get_type(err_get, "MultiAppMooseOkapiTransfer");
+
           std::string cell_filter_name = "cell";
           if (!cell_filter_name.compare(type))
           {
             err_get =
                 openmc_cell_filter_get_bins(filter_indices[0], &cell_indices, &num_cells_in_filter);
+            ErrorHandling::openmc_cell_filter_get_bins(err_get, "MultiAppMooseOkapiTransfer");
 
             for (decltype(num_cells_in_filter) i = 0; i < num_cells_in_filter; ++i)
             {
@@ -230,9 +240,11 @@ MultiAppMooseOkapiTransfer::execute()
               }
             }
             if (!cell_id_found)
-              mooseError("Requested cell_id not in the passed tally.");
+              mooseError("Requested cell_id not in the passed tally. Check that the cell filter in "
+                         "the tallies XML file contains the ID you're requesting");
 
             err_get = openmc_filter_get_type(filter_indices[1], type);
+            ErrorHandling::openmc_filter_get_type(err_get, "MultiAppMooseOkapiTransfer");
             getOrderAndCheckExpansionType(type, filter_indices[1], order);
 
             // The point at which the results we care about begin
@@ -253,6 +265,7 @@ MultiAppMooseOkapiTransfer::execute()
           {
             err_get =
                 openmc_cell_filter_get_bins(filter_indices[1], &cell_indices, &num_cells_in_filter);
+            ErrorHandling::openmc_cell_filter_get_bins(err_get, "MultiAppMooseOkapiTransfer");
 
             for (decltype(num_cells_in_filter) i = 0; i < num_cells_in_filter; ++i)
             {
@@ -316,5 +329,7 @@ MultiAppMooseOkapiTransfer::getOrderAndCheckExpansionType(const char * type,
     err_get = openmc_zernike_filter_get_order(index, &order);
   else
     mooseError("Expected an expansion filter as the second filter.");
+
+  ErrorHandling::openmc_filter_get_order(err_get, "MultiAppMooseOkapiTransfer");
   return 1;
 }

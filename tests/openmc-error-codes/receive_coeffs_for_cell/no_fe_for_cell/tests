@@ -3,7 +3,8 @@
   [./no_FET_for_cell]
     type = 'RunException'
     input = master.i
-    expect_err = "Invalid cell ID specified for storing expansion coefficients for FE tally! Check that there is an FET defined for the requested cell ID."
+    expect_err = "Requested cell_id not in the passed tally. Check that the cell filter in "
+                 "the tallies XML file contains the ID you're requesting"
     required_applications = 'BuffaloApp'
   [../]
 []
