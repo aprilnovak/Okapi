@@ -19,6 +19,7 @@ public:
 
 protected:
   bool getOrderAndCheckExpansionType(const char * type, const int32_t & index, int32_t & order);
+  void runChecks();
 
 protected:
   int32_t _cell;
@@ -33,7 +34,11 @@ protected:
   std::vector<std::vector<Real>> _fuel_temp_coeffs;
   std::vector<std::vector<Real>> _fission_coeffs;
 
-  const MooseEnum _geometry_type;
+  const Real _geometry_multiplier;
+  bool _checks_done;
+  int32_t _num_cells_in_filter;
+  int32_t _stride_integer;
+  int32_t _cell_filter_index;
 };
 
 #endif /* MULTIAPPMOOSEOKAPITRANSFER_H */

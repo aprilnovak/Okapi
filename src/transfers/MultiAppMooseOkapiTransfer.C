@@ -45,7 +45,9 @@ MultiAppMooseOkapiTransfer::MultiAppMooseOkapiTransfer(const InputParameters & p
     _tally(parameters.get<int32_t>("openmc_tally")),
     _dbg(parameters.get<bool>("dbg")),
     _store_results(parameters.get<bool>("store_results")),
-    _geometry_type(getParam<MooseEnum>("geometry_type"))
+    _geometry_multiplier(getParam<MooseEnum>("geometry_type") == "cylindrical" ? 2. : 1.),
+    _checks_done(false),
+    _stride_integer(0)
 {
 }
 
@@ -169,92 +171,21 @@ MultiAppMooseOkapiTransfer::execute()
       {
         if (_multi_app->hasLocalApp(I))
         {
+          if (!_checks_done)
+            runChecks();
+
           // Get a reference to the object in each MultiApp
           MutableCoefficientsInterface & to_object =
               (this->*getSubAppObject)(_multi_app->appProblemBase(I), _multi_app_object_name, 0);
-
-          int32_t * filter_indices = nullptr;
-          int32_t num_filter_indices;
-          int err_get =
-              openmc_tally_get_filters(_tally_index, &filter_indices, &num_filter_indices);
-          ErrorHandling::openmc_tally_get_filters(err_get, "MultiAppMooseOkapiTransfer");
-
-          if (num_filter_indices != 2)
-            mooseError(
-                "We expect there to be exactly two filters, one a cell filter and the other an "
-                "expansion filter. Check the tallies XML file to verify the existence of both for "
-                "the requested tally");
-          std::map<int32_t, int32_t> index_to_id;
-          for (decltype(n_cells) i = 0; i < n_cells; ++i)
-          {
-            int32_t id;
-            err_get = openmc_cell_get_id(i + 1, &id);
-            ErrorHandling::openmc_cell_get_id(err_get, "MultiAppMooseOkapiTransfer");
-            index_to_id[i + 1] = id;
-          }
-
-          // Important variables
-          int32_t order;
-          char type[20];
-          int32_t * cell_indices = nullptr;
-          int32_t num_cells_in_filter;
-          bool cell_id_found = false;
-          int32_t stride_integer = 0;
-          int32_t cell_filter_index;
-
-          std::string cell_filter_name = "cell";
-          bool cell_filter_found = false;
-          for (int32_t i = 0; i <= 1; ++i)
-          {
-            err_get = openmc_filter_get_type(filter_indices[i], type);
-            ErrorHandling::openmc_filter_get_type(err_get, "MultiAppMooseOkapiTransfer");
-            if (cell_filter_name.compare(type))
-              continue;
-            else
-            {
-              cell_filter_found = true;
-              cell_filter_index = i;
-              break;
-            }
-          }
-          if (!cell_filter_found)
-            mooseError("No cell filter specified. Check the tallies XML input file.");
-          else
-          {
-            err_get = openmc_cell_filter_get_bins(
-                filter_indices[cell_filter_index], &cell_indices, &num_cells_in_filter);
-            ErrorHandling::openmc_cell_filter_get_bins(err_get, "MultiAppMooseOkapiTransfer");
-
-            for (decltype(num_cells_in_filter) i = 0; i < num_cells_in_filter; ++i)
-            {
-              if (cell_indices[i] == _cell_index)
-              {
-                cell_id_found = true;
-                stride_integer = i;
-                break;
-              }
-            }
-            if (!cell_id_found)
-              mooseError("Requested cell_id not in the passed tally. Check that the cell filter in "
-                         "the tallies XML file contains the ID you're requesting");
-          }
-          int32_t expansion_filter_index = 1 - cell_filter_index;
-          err_get = openmc_filter_get_type(filter_indices[expansion_filter_index], type);
-          ErrorHandling::openmc_filter_get_type(err_get, "MultiAppMooseOkapiTransfer");
-          getOrderAndCheckExpansionType(type, filter_indices[expansion_filter_index], order);
-
-          Real multiplier = _geometry_type == "cylindrical" ? 2. : 1.;
-
-          // Determine size of array to allocate based on size of MOOSE variables
-          std::vector<Real> & coefficients = to_object.getCoefficients();
+          std::vector<Real> & moose_coefficients = to_object.getCoefficients();
           double * tally_results = nullptr;
           int shape[3];
 
-          err_get = openmc_tally_results(_tally_index, &tally_results, shape);
+          int err_get = openmc_tally_results(_tally_index, &tally_results, shape);
           ErrorHandling::openmc_tally_results(err_get, "MultiAppMooseOkapiTransfer");
 
           std::vector<double> tally_results_mean(shape[1] * shape[2]);
-          if (tally_results_mean.size() != coefficients.size())
+          if (tally_results_mean.size() != moose_coefficients.size())
             mooseError(
                 "The coefficient vector size from openmc doesn't match the coefficient vector size "
                 "from MOOSE. Check that the expansion orders are consistent between openmc and "
@@ -262,37 +193,38 @@ MultiAppMooseOkapiTransfer::execute()
           for (auto i = beginIndex(tally_results_mean); i < tally_results_mean.size(); ++i)
             tally_results_mean[i] = tally_results[1 + i * 3];
 
-          if (cell_filter_index == 0)
+          if (_cell_filter_index == 0)
           {
             // The point at which the results we care about begin
-            auto starting_point = coefficients.size() * stride_integer;
+            auto starting_point = moose_coefficients.size() * _stride_integer;
             std::vector<double> temp_results(&tally_results_mean[starting_point],
                                              &tally_results_mean[starting_point] +
-                                                 coefficients.size());
+                                                 moose_coefficients.size());
 
             std::transform(temp_results.begin(),
                            temp_results.end(),
                            temp_results.begin(),
                            std::bind(std::multiplies<Real>(),
                                      std::placeholders::_1,
-                                     multiplier / n_realizations));
-            coefficients = std::move(temp_results);
+                                     _geometry_multiplier / n_realizations));
+            moose_coefficients = std::move(temp_results);
           }
           else
           {
             std::vector<double> temp_results;
-            for (auto i = beginIndex(coefficients); i < coefficients.size(); ++i)
-              temp_results.push_back(tally_results_mean[stride_integer + i * num_cells_in_filter] *
-                                     multiplier / n_realizations);
-            coefficients = std::move(temp_results);
+            for (auto i = beginIndex(moose_coefficients); i < moose_coefficients.size(); ++i)
+              temp_results.push_back(
+                  tally_results_mean[_stride_integer + i * _num_cells_in_filter] *
+                  _geometry_multiplier / n_realizations);
+            moose_coefficients = std::move(temp_results);
           }
 
           if (_dbg)
           {
-            _console << "Transferring " << coefficients.size()
+            _console << "Transferring " << moose_coefficients.size()
                      << " coefficients from OpenMC to MOOSE for cell " << _cell << std::endl;
-            for (auto i = beginIndex(coefficients); i < coefficients.size(); ++i)
-              _console << coefficients[i] / multiplier << " ";
+            for (auto i = beginIndex(moose_coefficients); i < moose_coefficients.size(); ++i)
+              _console << moose_coefficients[i] / _geometry_multiplier << " ";
             _console << std::endl;
           }
         }
@@ -331,4 +263,75 @@ MultiAppMooseOkapiTransfer::getOrderAndCheckExpansionType(const char * type,
 
   ErrorHandling::openmc_filter_get_order(err_get, "MultiAppMooseOkapiTransfer");
   return 1;
+}
+
+void
+MultiAppMooseOkapiTransfer::runChecks()
+{
+  int32_t * filter_indices = nullptr;
+  int32_t num_filter_indices;
+  int err_get = openmc_tally_get_filters(_tally_index, &filter_indices, &num_filter_indices);
+  ErrorHandling::openmc_tally_get_filters(err_get, "MultiAppMooseOkapiTransfer");
+
+  if (num_filter_indices != 2)
+    mooseError("We expect there to be exactly two filters, one a cell filter and the other an "
+               "expansion filter. Check the tallies XML file to verify the existence of both for "
+               "the requested tally");
+  std::map<int32_t, int32_t> index_to_id;
+  for (decltype(n_cells) i = 0; i < n_cells; ++i)
+  {
+    int32_t id;
+    err_get = openmc_cell_get_id(i + 1, &id);
+    ErrorHandling::openmc_cell_get_id(err_get, "MultiAppMooseOkapiTransfer");
+    index_to_id[i + 1] = id;
+  }
+
+  // Important variables
+  int32_t order;
+  char type[20];
+  int32_t * cell_indices = nullptr;
+  bool cell_id_found = false;
+
+  std::string cell_filter_name = "cell";
+  bool cell_filter_found = false;
+  for (int32_t i = 0; i <= 1; ++i)
+  {
+    err_get = openmc_filter_get_type(filter_indices[i], type);
+    ErrorHandling::openmc_filter_get_type(err_get, "MultiAppMooseOkapiTransfer");
+    if (cell_filter_name.compare(type))
+      continue;
+    else
+    {
+      cell_filter_found = true;
+      _cell_filter_index = i;
+      break;
+    }
+  }
+  if (!cell_filter_found)
+    mooseError("No cell filter specified. Check the tallies XML input file.");
+  else
+  {
+    err_get = openmc_cell_filter_get_bins(
+        filter_indices[_cell_filter_index], &cell_indices, &_num_cells_in_filter);
+    ErrorHandling::openmc_cell_filter_get_bins(err_get, "MultiAppMooseOkapiTransfer");
+
+    for (decltype(_num_cells_in_filter) i = 0; i < _num_cells_in_filter; ++i)
+    {
+      if (cell_indices[i] == _cell_index)
+      {
+        cell_id_found = true;
+        _stride_integer = i;
+        break;
+      }
+    }
+    if (!cell_id_found)
+      mooseError("Requested cell_id not in the passed tally. Check that the cell filter in "
+                 "the tallies XML file contains the ID you're requesting");
+  }
+  int32_t expansion_filter_index = 1 - _cell_filter_index;
+  err_get = openmc_filter_get_type(filter_indices[expansion_filter_index], type);
+  ErrorHandling::openmc_filter_get_type(err_get, "MultiAppMooseOkapiTransfer");
+  getOrderAndCheckExpansionType(type, filter_indices[expansion_filter_index], order);
+
+  _checks_done = true;
 }
