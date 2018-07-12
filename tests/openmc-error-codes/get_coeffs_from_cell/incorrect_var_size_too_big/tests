@@ -4,7 +4,9 @@
   [./size_mismatch]
     type = 'RunException'
     input = master.i
-    expect_err = "Number of expansion coefficients to receive from cell does not equal its allocated size! Check that the order of the FE matches the order of the scalar aux variables in the MOOSE input files."
+    expect_err = "The coefficient vector size from openmc doesn't match the coefficient vector size "
+                "from MOOSE. Check that the expansion orders are consistent between openmc and "
+                "MOOSE input files."
     required_applications = 'BuffaloApp'
   [../]
 []

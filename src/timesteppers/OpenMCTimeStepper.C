@@ -1,17 +1,17 @@
 #include "OpenMCTimeStepper.h"
-#include "OpenMCInterface.h"
+#include "openmc.h"
 
-template<>
-InputParameters validParams<OpenMCTimeStepper>()
+template <>
+InputParameters
+validParams<OpenMCTimeStepper>()
 {
   InputParameters params = validParams<TimeStepper>();
   params.addParam<Real>("dt", 1.0, "Size of the time step");
   return params;
 }
 
-OpenMCTimeStepper::OpenMCTimeStepper(const InputParameters & parameters) :
-    TimeStepper(parameters),
-    _dt(getParam<Real>("dt"))
+OpenMCTimeStepper::OpenMCTimeStepper(const InputParameters & parameters)
+  : TimeStepper(parameters), _dt(getParam<Real>("dt"))
 {
 }
 
@@ -36,17 +36,17 @@ OpenMCTimeStepper::step()
 {
   // reset tallies to zero, "clear" any OpenMC instances of std::vector
   // implementation, etc.
-  OpenMC::openmc_reset();
+  openmc_reset();
 
   // perform all the logic for a Monte Carlo solve
-  OpenMC::openmc_run();
+  openmc_run();
 }
 
 void
 OpenMCTimeStepper::postExecute()
 {
   // free dynamically allocated memory, write output files, etc.
-  OpenMC::openmc_finalize();
+  openmc_finalize();
 }
 
 /* Indication of whether the Monte Carlo solve converged - assume this will

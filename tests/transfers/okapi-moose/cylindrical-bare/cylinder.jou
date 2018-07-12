@@ -1,0 +1,9 @@
+reset
+set node constraint on
+create Cylinder height 1 radius 60
+volume 1 size 3
+mesh volume 1
+sideset 1 surface 1
+sideset 2 surface 2
+sideset 3 surface 3
+export mesh 'cylinder.e' dimension 3 overwrite

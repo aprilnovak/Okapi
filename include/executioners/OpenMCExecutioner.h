@@ -4,14 +4,14 @@
 #include "Transient.h"
 class OpenMCExecutioner;
 
-template<>
+template <>
 InputParameters validParams<OpenMCExecutioner>();
 
 class OpenMCExecutioner : public Transient
 {
-  public:
-    OpenMCExecutioner(const InputParameters & parameters);
+public:
+  OpenMCExecutioner(const InputParameters & parameters);
 
-    virtual void init();
+  virtual void init();
 };
-#endif //OPENMCEXECUTIONER_H
+#endif // OPENMCEXECUTIONER_H

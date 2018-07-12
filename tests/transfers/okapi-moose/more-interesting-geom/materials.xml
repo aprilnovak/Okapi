@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='utf-8'?>
+<materials>
+  <material depletable="true" id="1">
+    <density units="g/cm3" value="10.0" />
+    <nuclide ao="0.000407123907791519" name="U234" />
+    <nuclide ao="0.04554905971706459" name="U235" />
+    <nuclide ao="0.9538351798037482" name="U238" />
+    <nuclide ao="0.00020863657139569977" name="U236" />
+    <nuclide ao="2.0" name="O16" />
+  </material>
+  <material id="2">
+    <density units="g/cm3" value="2.5" />
+    <nuclide ao="0.7928" name="B10" />
+    <nuclide ao="3.2072" name="B11" />
+    <nuclide ao="1.0" name="C0" />
+  </material>
+</materials>

@@ -43,6 +43,8 @@
     multi_app = bison
     multi_app_object_name = kappa_fission_mutable_series
     openmc_cell = 1
+    openmc_tally = 1
+    geometry_type = 'cylindrical'
     execute_on = timestep_end
   [../]
   [./from_bison]
@@ -51,6 +53,8 @@
     multi_app = bison
     multi_app_object_name = temperature_mutable_series_uo
     openmc_cell = 1
+    openmc_tally = 1
+    geometry_type = 'cylindrical'
     execute_on = timestep_begin
   [../]
 []

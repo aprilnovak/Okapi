@@ -3,8 +3,8 @@
   [./below_temp]
     type = 'RunException'
     input = master.i
-    expect_err = "Cross sections not available for specified temperature, setting temperature to lowest available data point!"
     should_crash = false
     required_applications = 'BuffaloApp'
+    expect_err = "OpenMC Error: '.*lower bound.*' Setting temperature to nearest available point!"
   [../]
 []

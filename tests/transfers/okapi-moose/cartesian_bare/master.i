@@ -42,19 +42,24 @@
     direction = to_multiapp
     multi_app = bison
     multi_app_object_name = kappa_fission_mutable_series
-    openmc_cell = 1
+    openmc_cell = 4
     execute_on = timestep_end
+    openmc_tally = 1
+    geometry_type = 'cartesian'
   [../]
   [./from_bison]
     type = MultiAppMooseOkapiTransfer
     direction = from_multiapp
     multi_app = bison
     multi_app_object_name = temperature_mutable_series_uo
-    openmc_cell = 1
+    openmc_cell = 4
     execute_on = timestep_end
+    openmc_tally = 1
+    geometry_type = 'cartesian'
   [../]
 []
 
 [Outputs]
   exodus = true
+  csv = true
 []

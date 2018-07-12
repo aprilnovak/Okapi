@@ -1,31 +1,19 @@
 #include <string>
 
-// all error codes from OpenMC that are to be handled
-extern int e_unassigned;
-extern int e_out_of_bounds;
-extern int e_cell_not_allocated;
-extern int e_cell_invalid_id;
-extern int e_cell_not_found;
-extern int e_nuclide_not_allocated;
-extern int e_nuclide_not_loaded;
-extern int e_nuclide_not_in_library;
-extern int e_material_not_allocated;
-extern int e_material_invalid_id;
-extern int e_tally_not_allocated;
-extern int e_tally_invalid_id;
-extern int e_invalid_size;
-extern int e_cell_no_material;
+namespace ErrorHandling
+{
 
-// all warning codes from OpenMC that are to be handled
-extern int w_below_min_bound;
-extern int w_above_max_bound;
-
-namespace ErrorHandling{
-
-  void receive_coeffs_for_cell(int);
-  void get_coeffs_from_cell(int);
-  void openmc_cell_set_temperature(int);
-  void openmc_get_cell(int, const std::string &);
-  void openmc_get_material(int, const std::string &);
-  void openmc_material_set_density(int);
+void get_coeffs_from_cell(int);
+void openmc_cell_set_temperature(int);
+void openmc_get_cell_index(int, const std::string &);
+void openmc_get_tally_index(int, const std::string &);
+void openmc_get_material_index(int, const std::string &);
+void openmc_material_set_density(int);
+void openmc_get_keff(int);
+void openmc_tally_results(int, const std::string &);
+void openmc_tally_get_filters(int, const std::string &);
+void openmc_cell_get_id(int, const std::string &);
+void openmc_filter_get_type(int, const std::string &);
+void openmc_cell_filter_get_bins(int, const std::string &);
+void openmc_filter_get_order(int, const std::string &);
 }

@@ -1,0 +1,9 @@
+[Tests]
+  [./bare_reactor_coupling]
+    type = CSVDiff
+    input = master.i
+    csvdiff = master_out_bison0.csv
+    rel_err = 1e-3
+    required_applications = 'BuffaloApp'
+  [../]
+[]

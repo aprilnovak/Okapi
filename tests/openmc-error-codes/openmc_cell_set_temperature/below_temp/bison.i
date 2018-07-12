@@ -2,7 +2,6 @@
 
 [GlobalParams]
   volume_pp = 'volume'
-  dbg = false
 []
 
 [Mesh]
@@ -89,7 +88,6 @@
   [./temp]
     type = DirichletBC
     variable = temp
-    function = temp_BC_reconstruction
     boundary = 'left right back'
     value = 5.0
   [../]
@@ -105,7 +103,6 @@
 [Postprocessors]
   [./volume]
     type = VolumePostprocessor
-    block_id = '1'
     execute_on = timestep_begin
   [../]
 []

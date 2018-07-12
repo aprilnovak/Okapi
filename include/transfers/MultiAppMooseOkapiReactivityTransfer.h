@@ -6,11 +6,10 @@
 
 class MultiAppMooseOkapiReactivityTransfer;
 
-template<>
+template <>
 InputParameters validParams<MultiAppMooseOkapiReactivityTransfer>();
 
-class MultiAppMooseOkapiReactivityTransfer :
-  public MultiAppTransfer
+class MultiAppMooseOkapiReactivityTransfer : public MultiAppTransfer
 {
 public:
   MultiAppMooseOkapiReactivityTransfer(const InputParameters & parameters);
