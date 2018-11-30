@@ -13,6 +13,8 @@
 #include "libmesh/meshfree_interpolation.h"
 #include "libmesh/system.h"
 
+#include "xtensor/xarray.hpp"
+
 template <>
 InputParameters
 validParams<MultiAppMooseOkapiTransfer>()
@@ -92,141 +94,50 @@ MultiAppMooseOkapiTransfer::execute()
 
   switch (_direction)
   {
-    // MOOSE -> Okapi. This transfer is used to pass coefficients for fuel
-    // temperature to Okapi.
+    // MOOSE -> Okap
     case FROM_MULTIAPP:
     {
       for (unsigned int I = 0; I < num_apps; ++I)
       {
         if (_multi_app->hasLocalApp(I) && _multi_app->isRootProcessor())
         {
-          // Get a reference to the first thread object in the first MultiApp
-          MutableCoefficientsInterface & from_object =
-              (this->*getSubAppObject)(_multi_app->appProblemBase(I), _multi_app_object_name, 0);
-
-          std::vector<Real> & coefficients = from_object.getCoefficients();
-
-          // Initialize the moose_coeffs array and then populate by looping over
-          // the source variables.
-          size_t num_coeffs_from_moose = coefficients.size();
-          double * moose_coeffs = &coefficients[0];
-
-          if (_dbg)
-          {
-            _console << "Transferring " << num_coeffs_from_moose
-                     << " coefficients from MOOSE to OpenMC for cell " << _cell << std::endl;
-
-            for (decltype(num_coeffs_from_moose) i = 0; i < num_coeffs_from_moose; ++i)
-              _console << moose_coeffs[i] << " ";
-            _console << std::endl;
-          }
-
-          // Change a temperature in OpenMC. For now, only use a single coefficient,
-          // since there's no continuous material tracking yet.
-          Real temp = moose_coeffs[0];
-          if (_dbg)
-            _console << "Setting OpenMC cell " << _cell << " temperature to " << temp << std::endl;
-
           if (_store_results)
           {
-            std::vector<Real> this_iteration;
-            for (decltype(num_coeffs_from_moose) i = 0; i < num_coeffs_from_moose; ++i)
-              this_iteration.push_back(moose_coeffs[i]);
-
-            _fuel_temp_coeffs.push_back(this_iteration);
-
-            _console << "Fuel temperature coefficients up to iteration " << _fuel_temp_coeffs.size()
-                     << std::endl;
-
-            for (unsigned int i = 0; i < _fuel_temp_coeffs.size(); ++i)
-              printResults(_fuel_temp_coeffs[i]);
+            for (const auto& c : cells_) 
+            {
+              auto shell_id = cell_to_shell.at(c.material_index_);
+              auto t = _shell_temperatures.at(shell_id)
+              if (_dbg)
+                _console << "Setting OpenMC cell " << c << " temperature to " << t << std::endl;
+              int err_temp = c.set_temperature(t);
+              ErrorHandling::openmc_cell_set_temperature(err_temp);
+            }
           }
-
-          // We pass a nullptr because we're not passing the optional instance
-          // parameter.
-          int err_temp = openmc_cell_set_temperature(_cell_index, temp, nullptr);
-          ErrorHandling::openmc_cell_set_temperature(err_temp);
         }
       }
       break;
     }
 
-    // Okapi -> MOOSE. This transfer is used to transfer coefficients for the kappa
-    // fission distribution from OpenMC to MOOSE.
+    // Okapi -> MOOSE
     case TO_MULTIAPP:
     {
-      // get the value for k and print it
-      if (_store_results)
-      {
-        // get k_eff value from OpenMC, then store results in _k_eff vector.
-        double keff[2];
-        int err_keff = openmc_get_keff(keff);
-        ErrorHandling::openmc_get_keff(err_keff);
-        _k_eff.push_back(keff[0]);
-        _console << "k_eff, up to iteration " << _k_eff.size() << ":" << std::endl;
-        printResults(_k_eff);
-      }
-
       for (unsigned int I = 0; I < num_apps; ++I)
       {
         if (_multi_app->hasLocalApp(I))
         {
-          if (!_checks_done)
-            runChecks();
 
-          // Get a reference to the object in each MultiApp
-          MutableCoefficientsInterface & to_object =
-              (this->*getSubAppObject)(_multi_app->appProblemBase(I), _multi_app_object_name, 0);
-          std::vector<Real> & moose_coefficients = to_object.getCoefficients();
-          double * tally_results = nullptr;
-          int shape[3];
+          // Create array to store volumetric heat deposition in each material
+          xt::xtensor<double, 1> heat = xt::empty<double>({n_materials_});
 
-          int err_get = openmc_tally_results(_tally_index, &tally_results, shape);
-          ErrorHandling::openmc_tally_results(err_get, "MultiAppMooseOkapiTransfer");
+          // Get heat source normalized by user-specified power
+          heat = openmc_driver_->heat_source(power_);
 
-          std::vector<double> tally_results_mean(shape[1] * shape[2]);
-          if (tally_results_mean.size() != moose_coefficients.size())
-            mooseError(
-                "The coefficient vector size from openmc doesn't match the coefficient vector size "
-                "from MOOSE. Check that the expansion orders are consistent between openmc and "
-                "MOOSE input files.");
-          for (auto i = beginIndex(tally_results_mean); i < tally_results_mean.size(); ++i)
-            tally_results_mean[i] = tally_results[1 + i * 3];
+          // TODO:  Give this to Bison?
 
-          if (_cell_filter_index == 0)
-          {
-            // The point at which the results we care about begin
-            auto starting_point = moose_coefficients.size() * _stride_integer;
-            std::vector<double> temp_results(&tally_results_mean[starting_point],
-                                             &tally_results_mean[starting_point] +
-                                                 moose_coefficients.size());
-
-            std::transform(temp_results.begin(),
-                           temp_results.end(),
-                           temp_results.begin(),
-                           std::bind(std::multiplies<Real>(),
-                                     std::placeholders::_1,
-                                     _geometry_multiplier / n_realizations));
-            moose_coefficients = std::move(temp_results);
-          }
-          else
-          {
-            std::vector<double> temp_results;
-            for (auto i = beginIndex(moose_coefficients); i < moose_coefficients.size(); ++i)
-              temp_results.push_back(
-                  tally_results_mean[_stride_integer + i * _num_cells_in_filter] *
-                  _geometry_multiplier / n_realizations);
-            moose_coefficients = std::move(temp_results);
-          }
-
-          if (_dbg)
-          {
-            _console << "Transferring " << moose_coefficients.size()
-                     << " coefficients from OpenMC to MOOSE for cell " << _cell << std::endl;
-            for (auto i = beginIndex(moose_coefficients); i < moose_coefficients.size(); ++i)
-              _console << moose_coefficients[i] / _geometry_multiplier << " ";
-            _console << std::endl;
-          }
+        }
+        else
+        {
+          // TODO: ???
         }
       }
       break;
@@ -277,8 +188,6 @@ MultiAppMooseOkapiTransfer::runChecks()
     mooseError("We expect there to be exactly two filters, one a cell filter and the other an "
                "expansion filter. Check the tallies XML file to verify the existence of both for "
                "the requested tally");
-  std::map<int32_t, int32_t> index_to_id;
-  for (decltype(n_cells) i = 0; i < n_cells; ++i)
   {
     int32_t id;
     err_get = openmc_cell_get_id(i + 1, &id);
@@ -335,3 +244,69 @@ MultiAppMooseOkapiTransfer::runChecks()
 
   _checks_done = true;
 }
+
+//! Get tally results array
+//!
+//! \return Internal tally results array. First dimension is filter
+//!   combinations, second dimension is scores, third dimension is of size
+//!   three (temporary value, sum of realizations, sum-squared)
+xt::xtensor<double, 3> 
+MultiAppMooseOkapiTransfer::tally_results()
+{
+  // Get material bins
+  int32_t* mats;
+  int32_t n_mats;
+  int err_temp = openmc_material_filter_get_bins(index_filter_, &mats, &n_mats);
+  // TODO: ErrorHandling
+
+  // Get tally results and number of realizations
+  double* results;
+  std::array<std::size_t, 3> shape;
+  err_chk(openmc_tally_results(index_tally_, &results, shape.data()));
+  int32_t m;
+  err_temp = openmc_tally_get_n_realizations(index_tally_, &m);
+  // TODO: ErrorHandling
+
+  // Determine size
+  std::size_t size {shape[0] * shape[1] * shape[2]};
+
+  // Adapt array into xtensor with no ownership
+  return xt::adapt(results, size, xt::no_ownership(), shape);
+}
+
+//! Get energy deposition in each material
+//!
+//! \param power User-specified power in [W]
+//! \return Heat source in each material as [W/cm3]
+xt::xtensor<double, 1> 
+MultiAppMooseOkapiTransfer::heat_source(double power)
+{
+  // Get tally results
+  auto results {tally_results()};
+
+  // Determine number of realizatoins for normalizing tallies
+  int32_t m;
+  int err_temp = openmc_tally_get_n_realizations(index_tally_, &m);
+  // TODO: ErrorHandling
+
+  // Determine energy production in each material
+  auto mean_value = xt::view(results, xt::all(), 0, 1);
+  xt::xtensor<double, 1> heat = JOULE_PER_EV * mean_value / m;
+
+  // Get total heat production [J/source]
+  double total_heat = xt::sum(heat)();
+
+  // Normalize heat source in each material and collect in an array
+  for (int i = 0; i < cells_.size(); ++i) {
+    // Get volume
+    double V = cells_.at(i).volume_;
+
+    // Convert heat from [J/source] to [W/cm^3]. Dividing by total_heat gives
+    // the fraction of heat deposited in each material. Multiplying by power
+    // givens an absolute value in W
+    heat(i) *= power / (total_heat * V);
+  }
+
+  return heat;
+}
+

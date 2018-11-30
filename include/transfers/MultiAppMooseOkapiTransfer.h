@@ -3,6 +3,7 @@
 
 // MOOSE includes
 #include "MultiAppFXTransfer.h"
+#include "CellInstance.h"
 
 class MultiAppMooseOkapiTransfer;
 
@@ -22,7 +23,8 @@ protected:
   void runChecks();
 
 protected:
-  int32_t _cell;
+  std::vector<CellInstance> _cells;
+  std::unordered_map<int32_t, int32_t> _cell_to_shell;
   int32_t _tally;
   const bool & _dbg;
   const bool & _store_results;
