@@ -40,6 +40,8 @@ OpenMCTimeStepper::step()
 
   // perform all the logic for a Monte Carlo solve
   openmc_run();
+
+  TimeStepper::step();
 }
 
 void
@@ -47,12 +49,4 @@ OpenMCTimeStepper::postExecute()
 {
   // free dynamically allocated memory, write output files, etc.
   openmc_finalize();
-}
-
-/* Indication of whether the Monte Carlo solve converged - assume this will
-   always be true. */
-bool
-OpenMCTimeStepper::converged()
-{
-  return true;
 }

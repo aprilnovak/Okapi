@@ -18,7 +18,6 @@ protected:
   virtual Real computeDT() override;
   virtual void step() override;
   virtual void postExecute() override;
-  virtual bool converged() override;
 
 private:
   Real _dt;
