@@ -12,6 +12,6 @@ class OpenMCExecutioner : public Transient
 public:
   OpenMCExecutioner(const InputParameters & parameters);
 
-  virtual void init();
+  virtual void init() override;
 };
 #endif // OPENMCEXECUTIONER_H
