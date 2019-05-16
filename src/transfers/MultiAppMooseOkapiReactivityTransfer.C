@@ -78,7 +78,7 @@ MultiAppMooseOkapiReactivityTransfer::execute()
             mooseWarning("Reactivity is greater than 'beta'! Results for changes "
                          "in fission power will be inaccurate using PKE approximation!");
 
-          std::vector<dof_id_type> & dof = to_vars->dofIndices();
+          auto && dof = to_vars->dofIndices();
           to_vars->sys().solution().set(dof[0], keff[0]);
           to_vars->sys().solution().close();
         }
