@@ -68,11 +68,6 @@ include            $(FRAMEWORK_DIR)/app.mk
 endif
 endif
 
-################################## OPENMC ####################################
-ifndef HDF5_ROOT
-$(error The HDF5_ROOT environment varible must be set in order to compile openmc)
-endif
-
 # Use the OPENMC submodule if it exists and OPENMC_DIR is not set
 OPENMC_SUBMODULE    := $(CURDIR)/openmc
 ifneq ($(wildcard $(OPENMC_SUBMODULE)/CMakeLists.txt),)
